@@ -30,7 +30,11 @@ func main() {
 		},
 		OnStartup:  app.startup,
 		OnShutdown: app.shutdown,
-		Bind:       []interface{}{app, runtime.RouteRewriteService()},
+		Bind: []interface{}{
+			app,
+			runtime.RouteRewriteService(),
+			runtime.ModelManagementService(),
+		},
 	})
 	if err != nil {
 		log.Fatal(err)

@@ -14,7 +14,21 @@ CREATE TABLE IF NOT EXISTS route_rewrite_rules (
 );
 `
 
+const createModelConfigTable = `
+CREATE TABLE IF NOT EXISTS model_configs (
+  id TEXT PRIMARY KEY,
+  base_url TEXT NOT NULL,
+  model TEXT NOT NULL,
+  api_key TEXT NOT NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+`
+
 func Migrate(db *sql.DB) error {
-	_, err := db.Exec(createRouteRewriteTable)
+	if _, err := db.Exec(createRouteRewriteTable); err != nil {
+		return err
+	}
+	_, err := db.Exec(createModelConfigTable)
 	return err
 }

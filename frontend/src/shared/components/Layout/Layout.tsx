@@ -7,7 +7,8 @@ const menuItems = [
   { path: "/codegen", label: "代码生成" },
   { path: "/database", label: "数据库管理" },
   { path: "/terminal", label: "终端" },
-  { path: "/mock-server", label: "Mock 服务" }
+  { path: "/mock-server", label: "Mock 服务" },
+  { path: "/settings/models", label: "模型管理" }
 ];
 
 type LayoutProps = {
