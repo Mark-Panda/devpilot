@@ -1,0 +1,17 @@
+{
+  "$schema": "https://wails.io/schemas/config.v2.json",
+  "name": "DevPilot",
+  "outputfilename": "devpilot",
+  "frontend:install": "npm install",
+  "frontend:build": "npm run build",
+  "frontend:dev:watcher": "npm run dev",
+  "frontend:dev:serverUrl": "auto",
+  "author": { "name": "DevPilot Team" },
+  "info": {
+    "companyName": "DevPilot",
+    "productName": "DevPilot Desktop",
+    "productVersion": "1.0.0",
+    "copyright": "Copyright 2026 DevPilot",
+    "comments": "Backend Development Assistant"
+  }
+}
