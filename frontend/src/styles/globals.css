@@ -264,7 +264,8 @@ body {
 }
 
 .form-field input,
-.form-field select {
+.form-field select,
+.form-field textarea {
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   padding: 10px 12px;
@@ -291,4 +292,90 @@ body {
   display: flex;
   justify-content: flex-end;
   gap: 12px;
+}
+
+.rulego-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.rulego-editor-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.rulego-editor-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 16px;
+  min-height: 640px;
+}
+
+.rulego-editor-canvas {
+  background: #0f172a;
+  border-radius: 12px;
+  overflow: hidden;
+  min-height: 640px;
+}
+
+.rulego-editor-side {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+  overflow: auto;
+}
+
+.rulego-editor-side textarea {
+  font-family: "SFMono-Regular", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+.rulego-dsl-editor {
+  height: 220px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.rulego-editor-canvas .blocklyToolboxDiv {
+  background: #111827;
+  color: #e5e7eb;
+  padding: 8px 6px;
+}
+
+.rulego-editor-canvas .blocklyTreeRow {
+  border-radius: 12px;
+  margin: 4px 6px;
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rulego-editor-canvas .blocklyTreeRowContentContainer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rulego-editor-canvas .categoryIconBubble {
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  padding: 2px;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.rulego-editor-canvas .blocklyTreeSelected {
+  background: rgba(148, 163, 184, 0.25) !important;
+}
+
+.rulego-editor-canvas .blocklyFlyoutBackground {
+  fill: #0b1220;
 }

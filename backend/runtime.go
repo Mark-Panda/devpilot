@@ -5,12 +5,14 @@ import (
 
 	"devpilot/backend/internal/services/model_management"
 	"devpilot/backend/internal/services/route_rewrite"
+	"devpilot/backend/internal/services/rulego"
 	"devpilot/backend/internal/store/sqlite"
 )
 
 type Runtime struct {
 	routeRewrite interface{}
 	modelManage  interface{}
+	ruleGo       interface{}
 	close        func() error
 }
 
@@ -29,10 +31,13 @@ func InitRuntime(dbPath string) (*Runtime, error) {
 	routeRewriteService := route_rewrite.NewService(routeRewriteStore)
 	modelStore := model_management.NewStore(db.DB)
 	modelService := model_management.NewService(modelStore)
+	ruleGoStore := rulego.NewStore(db.DB)
+	ruleGoService := rulego.NewService(ruleGoStore)
 
 	return &Runtime{
 		routeRewrite: routeRewriteService,
 		modelManage:  modelService,
+		ruleGo:       ruleGoService,
 		close:        db.Close,
 	}, nil
 }
@@ -43,6 +48,10 @@ func (r *Runtime) RouteRewriteService() interface{} {
 
 func (r *Runtime) ModelManagementService() interface{} {
 	return r.modelManage
+}
+
+func (r *Runtime) RuleGoService() interface{} {
+	return r.ruleGo
 }
 
 func (r *Runtime) Close() error {

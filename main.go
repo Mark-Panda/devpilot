@@ -34,6 +34,7 @@ func main() {
 			app,
 			runtime.RouteRewriteService(),
 			runtime.ModelManagementService(),
+			runtime.RuleGoService(),
 		},
 	})
 	if err != nil {

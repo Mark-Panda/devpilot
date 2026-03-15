@@ -8,6 +8,7 @@ const menuItems = [
   { path: "/database", label: "数据库管理" },
   { path: "/terminal", label: "终端" },
   { path: "/mock-server", label: "Mock 服务" },
+  { path: "/rulego", label: "RuleGo 规则管理" },
   { path: "/settings/models", label: "模型管理" }
 ];
 
