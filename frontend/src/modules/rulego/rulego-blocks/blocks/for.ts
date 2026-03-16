@@ -25,7 +25,6 @@ const def: BlockTypeDef = {
         );
         config.appendField(new (BlocklyF as any).FieldCheckbox(true), "DEBUG");
         (this as Block).appendStatementInput("branch_do").appendField("do 遍历体");
-        (this as Block).appendStatementInput("branch_success").appendField("Success");
         (this as Block).appendStatementInput("branch_failure").appendField("Failure");
         const configInput = (this as Block).getInput("CONFIG");
         if (configInput?.setVisible) configInput.setVisible(false);
@@ -56,17 +55,17 @@ const def: BlockTypeDef = {
   getConnectionBranches() {
     return [
       { inputName: "branch_do", connectionType: "Do" },
-      { inputName: "branch_success", connectionType: "Success" },
+      { inputName: "__next__", connectionType: "Success" },
       { inputName: "branch_failure", connectionType: "Failure" },
     ];
   },
   getInputNameForConnectionType(type) {
     if (type === "Do") return "branch_do";
     if (type === "Failure") return "branch_failure";
-    return "branch_success";
+    return undefined;
   },
   getWalkInputs() {
-    return ["branch_do", "branch_success", "branch_failure"];
+    return ["branch_do", "__next__", "branch_failure"];
   },
 };
 

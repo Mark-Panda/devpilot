@@ -58,9 +58,9 @@ const def: BlockTypeDef = {
         for (let i = 0; i < n; i++) {
           (this as Block).appendStatementInput(`branch_${i}`).appendField(`组内节点${i + 1}`);
         }
-        (this as Block).appendStatementInput("branch_success").appendField("Success");
         (this as Block).appendStatementInput("branch_failure").appendField("Failure");
         (this as Block).setPreviousStatement(true);
+        (this as Block).setNextStatement(true);
         this.setFieldValue(matchRel, "MATCH_RELATION_TYPE");
         this.setFieldValue(matchNum, "MATCH_NUM");
         this.setFieldValue(timeout, "GROUP_TIMEOUT");
@@ -103,12 +103,12 @@ const def: BlockTypeDef = {
   },
   getConnectionBranches() {
     return [
-      { inputName: "branch_success", connectionType: "Success" },
+      { inputName: "__next__", connectionType: "Success" },
       { inputName: "branch_failure", connectionType: "Failure" },
     ];
   },
   getInputNameForConnectionType(type) {
-    return type === "Failure" ? "branch_failure" : "branch_success";
+    return type === "Failure" ? "branch_failure" : undefined;
   },
   getWalkInputs(block) {
     const inputNames = (block.inputList ?? []).map((inp: { name: string }) => inp.name);

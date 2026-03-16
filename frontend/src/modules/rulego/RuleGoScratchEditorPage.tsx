@@ -1061,7 +1061,9 @@ export default function RuleGoScratchEditorPage() {
       const branches = def?.getConnectionBranches(fromBlock, blockHelpers);
       if (branches) {
         branches.forEach(({ inputName, connectionType }) => {
-          addConn(fromBlock.getInputTargetBlock(inputName) ?? null, connectionType);
+          const target =
+            inputName === "__next__" ? fromBlock.getNextBlock() : fromBlock.getInputTargetBlock(inputName) ?? null;
+          addConn(target, connectionType);
         });
       } else {
         const next = fromBlock.getNextBlock();
@@ -1088,6 +1090,11 @@ export default function RuleGoScratchEditorPage() {
         if (walkInputs && walkInputs.length > 0) {
           const cur = current;
           walkInputs.forEach((inputName: string) => {
+            if (inputName === "__next__") {
+              const nextBlock = cur.getNextBlock();
+              if (nextBlock) walkChain(nextBlock);
+              return;
+            }
             let branchBlock = cur.getInputTargetBlock(inputName);
             while (branchBlock) {
               walkChain(branchBlock);

@@ -67,7 +67,6 @@ const def: BlockTypeDef = {
         for (let i = 0; i < n; i++) {
           (this as Block).appendStatementInput(`branch_case_${i}`).appendField(`Case${i + 1}`);
         }
-        (this as Block).appendStatementInput("branch_default").appendField("Default");
         (this as Block).appendStatementInput("branch_failure").appendField("Failure");
         (this as Block).setPreviousStatement(true);
         (this as Block).setNextStatement(true);
@@ -113,12 +112,12 @@ const def: BlockTypeDef = {
       const thenType = cases[i]?.then ? String(cases[i].then) : `Case${i + 1}`;
       branches.push({ inputName: `branch_case_${i}`, connectionType: thenType });
     }
-    branches.push({ inputName: "branch_default", connectionType: "Default" });
+    branches.push({ inputName: "__next__", connectionType: "Default" });
     branches.push({ inputName: "branch_failure", connectionType: "Failure" });
     return branches;
   },
   getInputNameForConnectionType(type, block) {
-    if (type === "Default") return "branch_default";
+    if (type === "Default") return undefined;
     if (type === "Failure") return "branch_failure";
     if (!block) return undefined;
     const casesJson =
@@ -138,7 +137,7 @@ const def: BlockTypeDef = {
       Case5: "branch_case_4",
       Case6: "branch_case_5",
     };
-    return fallback[type] ?? "branch_default";
+    return fallback[type] ?? undefined;
   },
   getWalkInputs(block) {
     const casesJson =
@@ -151,7 +150,7 @@ const def: BlockTypeDef = {
     const n = Math.min(MAX_SWITCH_CASES, Array.isArray(cases) ? cases.length : 0);
     const inputs: string[] = [];
     for (let i = 0; i < n; i++) inputs.push(`branch_case_${i}`);
-    inputs.push("branch_default", "branch_failure");
+    inputs.push("__next__", "branch_failure");
     return inputs;
   },
 };

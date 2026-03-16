@@ -19,7 +19,6 @@ const def: BlockTypeDef = {
         config.appendField(new (BlocklyF as any).FieldTextInput("s3"), "NODE_ID");
         config.appendField(new (BlocklyF as any).FieldTextInput("return ['Success'];"), "JS_SCRIPT");
         config.appendField(new (BlocklyF as any).FieldCheckbox(true), "DEBUG");
-        (this as Block).appendStatementInput("branch_success").appendField("Success");
         (this as Block).appendStatementInput("branch_failure").appendField("Failure");
         (this as Block).appendStatementInput("branch_default").appendField("Default");
         const configInput = (this as Block).getInput("CONFIG");
@@ -38,7 +37,7 @@ const def: BlockTypeDef = {
   },
   getConnectionBranches() {
     return [
-      { inputName: "branch_success", connectionType: "Success" },
+      { inputName: "__next__", connectionType: "Success" },
       { inputName: "branch_failure", connectionType: "Failure" },
       { inputName: "branch_default", connectionType: "Default" },
     ];
@@ -46,10 +45,10 @@ const def: BlockTypeDef = {
   getInputNameForConnectionType(type) {
     if (type === "Failure") return "branch_failure";
     if (type === "Default") return "branch_default";
-    return "branch_success";
+    return undefined;
   },
   getWalkInputs() {
-    return ["branch_success", "branch_failure", "branch_default"];
+    return ["__next__", "branch_failure", "branch_default"];
   },
 };
 
