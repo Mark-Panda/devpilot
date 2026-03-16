@@ -100,6 +100,66 @@ func (s *Service) ExecuteRule(ruleID string, input ExecuteRuleInput) (ExecuteRul
 	return out, nil
 }
 
+// ExecuteRuleDefinition 使用给定的规则链定义 JSON 同步执行一次（模拟测试），不写入数据库。
+// 用于可视化编辑器中“测试”按钮：对当前画布内容进行调试运行。
+func (s *Service) ExecuteRuleDefinition(definition string, input ExecuteRuleInput) (ExecuteRuleOutput, error) {
+	def := definition
+	if def == "" {
+		return ExecuteRuleOutput{Success: false, Error: "规则定义为空"}, errors.New("empty definition")
+	}
+	if json.Unmarshal([]byte(def), &map[string]interface{}{}) != nil {
+		return ExecuteRuleOutput{Success: false, Error: "规则定义不是合法 JSON"}, errors.New("invalid definition json")
+	}
+	const testRuleID = "_test_"
+	engine, createErr := rulego.New(testRuleID, []byte(def), types.WithAspects(&LogAspect{}))
+	if createErr != nil {
+		return ExecuteRuleOutput{Success: false, Error: createErr.Error()}, createErr
+	}
+	defer func() {
+		engine.Stop(nil)
+		rulego.Del(testRuleID)
+	}()
+
+	msgType := input.MessageType
+	if msgType == "" {
+		msgType = "default"
+	}
+	metadata := types.NewMetadata()
+	for k, v := range input.Metadata {
+		metadata.PutValue(k, v)
+	}
+	data := input.Data
+	if data == "" {
+		data = "{}"
+	}
+
+	start := time.Now()
+	var lastMsg types.RuleMsg
+	var lastErr error
+	var mu sync.Mutex
+	engine.OnMsgAndWait(
+		types.NewMsg(time.Now().UnixMilli(), msgType, types.JSON, metadata, data),
+		types.WithOnEnd(func(ctx types.RuleContext, msg types.RuleMsg, err error, relationType string) {
+			mu.Lock()
+			lastMsg = msg
+			lastErr = err
+			mu.Unlock()
+		}),
+	)
+	elapsed := time.Since(start).Milliseconds()
+	mu.Lock()
+	defer mu.Unlock()
+	out := ExecuteRuleOutput{Elapsed: elapsed}
+	if lastErr != nil {
+		out.Success = false
+		out.Error = lastErr.Error()
+		return out, nil
+	}
+	out.Success = true
+	out.Data = lastMsg.GetData()
+	return out, nil
+}
+
 // ValidateRuleDefinition 校验规则链定义 JSON 是否可被 rulego 加载，不执行。
 func (s *Service) ValidateRuleDefinition(definition string) error {
 	if definition == "" {

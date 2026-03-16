@@ -16,6 +16,9 @@ export function ScriptTextarea({
       onChange={(e) => onChange(e.target.value)}
       placeholder="JavaScript"
       spellCheck={false}
+      autoCapitalize="off"
+      autoCorrect="off"
+      autoComplete="off"
       style={{
         height,
         width: "100%",

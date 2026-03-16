@@ -2,6 +2,7 @@ import {
   CreateRuleGoRule,
   DeleteRuleGoRule,
   ExecuteRule,
+  ExecuteRuleDefinition,
   GetRuleGoRule,
   ListRuleGoRules,
   LoadRuleChain,
@@ -63,6 +64,18 @@ export async function executeRuleGoRule(
   input: ExecuteRuleInput
 ): Promise<ExecuteRuleOutput> {
   return ExecuteRule(ruleId, {
+    message_type: input.message_type ?? "default",
+    metadata: input.metadata ?? {},
+    data: input.data ?? "{}",
+  });
+}
+
+/** 使用给定规则链定义执行一次（模拟测试），不写入数据库，用于可视化编辑器调试 */
+export async function executeRuleGoRuleByDefinition(
+  definition: string,
+  input: ExecuteRuleInput
+): Promise<ExecuteRuleOutput> {
+  return ExecuteRuleDefinition(definition, {
     message_type: input.message_type ?? "default",
     metadata: input.metadata ?? {},
     data: input.data ?? "{}",

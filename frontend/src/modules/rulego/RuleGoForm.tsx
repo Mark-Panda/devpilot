@@ -97,6 +97,9 @@ export default function RuleGoForm({
             value={values.name}
             onChange={(event) => setValues({ ...values, name: event.target.value })}
             placeholder="RuleGo 规则名称"
+            autoCapitalize="off"
+            autoCorrect="off"
+            autoComplete="off"
           />
           <small className="form-hint">示例：订单审批规则</small>
         </label>
@@ -106,6 +109,9 @@ export default function RuleGoForm({
             value={values.description}
             onChange={(event) => setValues({ ...values, description: event.target.value })}
             placeholder="规则用途说明"
+            autoCapitalize="off"
+            autoCorrect="off"
+            autoComplete="off"
           />
           <small className="form-hint">用于说明该规则的使用场景</small>
         </label>
@@ -117,6 +123,10 @@ export default function RuleGoForm({
               onChange={(event) => setValues({ ...values, definition: event.target.value })}
               placeholder="JSON / DSL"
               rows={6}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+              spellCheck={false}
             />
             <small className="form-hint">保存为 RuleGo DSL</small>
           </label>
@@ -129,6 +139,10 @@ export default function RuleGoForm({
               onChange={(event) => setValues({ ...values, editorJson: event.target.value })}
               placeholder="Scratch JSON"
               rows={6}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+              spellCheck={false}
             />
             <small className="form-hint">保存 Scratch workspace JSON</small>
           </label>

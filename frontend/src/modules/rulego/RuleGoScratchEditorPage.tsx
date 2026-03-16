@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import * as ScratchBlocks from "scratch-blocks";
 import type { WorkspaceSvg, Block, BlockSvg } from "blockly/core";
 import { useRuleGoRules } from "./useRuleGoRules";
+import { executeRuleGoRuleByDefinition, type ExecuteRuleOutput } from "./useRuleGoApi";
 import {
   registerAllBlocks,
   toolbox as rulegoToolbox,
@@ -192,6 +193,9 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
                 <input
                   value={String(form.NODE_NAME ?? "")}
                   onChange={(e) => setForm((f) => ({ ...f, NODE_NAME: e.target.value }))}
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  autoComplete="off"
                 />
               </label>
               {block.type === "rulego_switch" && (
@@ -221,6 +225,9 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
                             }
                             placeholder="如 msg.temperature > 50"
                             style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #e2e8f0" }}
+                            autoCapitalize="off"
+                            autoCorrect="off"
+                            autoComplete="off"
                           />
                         </label>
                         <label style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 90 }}>
@@ -462,6 +469,9 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
                     <input
                       value={String(form.REST_URL ?? "")}
                       onChange={(e) => setForm((f) => ({ ...f, REST_URL: e.target.value }))}
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      autoComplete="off"
                     />
                   </label>
                   <label className="form-field">
@@ -478,12 +488,33 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
                   </label>
                   <label className="form-field" style={{ gridColumn: "1 / -1" }}>
                     <span>Headers (JSON)</span>
-                    <textarea
-                      value={String(form.REST_HEADERS ?? "{}")}
-                      onChange={(e) => setForm((f) => ({ ...f, REST_HEADERS: e.target.value }))}
-                      rows={2}
-                      style={{ fontFamily: "monospace" }}
-                    />
+                    <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                      <textarea
+                        value={String(form.REST_HEADERS ?? "{}")}
+                        onChange={(e) => setForm((f) => ({ ...f, REST_HEADERS: e.target.value }))}
+                        rows={2}
+                        style={{ flex: 1, fontFamily: "monospace" }}
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                        autoComplete="off"
+                        spellCheck={false}
+                      />
+                      <button
+                        type="button"
+                        className="text-button"
+                        style={{ flexShrink: 0, padding: "6px 10px" }}
+                        onClick={() => {
+                          try {
+                            const raw = String(form.REST_HEADERS ?? "{}").trim() || "{}";
+                            setForm((f) => ({ ...f, REST_HEADERS: JSON.stringify(JSON.parse(raw), null, 2) }));
+                          } catch {
+                            // 非法 JSON 不覆盖
+                          }
+                        }}
+                      >
+                        格式化
+                      </button>
+                    </div>
                   </label>
                   <label className="form-field" style={{ gridColumn: "1 / -1" }}>
                     <span>Body</span>
@@ -492,6 +523,10 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
                       onChange={(e) => setForm((f) => ({ ...f, REST_BODY: e.target.value }))}
                       rows={3}
                       style={{ fontFamily: "monospace" }}
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      autoComplete="off"
+                      spellCheck={false}
                     />
                   </label>
                   <label className="form-field">
@@ -507,6 +542,9 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
                     <input
                       value={String(form.REST_MAX_PARALLEL ?? "200")}
                       onChange={(e) => setForm((f) => ({ ...f, REST_MAX_PARALLEL: e.target.value }))}
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      autoComplete="off"
                     />
                   </label>
                 </>
@@ -587,6 +625,12 @@ export default function RuleGoScratchEditorPage() {
   const [nameModalError, setNameModalError] = useState<string | null>(null);
   const [viewDslOpen, setViewDslOpen] = useState(false);
   const [viewJsonOpen, setViewJsonOpen] = useState(false);
+  const [testModalOpen, setTestModalOpen] = useState(false);
+  const [testMessageType, setTestMessageType] = useState("default");
+  const [testMetadataJson, setTestMetadataJson] = useState("{}");
+  const [testDataJson, setTestDataJson] = useState("{}");
+  const [testResult, setTestResult] = useState<ExecuteRuleOutput | null>(null);
+  const [testRunning, setTestRunning] = useState(false);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [blockCount, setBlockCount] = useState(0);
   const [librarySearchKeyword, setLibrarySearchKeyword] = useState("");
@@ -853,6 +897,62 @@ export default function RuleGoScratchEditorPage() {
       enabled: enabledDraftInModal,
       debugMode: debugDraftInModal,
     });
+  };
+
+  const handleTestClick = () => {
+    const currentDsl = workspaceRef.current ? buildRuleGoDsl(workspaceRef.current, name, debugMode) : dsl;
+    if (!currentDsl.trim()) {
+      setError("画布为空，无法测试");
+      return;
+    }
+    setError(null);
+    setTestResult(null);
+    setTestModalOpen(true);
+  };
+
+  const formatJsonField = (raw: string): string | null => {
+    const s = raw.trim();
+    if (!s) return "{}";
+    try {
+      const parsed = JSON.parse(s);
+      return JSON.stringify(parsed, null, 2);
+    } catch {
+      return null;
+    }
+  };
+
+  const handleTestRun = async () => {
+    const currentDsl = workspaceRef.current ? buildRuleGoDsl(workspaceRef.current, name, debugMode) : dsl;
+    if (!currentDsl.trim()) {
+      setTestResult({ success: false, data: "", error: "画布为空", elapsed: 0 });
+      return;
+    }
+    let metadata: Record<string, string> = {};
+    try {
+      if (testMetadataJson.trim()) metadata = JSON.parse(testMetadataJson) as Record<string, string>;
+    } catch {
+      setTestResult({ success: false, data: "", error: "metadata 不是合法 JSON", elapsed: 0 });
+      return;
+    }
+    setTestRunning(true);
+    setTestResult(null);
+    try {
+      const result = await executeRuleGoRuleByDefinition(currentDsl, {
+        message_type: testMessageType || "default",
+        metadata,
+        data: testDataJson.trim() || "{}",
+      });
+      setTestResult(result);
+    } catch (err) {
+      setTestResult({
+        success: false,
+        data: "",
+        error: (err as Error).message || "执行失败",
+        elapsed: 0,
+      });
+    } finally {
+      setTestRunning(false);
+    }
   };
 
   const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -1156,7 +1256,7 @@ export default function RuleGoScratchEditorPage() {
           <button className="rulego-toolbar-btn" type="button" title="导入">
             导入
           </button>
-          <button className="rulego-toolbar-btn" type="button" title="测试">
+          <button className="rulego-toolbar-btn" type="button" title="测试" onClick={handleTestClick}>
             测试
           </button>
           <button className="rulego-toolbar-btn" type="button" title="部署">
@@ -1343,6 +1443,9 @@ export default function RuleGoScratchEditorPage() {
                     if (nameModalError) setNameModalError(null);
                   }}
                   placeholder="请输入规则链名称"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  autoComplete="off"
                 />
               </label>
               <label className="form-field">
@@ -1354,6 +1457,9 @@ export default function RuleGoScratchEditorPage() {
                     if (nameModalError) setNameModalError(null);
                   }}
                   placeholder="请输入规则描述"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  autoComplete="off"
                 />
               </label>
               <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -1382,6 +1488,131 @@ export default function RuleGoScratchEditorPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {testModalOpen && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setTestModalOpen(false)}>
+          <div className="modal" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>模拟测试规则链</h3>
+              <button type="button" className="text-button" onClick={() => setTestModalOpen(false)} aria-label="关闭">
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="form-hint" style={{ marginBottom: 12 }}>
+                参考 RuleGo 调试：输入消息类型、元数据与消息体，对当前画布规则链执行一次，查看末端输出。
+              </p>
+              <label className="form-field">
+                <span>消息类型 (message_type)</span>
+                <input
+                  value={testMessageType}
+                  onChange={(e) => setTestMessageType(e.target.value)}
+                  placeholder="default"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  autoComplete="off"
+                  spellCheck={false}
+                />
+              </label>
+              <label className="form-field">
+                <span>元数据 (metadata) JSON</span>
+                <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                  <textarea
+                    value={testMetadataJson}
+                    onChange={(e) => setTestMetadataJson(e.target.value)}
+                    rows={3}
+                    style={{ flex: 1, fontFamily: "monospace", fontSize: 13 }}
+                    placeholder='{"key": "value"}'
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <button
+                    type="button"
+                    className="text-button"
+                    style={{ flexShrink: 0, padding: "6px 10px" }}
+                    onClick={() => {
+                      const formatted = formatJsonField(testMetadataJson);
+                      if (formatted !== null) setTestMetadataJson(formatted);
+                      else setError("元数据不是合法 JSON，无法格式化");
+                    }}
+                  >
+                    格式化
+                  </button>
+                </div>
+              </label>
+              <label className="form-field">
+                <span>消息体 (data) JSON</span>
+                <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
+                  <textarea
+                    value={testDataJson}
+                    onChange={(e) => setTestDataJson(e.target.value)}
+                    rows={4}
+                    style={{ flex: 1, fontFamily: "monospace", fontSize: 13 }}
+                    placeholder='{}'
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    autoComplete="off"
+                    spellCheck={false}
+                  />
+                  <button
+                    type="button"
+                    className="text-button"
+                    style={{ flexShrink: 0, padding: "6px 10px" }}
+                    onClick={() => {
+                      const formatted = formatJsonField(testDataJson);
+                      if (formatted !== null) setTestDataJson(formatted);
+                      else setError("消息体不是合法 JSON，无法格式化");
+                    }}
+                  >
+                    格式化
+                  </button>
+                </div>
+              </label>
+              <div className="modal-actions" style={{ marginTop: 8 }}>
+                <button type="button" className="text-button" onClick={() => setTestModalOpen(false)}>
+                  关闭
+                </button>
+                <button
+                  type="button"
+                  className="primary-button"
+                  disabled={testRunning}
+                  onClick={() => void handleTestRun()}
+                >
+                  {testRunning ? "执行中…" : "执行"}
+                </button>
+              </div>
+              {testResult !== null && (
+                <div
+                  className="form-field"
+                  style={{
+                    marginTop: 16,
+                    padding: 12,
+                    background: testResult.success ? "var(--color-success-bg, #ecfdf5)" : "var(--color-error-bg, #fef2f2)",
+                    borderRadius: 8,
+                    border: `1px solid ${testResult.success ? "var(--color-success, #10b981)" : "var(--color-error, #ef4444)"}`,
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                    <span style={{ fontWeight: 600 }}>{testResult.success ? "成功" : "失败"}</span>
+                    <span style={{ fontSize: 13, color: "#64748b" }}>耗时 {testResult.elapsed} ms</span>
+                  </div>
+                  {testResult.success ? (
+                    <pre style={{ margin: 0, fontSize: 13, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                      {testResult.data || "(无输出)"}
+                    </pre>
+                  ) : (
+                    <pre style={{ margin: 0, fontSize: 13, color: "var(--color-error, #b91c1c)", whiteSpace: "pre-wrap" }}>
+                      {testResult.error || "未知错误"}
+                    </pre>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
