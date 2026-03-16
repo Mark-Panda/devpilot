@@ -71,8 +71,9 @@ export function useRuleGoRules() {
       definition: input.definition,
       editor_json: input.editorJson,
     });
+    // 使用请求体中的 name 更新本地，确保弹框填写的规则链名称能正确展示（不依赖接口返回）
     updateRule(id, {
-      name: result.name,
+      name: input.name,
       description: result.description,
       enabled: result.enabled,
       definition: result.definition,

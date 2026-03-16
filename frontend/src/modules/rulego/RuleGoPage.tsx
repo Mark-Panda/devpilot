@@ -36,19 +36,9 @@ export default function RuleGoPage() {
           <button
             className="primary-button"
             type="button"
-            onClick={() => {
-              setEditingRule(null);
-              setModalOpen(true);
-            }}
-          >
-            新增规则
-          </button>
-          <button
-            className="text-button"
-            type="button"
             onClick={() => navigate("/rulego/editor")}
           >
-            可视化编辑
+            新增规则
           </button>
           <button className="text-button" type="button" onClick={refresh}>
             刷新

@@ -7,7 +7,6 @@ import {
   registerAllBlocks,
   toolbox as rulegoToolbox,
   getBlockDef,
-  getNodeType as getNodeTypeFromRegistry,
   getBlockTypeFromNodeType,
 } from "./rulego-blocks";
 import { BlockLibraryPanel, DRAG_TYPE_BLOCK } from "./BlockLibraryPanel";
@@ -579,6 +578,13 @@ export default function RuleGoScratchEditorPage() {
   const [json, setJson] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nameModalOpen, setNameModalOpen] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
+  const [descriptionDraft, setDescriptionDraft] = useState("");
+  const [debugMode, setDebugMode] = useState(false);
+  const [enabledDraftInModal, setEnabledDraftInModal] = useState(true);
+  const [debugDraftInModal, setDebugDraftInModal] = useState(false);
+  const [nameModalError, setNameModalError] = useState<string | null>(null);
   const [viewDslOpen, setViewDslOpen] = useState(false);
   const [viewJsonOpen, setViewJsonOpen] = useState(false);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
@@ -726,16 +732,24 @@ export default function RuleGoScratchEditorPage() {
       setEnabled(editingRule.enabled);
       setDsl(editingRule.definition);
       setJson(editingRule.editorJson);
+      try {
+        const parsed = JSON.parse(editingRule.definition);
+        const chain = parsed?.ruleChain;
+        setDebugMode(Boolean(chain?.debugMode));
+      } catch {
+        setDebugMode(false);
+      }
     } else {
-      setName("未命名规则");
+      setName("");
       setDescription("");
+      setDebugMode(false);
     }
 
     if (editingRule?.editorJson) {
       try {
         const state = JSON.parse(editingRule.editorJson);
         ScratchBlocks.serialization.workspaces.load(state, workspaceRef.current, { recordUndo: false });
-        setDsl(buildRuleGoDsl(workspaceRef.current));
+        setDsl(buildRuleGoDsl(workspaceRef.current, editingRule.name));
         return;
       } catch {
         // ignore malformed json
@@ -747,19 +761,25 @@ export default function RuleGoScratchEditorPage() {
         const ruleDsl = JSON.parse(editingRule.definition);
         loadWorkspaceFromRuleGoDsl(ruleDsl, workspaceRef.current);
         ensureRuleGoNodeIdsAreUuid(workspaceRef.current);
-        setDsl(buildRuleGoDsl(workspaceRef.current));
+        setDsl(buildRuleGoDsl(workspaceRef.current, editingRule.name));
       } catch (err) {
         setError((err as Error).message || "RuleGo DSL 解析失败");
       }
     }
   }, [editingRule]);
 
-  const handleSave = async () => {
-    if (!name.trim()) {
+  type SaveRuleOverrides = { description?: string; enabled?: boolean; debugMode?: boolean } | undefined;
+  const saveRule = async (ruleName: string, overrides?: SaveRuleOverrides) => {
+    const trimmedName = ruleName.trim();
+    if (!trimmedName) {
       setError("规则名称不能为空");
       return;
     }
-    if (!dsl.trim()) {
+    const useDescription = overrides?.description ?? description;
+    const useEnabled = overrides?.enabled ?? enabled;
+    const useDebugMode = overrides?.debugMode ?? debugMode;
+    const nextDsl = workspaceRef.current ? buildRuleGoDsl(workspaceRef.current, trimmedName, useDebugMode) : dsl;
+    if (!nextDsl.trim()) {
       setError("RuleGo DSL 不能为空");
       return;
     }
@@ -767,23 +787,26 @@ export default function RuleGoScratchEditorPage() {
       setError("Scratch JSON 不能为空");
       return;
     }
+    if (workspaceRef.current) {
+      setDsl(nextDsl);
+    }
     setSaving(true);
     setError(null);
     try {
       if (editingRule) {
         await update(editingRule.id, {
-          name: name.trim(),
-          description: description.trim(),
-          enabled,
-          definition: dsl.trim(),
+          name: trimmedName,
+          description: String(useDescription).trim(),
+          enabled: useEnabled,
+          definition: nextDsl.trim(),
           editorJson: json.trim(),
         });
       } else {
         await create({
-          name: name.trim(),
-          description: description.trim(),
-          enabled,
-          definition: dsl.trim(),
+          name: trimmedName,
+          description: String(useDescription).trim(),
+          enabled: useEnabled,
+          definition: nextDsl.trim(),
           editorJson: json.trim(),
         });
       }
@@ -793,6 +816,43 @@ export default function RuleGoScratchEditorPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const handleSave = async () => {
+    if (!name.trim() || !description.trim()) {
+      setNameDraft(name);
+      setDescriptionDraft(description);
+      setEnabledDraftInModal(enabled);
+      setDebugDraftInModal(debugMode);
+      setNameModalError(null);
+      setNameModalOpen(true);
+      return;
+    }
+    await saveRule(name);
+  };
+
+  const handleNameConfirm = async () => {
+    const trimmedName = nameDraft.trim();
+    const trimmedDesc = descriptionDraft.trim();
+    if (!trimmedName) {
+      setNameModalError("规则名称不能为空");
+      return;
+    }
+    if (!trimmedDesc) {
+      setNameModalError("规则描述不能为空");
+      return;
+    }
+    setNameModalError(null);
+    setNameModalOpen(false);
+    setName(trimmedName);
+    setDescription(trimmedDesc);
+    setEnabled(enabledDraftInModal);
+    setDebugMode(debugDraftInModal);
+    await saveRule(trimmedName, {
+      description: trimmedDesc,
+      enabled: enabledDraftInModal,
+      debugMode: debugDraftInModal,
+    });
   };
 
   const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -834,7 +894,6 @@ export default function RuleGoScratchEditorPage() {
     parseJsonValue,
   };
 
-  const getNodeType = (blockType: string) => getNodeTypeFromRegistry(blockType);
 
   const getDefaultConnectionType = (blockType: string) => getBlockDef(blockType)?.defaultConnectionType ?? "Success";
 
@@ -959,7 +1018,7 @@ export default function RuleGoScratchEditorPage() {
     workspace.refreshTheme();
   };
 
-  const buildRuleGoDsl = (workspace: WorkspaceSvg) => {
+  const buildRuleGoDsl = (workspace: WorkspaceSvg, ruleName?: string, debugModeParam?: boolean) => {
     const topBlocks = workspace.getTopBlocks(true);
     if (topBlocks.length === 0) return "";
 
@@ -1049,14 +1108,15 @@ export default function RuleGoScratchEditorPage() {
     topBlocks.forEach((block) => walkChain(block));
 
     const ruleChainId = editingRule?.id ?? id ?? "rule01";
-    const ruleChainName = name.trim() || "Rule Chain";
+    const ruleChainName = ruleName?.trim() || name.trim() || "Rule Chain";
+    const ruleChainDebugMode = typeof debugModeParam === "boolean" ? debugModeParam : debugMode;
 
     return JSON.stringify(
       {
         ruleChain: {
           id: ruleChainId,
           name: ruleChainName,
-          debugMode: false,
+          debugMode: ruleChainDebugMode,
           root: true,
           disabled: !enabled,
           configuration: {},
@@ -1254,6 +1314,74 @@ export default function RuleGoScratchEditorPage() {
             <div className="modal-body">
               <textarea readOnly value={json} rows={20} style={{ width: "100%", fontFamily: "monospace", fontSize: 13 }} />
             </div>
+          </div>
+        </div>
+      )}
+
+      {nameModalOpen && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setNameModalOpen(false)}>
+          <div className="modal" style={{ maxWidth: 520 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>配置规则链</h3>
+              <button type="button" className="text-button" onClick={() => setNameModalOpen(false)} aria-label="关闭">
+                ×
+              </button>
+            </div>
+            <form
+              className="modal-body"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void handleNameConfirm();
+              }}
+            >
+              <label className="form-field">
+                <span>规则名称（必填）</span>
+                <input
+                  value={nameDraft}
+                  onChange={(event) => {
+                    setNameDraft(event.target.value);
+                    if (nameModalError) setNameModalError(null);
+                  }}
+                  placeholder="请输入规则链名称"
+                />
+              </label>
+              <label className="form-field">
+                <span>规则描述（必填）</span>
+                <input
+                  value={descriptionDraft}
+                  onChange={(event) => {
+                    setDescriptionDraft(event.target.value);
+                    if (nameModalError) setNameModalError(null);
+                  }}
+                  placeholder="请输入规则描述"
+                />
+              </label>
+              <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={enabledDraftInModal}
+                  onChange={(e) => setEnabledDraftInModal(e.target.checked)}
+                />
+                <span>启用</span>
+              </label>
+              <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={debugDraftInModal}
+                  onChange={(e) => setDebugDraftInModal(e.target.checked)}
+                />
+                <span>调试</span>
+              </label>
+              {nameModalError ? <div className="form-error">{nameModalError}</div> : null}
+              <div className="modal-actions">
+                <button type="button" className="text-button" onClick={() => setNameModalOpen(false)}>
+                  取消
+                </button>
+                <button className="primary-button" type="submit" disabled={saving}>
+                  保存
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
