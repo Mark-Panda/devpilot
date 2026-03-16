@@ -12,7 +12,8 @@ const def: BlockTypeDef = {
   nodeType,
   category,
   register(ScratchBlocks, BlocklyF) {
-    (ScratchBlocks as Record<string, unknown>).Blocks[blockType] = {
+    const blocks = (ScratchBlocks as { Blocks: Record<string, object> }).Blocks;
+    blocks[blockType] = {
       init: function (this: Block & { caseCount_?: number; casesJson_?: string; updateShape_?: () => void }) {
         this.caseCount_ = 1;
         this.casesJson_ = '[{"case":"true","then":"Case1"}]';

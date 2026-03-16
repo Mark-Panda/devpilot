@@ -11,7 +11,8 @@ const def: BlockTypeDef = {
   nodeType,
   category,
   register(ScratchBlocks, BlocklyF) {
-    (ScratchBlocks as Record<string, unknown>).Blocks[blockType] = {
+    const blocks = (ScratchBlocks as { Blocks: Record<string, object> }).Blocks;
+    blocks[blockType] = {
       init: function (this: Block) {
         (this as Block).appendDummyInput("HEAD").appendField(new (BlocklyF as any).FieldTextInput("Endpoint"), "NODE_NAME");
         const config = (this as Block).appendDummyInput("CONFIG");

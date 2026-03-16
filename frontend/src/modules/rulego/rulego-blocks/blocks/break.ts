@@ -12,7 +12,8 @@ const def: BlockTypeDef = {
   nodeType,
   category,
   register(ScratchBlocks, BlocklyF) {
-    (ScratchBlocks as Record<string, unknown>).Blocks[blockType] = {
+    const blocks = (ScratchBlocks as { Blocks: Record<string, object> }).Blocks;
+    blocks[blockType] = {
       init: buildMinimalNodeInit(BlocklyF as any, {
         defaultId: "br1",
         defaultName: "Break",
