@@ -13,18 +13,25 @@ import (
 	"devpilot/backend/internal/store/sqlite"
 )
 
-// logRegisteredComponents 打印当前 RuleGo 引擎中已注册的节点类型（启动时调用一次）。
-func logRegisteredComponents() {
+// GetRegisteredNodeTypes 返回当前 RuleGo 引擎中已注册的节点类型列表（排序后）。
+// 用于启动时打印日志或生成 Cursor/Claude 规则文件。
+func GetRegisteredNodeTypes() []string {
 	components := engine.Registry.GetComponents()
-	if len(components) == 0 {
-		log.Printf("[rulego] 已注册节点: (无)")
-		return
-	}
 	typeNames := make([]string, 0, len(components))
 	for t := range components {
 		typeNames = append(typeNames, t)
 	}
 	sort.Strings(typeNames)
+	return typeNames
+}
+
+// logRegisteredComponents 打印当前 RuleGo 引擎中已注册的节点类型（启动时调用一次）。
+func logRegisteredComponents() {
+	typeNames := GetRegisteredNodeTypes()
+	if len(typeNames) == 0 {
+		log.Printf("[rulego] 已注册节点: (无)")
+		return
+	}
 	for _, t := range typeNames {
 		log.Printf("[rulego] 已注册节点: type=%s", t)
 	}

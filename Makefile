@@ -1,4 +1,4 @@
-.PHONY: dev build clean lint test build-all generate docs deps
+.PHONY: dev build clean lint test build-all generate docs deps rulego-rules
 
 dev:
 	wails dev
@@ -30,3 +30,7 @@ deps:
 	go mod tidy
 	go mod verify
 	cd frontend && npm audit
+
+# 根据后端已注册的 RuleGo 节点生成 .cursor/rules/rulego-backend-nodes.mdc（供 Cursor/Claude 使用）
+rulego-rules:
+	go run ./backend/cmd/list-rulego-nodes

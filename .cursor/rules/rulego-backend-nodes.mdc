@@ -1,0 +1,49 @@
+---
+description: RuleGo 后端已注册节点类型（与引擎一致，供 Cursor/Claude 参考）
+globs: backend/internal/services/rulego/**/*,frontend/src/modules/rulego/**/*
+alwaysApply: false
+---
+
+# RuleGo 后端已注册节点
+
+以下 `node.type` 已在后端 RuleGo 引擎中注册，规则链 DSL 中可使用。前端块 `nodeType` 需与其中一项一致。
+
+- break
+- cacheDelete
+- cacheGet
+- cacheSet
+- comment
+- dbClient
+- delay
+- end
+- exec
+- exprFilter
+- exprTransform
+- fetchNodeOutput
+- fieldFilter
+- flow
+- for
+- fork
+- functions
+- groupAction
+- groupFilter
+- inclusive
+- join
+- jsFilter
+- jsSwitch
+- jsTransform
+- log
+- metadataTransform
+- mqttClient
+- msgTypeSwitch
+- net
+- ref
+- restApiCall
+- sendEmail
+- ssh
+- startTrigger
+- switch
+- text/template
+- while
+
+自定义节点实现见 `backend/internal/services/rulego/node_*.go`，通过 `rulego.Registry.Register` 在 init 中注册。

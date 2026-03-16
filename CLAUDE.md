@@ -31,4 +31,5 @@ Wails + Go 后端 + React 前端。项目架构参考根目录的 devpilot-archi
 - **DSL 双向**：块→DSL 由 `buildRuleGoDsl` 通过 `walkChain` 与各 def 的 `getConfiguration`/`getConnectionBranches` 收集 nodes/connections；DSL→块由 `loadWorkspaceFromRuleGoDsl` 调用 `createBlockForNode`（含 setConfiguration）再按 connections 与 for/groupAction 特殊逻辑连线。
 - **块配置 UI**：`RuleGoScratchEditorPage.tsx` 内 `BlockConfigModal` 按 `block.type` 分支读写表单；新增可配置块时需在该模态的 useEffect（同步 form）和 handleSubmit（写回块）中增加对应字段。
 - **动态形状**：多分支/多槽位块（如 switch、groupAction）使用 Blockly mutation（mutationToDom/domToMutation）和 `updateShape_` 动态增删 statementInput；序列化/反序列化依赖这些方法。
+- **后端已注册节点**：后端 RuleGo 引擎中可用的 `node.type` 列表见 `.cursor/rules/rulego-backend-nodes.mdc`（由 `make rulego-rules` 根据当前注册节点生成）；前端块 `nodeType` 需与后端注册类型一致。
 - 详细约定见 `.cursor/rules/rulego-blocks.mdc`（在编辑 rulego 相关文件时自动生效）。
