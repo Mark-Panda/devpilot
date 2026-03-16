@@ -1,0 +1,138 @@
+/**
+ * 单列可折叠积木库：分类在同一列展示，点击分类展开/折叠其下组件块，从积木库拖拽块类型到工作区添加。
+ */
+import { useState, useMemo } from "react";
+import type { WorkspaceSvg } from "blockly/core";
+import { toolbox as rulegoToolbox } from "./rulego-blocks";
+
+export const DRAG_TYPE_BLOCK = "application/x-rulego-block-type";
+
+const CATEGORY_STYLES: Record<string, { bg: string; border: string }> = {
+  rulego_trigger: { bg: "rgba(239, 68, 68, 0.2)", border: "#ef4444" },
+  rulego_action: { bg: "rgba(59, 130, 246, 0.2)", border: "#3b82f6" },
+  rulego_condition: { bg: "rgba(20, 184, 166, 0.2)", border: "#14b8a6" },
+  rulego_data: { bg: "rgba(245, 158, 11, 0.2)", border: "#f59e0b" },
+  rulego_flow: { bg: "rgba(139, 92, 246, 0.2)", border: "#8b5cf6" },
+};
+
+const BLOCK_LABELS: Record<string, string> = {
+  rulego_endpoint: "Endpoint",
+  rulego_router: "Router",
+  rulego_restApiCall: "HTTP客户端",
+  rulego_jsTransform: "脚本转换器",
+  rulego_jsFilter: "Filter",
+  rulego_switch: "多条件分支",
+  rulego_jsSwitch: "脚本路由",
+  rulego_for: "循环",
+  rulego_join: "汇聚",
+  rulego_groupAction: "节点组",
+  rulego_break: "停止执行",
+};
+
+type CategoryItem = {
+  id: string;
+  name: string;
+  categorystyle: string;
+  blocks: Array<{ type: string }>;
+};
+
+function getLibraryCategories(): CategoryItem[] {
+  const contents = rulegoToolbox.kind === "categoryToolbox" ? rulegoToolbox.contents : [];
+  if (!Array.isArray(contents)) return [];
+  return contents
+    .filter((c): c is { kind: string; name: string; categorystyle: string; contents: Array<{ kind: string; type?: string }> } => "name" in c && "contents" in c)
+    .map((c) => ({
+      id: c.name,
+      name: c.name,
+      categorystyle: c.categorystyle || "rulego_data",
+      blocks: (c.contents || []).filter((b) => b.kind === "block" && b.type).map((b) => ({ type: b.type! })),
+    }));
+}
+
+type BlockLibraryPanelProps = {
+  workspaceRef: React.RefObject<WorkspaceSvg | null>;
+  searchKeyword?: string;
+};
+
+export function BlockLibraryPanel({ workspaceRef, searchKeyword = "" }: BlockLibraryPanelProps) {
+  const [expanded, setExpanded] = useState<Record<string, boolean>>(() => {
+    const cats = getLibraryCategories();
+    const init: Record<string, boolean> = {};
+    cats.forEach((c) => {
+      init[c.id] = true;
+    });
+    return init;
+  });
+
+  const categories = useMemo(() => getLibraryCategories(), []);
+
+  const filteredCategories = useMemo(() => {
+    const k = searchKeyword.trim().toLowerCase();
+    if (!k) return categories;
+    return categories
+      .map((cat) => {
+        const nameMatch = cat.name.toLowerCase().includes(k);
+        const blocks = nameMatch
+          ? cat.blocks
+          : cat.blocks.filter((b) => (BLOCK_LABELS[b.type] || b.type).toLowerCase().includes(k));
+        return { ...cat, blocks };
+      })
+      .filter((cat) => cat.blocks.length > 0 || cat.name.toLowerCase().includes(k));
+  }, [categories, searchKeyword]);
+
+  const toggle = (id: string) => {
+    setExpanded((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const handleDragStart = (e: React.DragEvent, blockType: string) => {
+    e.dataTransfer.setData(DRAG_TYPE_BLOCK, blockType);
+    e.dataTransfer.effectAllowed = "copy";
+  };
+
+  return (
+    <div className="rulego-block-library-panel">
+      {filteredCategories.map((cat) => {
+        const isExpanded = expanded[cat.id];
+        const style = CATEGORY_STYLES[cat.categorystyle] || CATEGORY_STYLES.rulego_data;
+        return (
+          <div key={cat.id} className="rulego-block-library-category">
+            <button
+              type="button"
+              className="rulego-block-library-category-header"
+              style={{ background: style.bg, borderLeftColor: style.border }}
+              onClick={() => toggle(cat.id)}
+              aria-expanded={isExpanded}
+            >
+              <span className="rulego-block-library-category-chevron" aria-hidden>
+                {isExpanded ? "▼" : "▶"}
+              </span>
+              <span className="rulego-block-library-category-name">{cat.name}</span>
+              <span className="rulego-block-library-category-count">{cat.blocks.length}</span>
+            </button>
+            {isExpanded && (
+              <div className="rulego-block-library-blocks">
+                {cat.blocks.map((b) => (
+                  <div
+                    key={b.type}
+                    role="button"
+                    tabIndex={0}
+                    className="rulego-block-library-block-item rulego-block-library-block-item-draggable"
+                    style={{ borderLeftColor: style.border }}
+                    draggable
+                    onDragStart={(e) => handleDragStart(e, b.type)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") e.preventDefault();
+                    }}
+                  >
+                    <span className="rulego-block-library-block-label">{BLOCK_LABELS[b.type] || b.type}</span>
+                    <span className="rulego-block-library-block-drag-hint" aria-hidden>⋮⋮</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}

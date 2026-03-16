@@ -4,7 +4,7 @@ import { registerBlockType } from "../registry";
 
 const blockType = "rulego_jsFilter";
 const nodeType = "jsFilter";
-const category = "rulego_nodes" as const;
+const category = "rulego_action" as const;
 
 const def: BlockTypeDef = {
   blockType,

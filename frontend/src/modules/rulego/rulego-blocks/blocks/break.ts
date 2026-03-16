@@ -5,7 +5,7 @@ import { buildMinimalNodeInit } from "./shared";
 
 const blockType = "rulego_break";
 const nodeType = "break";
-const category = "rulego_routes" as const;
+const category = "rulego_flow" as const;
 
 const def: BlockTypeDef = {
   blockType,

@@ -9,55 +9,45 @@ import {
   getBlockDef,
   getNodeType as getNodeTypeFromRegistry,
   getBlockTypeFromNodeType,
-  getAllBlockTypes,
 } from "./rulego-blocks";
+import { BlockLibraryPanel, DRAG_TYPE_BLOCK } from "./BlockLibraryPanel";
 import { ScriptTextarea } from "./ScriptTextarea";
 
 const scratchTheme = new ScratchBlocks.Theme(
   "scratch",
   {
-    rulego_nodes: {
-      colourPrimary: "#6366f1",
-      colourSecondary: "#a5b4fc",
-      colourTertiary: "#c7d2fe",
+    rulego_trigger: {
+      colourPrimary: "#ef4444",
+      colourSecondary: "#f87171",
+      colourTertiary: "#fca5a5",
     },
-    rulego_routes: {
-      colourPrimary: "#f59e0b",
-      colourSecondary: "#fcd34d",
-      colourTertiary: "#fde68a",
+    rulego_action: {
+      colourPrimary: "#3b82f6",
+      colourSecondary: "#60a5fa",
+      colourTertiary: "#93c5fd",
+    },
+    rulego_condition: {
+      colourPrimary: "#14b8a6",
+      colourSecondary: "#2dd4bf",
+      colourTertiary: "#5eead4",
     },
     rulego_data: {
-      colourPrimary: "#10b981",
-      colourSecondary: "#6ee7b7",
-      colourTertiary: "#a7f3d0",
+      colourPrimary: "#f59e0b",
+      colourSecondary: "#fbbf24",
+      colourTertiary: "#fde68a",
     },
-    rulego_endpoints: {
-      colourPrimary: "#0ea5e9",
-      colourSecondary: "#7dd3fc",
-      colourTertiary: "#bae6fd",
-    },
-    rulego_routers: {
-      colourPrimary: "#ec4899",
-      colourSecondary: "#f9a8d4",
-      colourTertiary: "#fbcfe8",
+    rulego_flow: {
+      colourPrimary: "#8b5cf6",
+      colourSecondary: "#a78bfa",
+      colourTertiary: "#c4b5fd",
     },
   },
   {
-    rulego_nodes: {
-      colour: "#6366f1",
-    },
-    rulego_routes: {
-      colour: "#f59e0b",
-    },
-    rulego_data: {
-      colour: "#10b981",
-    },
-    rulego_endpoints: {
-      colour: "#0ea5e9",
-    },
-    rulego_routers: {
-      colour: "#ec4899",
-    },
+    rulego_trigger: { colour: "#ef4444" },
+    rulego_action: { colour: "#3b82f6" },
+    rulego_condition: { colour: "#14b8a6" },
+    rulego_data: { colour: "#f59e0b" },
+    rulego_flow: { colour: "#8b5cf6" },
   }
 );
 
@@ -569,10 +559,35 @@ export default function RuleGoScratchEditorPage() {
   const [viewJsonOpen, setViewJsonOpen] = useState(false);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   const [blockCount, setBlockCount] = useState(0);
+  const [librarySearchKeyword, setLibrarySearchKeyword] = useState("");
   const sidePanelRef = useRef<HTMLDivElement>(null);
   const lastTouchedBlockIdRef = useRef<string | null>(null);
 
   const editingRule = useMemo(() => rules.find((rule) => rule.id === id), [rules, id]);
+
+  const handleCanvasDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  };
+
+  const handleCanvasDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const blockType = e.dataTransfer.getData(DRAG_TYPE_BLOCK);
+    if (!blockType || !workspaceRef.current || !containerRef.current) return;
+    const workspace = workspaceRef.current;
+    const rect = containerRef.current.getBoundingClientRect();
+    const ws = workspace as WorkspaceSvg & { getMetrics?: () => { viewLeft?: number; viewTop?: number }; getScale?: () => number };
+    const scale = ws.getScale?.() ?? 1;
+    const metrics = ws.getMetrics?.();
+    const viewLeft = metrics?.viewLeft ?? 0;
+    const viewTop = metrics?.viewTop ?? 0;
+    const wsX = viewLeft + (e.clientX - rect.left) / scale;
+    const wsY = viewTop + (e.clientY - rect.top) / scale;
+    const block = workspace.newBlock(blockType) as BlockSvg;
+    block.initSvg();
+    block.render();
+    block.moveBy(wsX, wsY);
+  };
 
   useEffect(() => {
     const onUnhandledRejection = (ev: PromiseRejectionEvent) => {
@@ -599,8 +614,9 @@ export default function RuleGoScratchEditorPage() {
       meta.env?.BASE_URL != null ? String(meta.env.BASE_URL).replace(/\/$/, "") : "";
     const mediaPath = !baseUrl || baseUrl === "/" ? "/scratch-blocks/" : `${baseUrl}/scratch-blocks/`;
 
+    const emptyToolbox = { kind: "flyoutToolbox" as const, contents: [] };
     const workspace = ScratchBlocks.inject(containerRef.current, {
-      toolbox: rulegoToolbox,
+      toolbox: emptyToolbox,
       media: mediaPath,
       renderer: "scratch",
       theme: scratchTheme,
@@ -1117,6 +1133,7 @@ export default function RuleGoScratchEditorPage() {
   const workspaceWs = workspaceRef.current as (WorkspaceSvg & { undo?: () => void; redo?: () => void; zoom?: (delta: number, cursor?: { x: number; y: number }) => void; getScale?: () => number }) | null;
   const blockLibraryCount = useMemo(() => {
     const contents = rulegoToolbox.contents;
+    if (!Array.isArray(contents)) return 0;
     let n = 0;
     for (const cat of contents) {
       if ("contents" in cat && Array.isArray(cat.contents)) n += cat.contents.length;
@@ -1211,17 +1228,34 @@ export default function RuleGoScratchEditorPage() {
       <div
         className={`rulego-editor-layout rulego-editor-three-col ${selectedBlockId ? "" : "rulego-editor-side-hidden"}`}
       >
-        <div className="rulego-editor-canvas-wrap">
-          <div className="rulego-panel-title rulego-library-title">
-            <span>积木库</span>
-            <span className="rulego-badge">{blockLibraryCount}</span>
+        <div className="rulego-editor-canvas-wrap rulego-editor-single-col-library">
+          <div className="rulego-editor-library-col">
+            <div className="rulego-panel-title rulego-library-title">
+              <span>积木库</span>
+              <span className="rulego-badge">{blockLibraryCount}</span>
+            </div>
+            <input
+              type="text"
+              className="rulego-library-search"
+              placeholder="搜索积木"
+              aria-label="搜索积木"
+              value={librarySearchKeyword}
+              onChange={(e) => setLibrarySearchKeyword(e.target.value)}
+            />
+            <BlockLibraryPanel workspaceRef={workspaceRef} searchKeyword={librarySearchKeyword} />
           </div>
-          <input type="text" className="rulego-library-search" placeholder="搜索积木" aria-label="搜索积木" />
-          <div className="rulego-panel-title rulego-workspace-title">
-            <span>积木工作区</span>
-            <span className="rulego-block-count">{blockCount} 个积木</span>
+          <div className="rulego-editor-workspace-col">
+            <div className="rulego-panel-title rulego-workspace-title">
+              <span>积木工作区</span>
+              <span className="rulego-block-count">{blockCount} 个积木</span>
+            </div>
+            <div
+              className="rulego-editor-canvas"
+              ref={containerRef}
+              onDragOver={handleCanvasDragOver}
+              onDrop={handleCanvasDrop}
+            />
           </div>
-          <div className="rulego-editor-canvas" ref={containerRef} />
         </div>
         {selectedBlockId ? (
           <div

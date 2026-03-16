@@ -4,7 +4,7 @@ import { registerBlockType } from "../registry";
 
 const blockType = "rulego_restApiCall";
 const nodeType = "restApiCall";
-const category = "rulego_nodes" as const;
+const category = "rulego_action" as const;
 
 const def: BlockTypeDef = {
   blockType,

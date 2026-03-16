@@ -4,7 +4,7 @@ import { registerBlockType } from "../registry";
 
 const blockType = "rulego_jsTransform";
 const nodeType = "jsTransform";
-const category = "rulego_nodes" as const;
+const category = "rulego_action" as const;
 const defaultScript =
   "metadata['name']='test02';\nmetadata['index']=22;\nmsg['addField']='addValue2';\nreturn {'msg':msg,'metadata':metadata,'msgType':msgType};";
 

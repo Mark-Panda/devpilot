@@ -4,7 +4,7 @@ import { registerBlockType } from "../registry";
 
 const blockType = "rulego_join";
 const nodeType = "join";
-const category = "rulego_routes" as const;
+const category = "rulego_data" as const;
 
 const def: BlockTypeDef = {
   blockType,

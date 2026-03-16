@@ -31,28 +31,36 @@ export function registerAllBlocks(ScratchBlocks: unknown, BlocklyF: unknown, _op
   }
 }
 
+/** 分类工具箱：每类可折叠/展开，点击分类名展开显示该组积木，再次点击或切换分类可折叠 */
 export const toolbox = {
   kind: "categoryToolbox" as const,
   contents: [
     {
       kind: "category" as const,
-      name: "规则链节点",
-      categorystyle: "rulego_nodes",
+      name: "触发器",
+      categorystyle: "rulego_trigger",
       contents: [
-        { kind: "block" as const, type: "rulego_jsFilter" },
-        { kind: "block" as const, type: "rulego_jsTransform" },
-        { kind: "block" as const, type: "rulego_jsSwitch" },
-        { kind: "block" as const, type: "rulego_restApiCall" },
+        { kind: "block" as const, type: "rulego_endpoint" },
+        { kind: "block" as const, type: "rulego_router" },
       ],
     },
     {
       kind: "category" as const,
-      name: "条件与路由",
-      categorystyle: "rulego_routes",
+      name: "动作",
+      categorystyle: "rulego_action",
+      contents: [
+        { kind: "block" as const, type: "rulego_restApiCall" },
+        { kind: "block" as const, type: "rulego_jsTransform" },
+        { kind: "block" as const, type: "rulego_jsFilter" },
+      ],
+    },
+    {
+      kind: "category" as const,
+      name: "条件判断",
+      categorystyle: "rulego_condition",
       contents: [
         { kind: "block" as const, type: "rulego_switch" },
-        { kind: "block" as const, type: "rulego_break" },
-        { kind: "block" as const, type: "rulego_join" },
+        { kind: "block" as const, type: "rulego_jsSwitch" },
       ],
     },
     {
@@ -61,20 +69,15 @@ export const toolbox = {
       categorystyle: "rulego_data",
       contents: [
         { kind: "block" as const, type: "rulego_for" },
+        { kind: "block" as const, type: "rulego_join" },
         { kind: "block" as const, type: "rulego_groupAction" },
       ],
     },
     {
       kind: "category" as const,
-      name: "Endpoints",
-      categorystyle: "rulego_endpoints",
-      contents: [{ kind: "block" as const, type: "rulego_endpoint" }],
-    },
-    {
-      kind: "category" as const,
-      name: "Routers",
-      categorystyle: "rulego_routers",
-      contents: [{ kind: "block" as const, type: "rulego_router" }],
+      name: "流程控制",
+      categorystyle: "rulego_flow",
+      contents: [{ kind: "block" as const, type: "rulego_break" }],
     },
   ],
 };

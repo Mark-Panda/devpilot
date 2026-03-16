@@ -4,7 +4,7 @@ import { registerBlockType } from "../registry";
 
 const blockType = "rulego_switch";
 const nodeType = "switch";
-const category = "rulego_routes" as const;
+const category = "rulego_condition" as const;
 const MAX_SWITCH_CASES = 6;
 
 const def: BlockTypeDef = {

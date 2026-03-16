@@ -1,11 +1,11 @@
 import type { Block } from "blockly/core";
 
 export type BlockTypeCategory =
-  | "rulego_nodes"
-  | "rulego_routes"
+  | "rulego_trigger"
+  | "rulego_action"
+  | "rulego_condition"
   | "rulego_data"
-  | "rulego_endpoints"
-  | "rulego_routers";
+  | "rulego_flow";
 
 export interface ConnectionBranch {
   inputName: string;

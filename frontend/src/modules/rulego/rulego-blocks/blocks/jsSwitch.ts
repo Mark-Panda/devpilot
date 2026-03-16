@@ -4,7 +4,7 @@ import { registerBlockType } from "../registry";
 
 const blockType = "rulego_jsSwitch";
 const nodeType = "jsSwitch";
-const category = "rulego_nodes" as const;
+const category = "rulego_condition" as const;
 
 const def: BlockTypeDef = {
   blockType,
