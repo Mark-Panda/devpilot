@@ -16,6 +16,7 @@ const CATEGORY_STYLES: Record<string, { bg: string; border: string }> = {
 };
 
 const BLOCK_LABELS: Record<string, string> = {
+  rulego_startTrigger: "开始",
   rulego_endpoint: "Endpoint",
   rulego_router: "Router",
   rulego_restApiCall: "HTTP客户端",

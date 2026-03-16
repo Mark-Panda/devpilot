@@ -13,6 +13,7 @@ import "./blocks/restApiCall";
 import "./blocks/switch";
 import "./blocks/endpoint";
 import "./blocks/router";
+import "./blocks/startTrigger";
 
 import {
   getBlockDef,
@@ -40,6 +41,7 @@ export const toolbox = {
       name: "触发器",
       categorystyle: "rulego_trigger",
       contents: [
+        { kind: "block" as const, type: "rulego_startTrigger" },
         { kind: "block" as const, type: "rulego_endpoint" },
         { kind: "block" as const, type: "rulego_router" },
       ],
