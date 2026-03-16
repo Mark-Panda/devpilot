@@ -9,6 +9,7 @@ import {
   getBlockDef,
   getNodeType as getNodeTypeFromRegistry,
   getBlockTypeFromNodeType,
+  getAllBlockTypes,
 } from "./rulego-blocks";
 import { ScriptTextarea } from "./ScriptTextarea";
 
@@ -67,11 +68,13 @@ type BlockConfigModalProps = {
   workspaceRef: React.RefObject<WorkspaceSvg | null>;
   onClose: () => void;
   onSaved?: () => void;
+  /** 内嵌模式：在右侧属性面板中渲染，无遮罩无取消 */
+  inline?: boolean;
 };
 
 type CaseItem = { case: string; then: string };
 
-function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved }: BlockConfigModalProps) {
+function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: BlockConfigModalProps) {
   const block = blockId && workspaceRef.current ? workspaceRef.current.getBlockById(blockId) : null;
   const [form, setForm] = useState<Record<string, string | boolean>>({});
   const [switchCases, setSwitchCases] = useState<CaseItem[]>([{ case: "true", then: "Case1" }]);
@@ -172,26 +175,13 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved }: BlockConf
       b.updateShape_?.();
     }
     onSaved?.();
-    onClose();
+    if (!inline) onClose();
   };
 
   if (!blockId) return null;
 
-  return (
-    <div
-      className="modal-overlay"
-      role="dialog"
-      aria-modal="true"
-      onClick={onClose}
-    >
-      <div className="modal" onClick={(ev) => ev.stopPropagation()} style={{ maxWidth: 560 }}>
-        <div className="modal-header">
-          <h3>编辑块配置 · {block?.type ?? blockId}</h3>
-          <button type="button" className="text-button" onClick={onClose} aria-label="关闭">
-            ×
-          </button>
-        </div>
-        <form className="modal-body" onSubmit={handleSubmit}>
+  const formContent = (
+    <form className={inline ? "block-config-inline-form" : "modal-body"} onSubmit={handleSubmit}>
           {!block ? (
             <p className="confirm-text">块不存在或已被删除，请先在画布中选中一个块。</p>
           ) : (
@@ -518,15 +508,45 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved }: BlockConf
               </label>
             </div>
           )}
-          <div className="modal-actions">
-            <button type="button" className="text-button" onClick={onClose}>
-              取消
-            </button>
+          <div className={inline ? "block-config-inline-actions" : "modal-actions"}>
+            {!inline && (
+              <button type="button" className="text-button" onClick={onClose}>
+                取消
+              </button>
+            )}
             <button type="submit" className="primary-button" disabled={!block}>
               确定
             </button>
           </div>
         </form>
+  );
+
+  if (inline) {
+    return (
+      <div className="block-config-inline">
+        <div className="block-config-inline-header">
+          <h3>块属性 · {block?.type ?? blockId}</h3>
+        </div>
+        {formContent}
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
+      <div className="modal" onClick={(ev) => ev.stopPropagation()} style={{ maxWidth: 560 }}>
+        <div className="modal-header">
+          <h3>编辑块配置 · {block?.type ?? blockId}</h3>
+          <button type="button" className="text-button" onClick={onClose} aria-label="关闭">
+            ×
+          </button>
+        </div>
+        {formContent}
       </div>
     </div>
   );
@@ -545,12 +565,27 @@ export default function RuleGoScratchEditorPage() {
   const [json, setJson] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [configModalBlockId, setConfigModalBlockId] = useState<string | null>(null);
   const [viewDslOpen, setViewDslOpen] = useState(false);
   const [viewJsonOpen, setViewJsonOpen] = useState(false);
+  const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  const [blockCount, setBlockCount] = useState(0);
+  const sidePanelRef = useRef<HTMLDivElement>(null);
   const lastTouchedBlockIdRef = useRef<string | null>(null);
 
   const editingRule = useMemo(() => rules.find((rule) => rule.id === id), [rules, id]);
+
+  useEffect(() => {
+    const onUnhandledRejection = (ev: PromiseRejectionEvent) => {
+      const msg = ev.reason?.message ?? String(ev.reason);
+      if (msg && (msg.includes("Decoding") || msg.includes("EncodingError"))) {
+        console.warn("[RuleGo] Media/decoding error (scratch-blocks):", ev.reason);
+        ev.preventDefault();
+        ev.stopPropagation();
+      }
+    };
+    window.addEventListener("unhandledrejection", onUnhandledRejection);
+    return () => window.removeEventListener("unhandledrejection", onUnhandledRejection);
+  }, []);
 
   useEffect(() => {
     if (!containerRef.current || workspaceRef.current) return;
@@ -559,9 +594,14 @@ export default function RuleGoScratchEditorPage() {
     const BlocklyF = ScratchBlocks as any;
     registerAllBlocks(ScratchBlocks, BlocklyF);
 
+    const meta = import.meta as { env?: { BASE_URL?: string } };
+    const baseUrl =
+      meta.env?.BASE_URL != null ? String(meta.env.BASE_URL).replace(/\/$/, "") : "";
+    const mediaPath = !baseUrl || baseUrl === "/" ? "/scratch-blocks/" : `${baseUrl}/scratch-blocks/`;
+
     const workspace = ScratchBlocks.inject(containerRef.current, {
       toolbox: rulegoToolbox,
-      media: "/scratch-blocks/",
+      media: mediaPath,
       renderer: "scratch",
       theme: scratchTheme,
       zoom: {
@@ -578,10 +618,6 @@ export default function RuleGoScratchEditorPage() {
 
     workspaceRef.current = workspace;
 
-    const initialState = ScratchBlocks.serialization.workspaces.save(workspace);
-    setJson(JSON.stringify(initialState, null, 2));
-    setDsl(buildRuleGoDsl(workspace));
-
     const handleChange = (ev?: { blockId?: string }) => {
       ensureRuleGoNodeIdsAreUuid(workspace);
       if (ev?.blockId) lastTouchedBlockIdRef.current = ev.blockId;
@@ -589,10 +625,31 @@ export default function RuleGoScratchEditorPage() {
       setJson(JSON.stringify(state, null, 2));
       const nextDsl = buildRuleGoDsl(workspace);
       setDsl(nextDsl);
+      const topBlocks = workspace.getTopBlocks(true);
+      setBlockCount(topBlocks.length);
+      // 不在 handleChange 里用 getSelected() 覆盖 selectedBlockId，否则焦点移到属性面板时会被清空
     };
+
+    const initialState = ScratchBlocks.serialization.workspaces.save(workspace);
+    setJson(JSON.stringify(initialState, null, 2));
+    setDsl(buildRuleGoDsl(workspace));
+    handleChange();
 
     const changeListener = (ev: unknown) => {
       handleChange(ev as { blockId?: string });
+      const e = ev as { type?: string; blockId?: string };
+      if (e?.type === "click") {
+        if (e?.blockId) {
+          const block = workspace.getBlockById(e.blockId);
+          if (block?.type?.startsWith("rulego_")) {
+            setSelectedBlockId(e.blockId);
+          } else {
+            setSelectedBlockId(null);
+          }
+        } else {
+          setSelectedBlockId(null);
+        }
+      }
     };
     workspace.addChangeListener(changeListener);
 
@@ -604,7 +661,7 @@ export default function RuleGoScratchEditorPage() {
         if (!block.type.startsWith("rulego_")) continue;
         const svgRoot = (block as BlockSvg).getSvgRoot?.();
         if (svgRoot?.contains(target)) {
-          setConfigModalBlockId(block.id ?? null);
+          setSelectedBlockId(block.id ?? null);
           e.preventDefault();
           return;
         }
@@ -1057,19 +1114,74 @@ export default function RuleGoScratchEditorPage() {
     );
   };
 
+  const workspaceWs = workspaceRef.current as (WorkspaceSvg & { undo?: () => void; redo?: () => void; zoom?: (delta: number, cursor?: { x: number; y: number }) => void; getScale?: () => number }) | null;
+  const blockLibraryCount = useMemo(() => {
+    const contents = rulegoToolbox.contents;
+    let n = 0;
+    for (const cat of contents) {
+      if ("contents" in cat && Array.isArray(cat.contents)) n += cat.contents.length;
+    }
+    return n;
+  }, []);
+
   return (
-    <div className="rulego-editor">
-      <div className="rulego-editor-header">
-        <div>
-          <h2>{editingRule ? "编辑 RuleGo 规则" : "新增 RuleGo 规则"}</h2>
-          <p className="page-subtitle">可视化构建 Scratch 规则并保存 DSL</p>
+    <div className="rulego-editor rulego-editor-visual">
+      <header className="rulego-editor-header-bar">
+        <h1 className="rulego-editor-title">可视化规则编辑器</h1>
+        <div className="rulego-editor-toolbar">
+          <button className="rulego-toolbar-btn primary" type="button" onClick={handleSave} disabled={saving}>
+            保存
+          </button>
+          <button className="rulego-toolbar-btn" type="button" title="导入">
+            导入
+          </button>
+          <button className="rulego-toolbar-btn" type="button" title="测试">
+            测试
+          </button>
+          <button className="rulego-toolbar-btn" type="button" title="部署">
+            部署
+          </button>
         </div>
-        <div className="page-actions">
-          <button className="text-button" type="button" onClick={() => navigate("/rulego")}>
+        <div className="rulego-editor-view-controls">
+          <button
+            className="rulego-toolbar-btn icon"
+            type="button"
+            title="撤销"
+            onClick={() => workspaceWs?.undo?.()}
+          >
+            ↶
+          </button>
+          <button
+            className="rulego-toolbar-btn icon"
+            type="button"
+            title="重做"
+            onClick={() => workspaceWs?.redo?.()}
+          >
+            ↷
+          </button>
+          <span className="rulego-zoom-label" title="缩放">
+            {workspaceWs?.getScale ? `${Math.round((workspaceWs.getScale() ?? 1) * 100)}%` : "100%"}
+          </span>
+          <button
+            className="rulego-toolbar-btn icon"
+            type="button"
+            title="适配画布"
+            onClick={() => {
+              if (workspaceRef.current) {
+                const ws = workspaceRef.current as WorkspaceSvg & { zoomToFit?: (opt?: { padding?: number }) => void };
+                ws.zoomToFit?.({ padding: 40 });
+              }
+            }}
+          >
+            ⊡
+          </button>
+        </div>
+        <div className="rulego-editor-header-extra">
+          <button className="rulego-toolbar-btn text" type="button" onClick={() => navigate("/rulego")}>
             返回列表
           </button>
           <button
-            className="text-button"
+            className="rulego-toolbar-btn text"
             type="button"
             onClick={() => {
               if (workspaceRef.current) {
@@ -1079,10 +1191,10 @@ export default function RuleGoScratchEditorPage() {
               setViewDslOpen(true);
             }}
           >
-            查看 RuleGo DSL
+            查看 DSL
           </button>
           <button
-            className="text-button"
+            className="rulego-toolbar-btn text"
             type="button"
             onClick={() => {
               if (workspaceRef.current) {
@@ -1091,19 +1203,49 @@ export default function RuleGoScratchEditorPage() {
               setViewJsonOpen(true);
             }}
           >
-            查看 Scratch JSON
-          </button>
-          <button className="primary-button" type="button" onClick={handleSave} disabled={saving}>
-            保存
+            查看 JSON
           </button>
         </div>
-      </div>
+      </header>
 
-      <div className="rulego-editor-layout">
-        <div className="rulego-editor-canvas" ref={containerRef} />
-        <div className="rulego-editor-side">
-          {error ? <div className="form-error">{error}</div> : null}
+      <div
+        className={`rulego-editor-layout rulego-editor-three-col ${selectedBlockId ? "" : "rulego-editor-side-hidden"}`}
+      >
+        <div className="rulego-editor-canvas-wrap">
+          <div className="rulego-panel-title rulego-library-title">
+            <span>积木库</span>
+            <span className="rulego-badge">{blockLibraryCount}</span>
+          </div>
+          <input type="text" className="rulego-library-search" placeholder="搜索积木" aria-label="搜索积木" />
+          <div className="rulego-panel-title rulego-workspace-title">
+            <span>积木工作区</span>
+            <span className="rulego-block-count">{blockCount} 个积木</span>
+          </div>
+          <div className="rulego-editor-canvas" ref={containerRef} />
         </div>
+        {selectedBlockId ? (
+          <div
+            className="rulego-editor-side"
+            ref={sidePanelRef}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="rulego-panel-title">属性设置</div>
+            {error ? <div className="form-error">{error}</div> : null}
+            <BlockConfigModal
+              blockId={selectedBlockId}
+              workspaceRef={workspaceRef}
+              onClose={() => setSelectedBlockId(null)}
+              onSaved={() => {
+                if (workspaceRef.current) {
+                  setDsl(buildRuleGoDsl(workspaceRef.current));
+                  setJson(JSON.stringify(ScratchBlocks.serialization.workspaces.save(workspaceRef.current), null, 2));
+                }
+              }}
+              inline
+            />
+          </div>
+        ) : null}
       </div>
 
       {viewDslOpen && (
@@ -1138,13 +1280,6 @@ export default function RuleGoScratchEditorPage() {
         </div>
       )}
 
-      {configModalBlockId !== null && (
-        <BlockConfigModal
-          blockId={configModalBlockId}
-          workspaceRef={workspaceRef}
-          onClose={() => setConfigModalBlockId(null)}
-        />
-      )}
     </div>
   );
 }

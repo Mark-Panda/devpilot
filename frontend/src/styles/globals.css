@@ -427,3 +427,301 @@ body {
 .rulego-editor-canvas .blocklyTreeSelected {
   background: rgba(148, 163, 184, 0.25) !important;
 }
+
+/* 可视化规则编辑器 - 图中类似布局（三栏 + 顶部工具栏） */
+.rulego-editor-visual {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.rulego-editor-header-bar {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 20px;
+  background: #1e293b;
+  color: #e2e8f0;
+  border-radius: 12px 12px 0 0;
+  flex-wrap: wrap;
+}
+
+.rulego-editor-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+.rulego-editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rulego-editor-view-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rulego-editor-header-extra {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rulego-editor-decoding-banner {
+  flex-basis: 100%;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  margin-top: 8px;
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.rulego-editor-decoding-banner button {
+  flex-shrink: 0;
+}
+
+.rulego-toolbar-btn {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #334155;
+  color: #e2e8f0;
+  font-size: 13px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.rulego-toolbar-btn:hover {
+  background: #475569;
+  border-color: #475569;
+}
+
+.rulego-toolbar-btn.primary {
+  background: #6366f1;
+  border-color: #6366f1;
+}
+
+.rulego-toolbar-btn.primary:hover {
+  background: #4f46e5;
+  border-color: #4f46e5;
+}
+
+.rulego-toolbar-btn.icon {
+  padding: 8px 10px;
+}
+
+.rulego-toolbar-btn.text {
+  background: transparent;
+  border-color: transparent;
+}
+
+.rulego-toolbar-btn.text:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.rulego-zoom-label {
+  font-size: 12px;
+  color: #94a3b8;
+  min-width: 40px;
+  text-align: center;
+}
+
+/* 三栏布局：左侧积木库+工作区区域，右侧属性 */
+.rulego-editor-three-col {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-rows: 1fr;
+  gap: 0;
+  min-height: 640px;
+  flex: 1;
+}
+
+/* 未选中块时隐藏整个属性设置栏，画布占满宽度 */
+.rulego-editor-three-col.rulego-editor-side-hidden {
+  grid-template-columns: 1fr;
+}
+
+.rulego-editor-canvas-wrap {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto 1fr;
+  gap: 0;
+  background: #0f172a;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.rulego-editor-canvas-wrap .rulego-library-title {
+  grid-column: 1;
+  grid-row: 1;
+  padding: 12px 14px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e2e8f0;
+  border-bottom: 1px solid #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rulego-editor-canvas-wrap .rulego-library-search {
+  grid-column: 1;
+  grid-row: 2;
+  margin: 8px 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid #334155;
+  background: #1e293b;
+  color: #e2e8f0;
+  font-size: 13px;
+}
+
+.rulego-editor-canvas-wrap .rulego-library-search::placeholder {
+  color: #64748b;
+}
+
+.rulego-editor-canvas-wrap .rulego-workspace-title {
+  grid-column: 2;
+  grid-row: 1;
+  padding: 12px 14px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #e2e8f0;
+  border-bottom: 1px solid #1e293b;
+  border-left: 1px solid #1e293b;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 画布不再使用 grid，由 Blockly 自行布局 toolbox + workspace，避免积木库/工作区不渲染 */
+.rulego-editor-canvas-wrap .rulego-editor-canvas {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  min-height: 400px;
+  min-width: 300px;
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+.rulego-panel-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rulego-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  font-size: 12px;
+  font-weight: 500;
+  background: #ef4444;
+  color: #fff;
+  border-radius: 10px;
+}
+
+.rulego-block-count {
+  font-size: 12px;
+  font-weight: 400;
+  color: #94a3b8;
+}
+
+.rulego-editor-side .rulego-panel-title {
+  color: #0f172a;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
+  margin-bottom: 8px;
+}
+
+.rulego-props-placeholder {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: #94a3b8;
+  font-size: 14px;
+  padding: 24px;
+}
+
+.rulego-props-placeholder-icon {
+  font-size: 32px;
+  opacity: 0.5;
+}
+
+.rulego-editor-side {
+  background: #ffffff;
+  border-radius: 0 0 12px 0;
+  border-left: 1px solid #e2e8f0;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.04);
+  overflow: auto;
+}
+
+.rulego-editor-three-col .rulego-editor-side {
+  border-radius: 0 0 12px 0;
+}
+
+.block-config-inline {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
+.block-config-inline-header h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.block-config-inline-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.block-config-inline-form .form-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.block-config-inline-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #e2e8f0;
+}
