@@ -10,6 +10,7 @@ import {
   getBlockDef,
   getBlockTypeFromNodeType,
 } from "./rulego-blocks";
+import { JsonEditor } from "../../shared/components";
 import { BlockLibraryPanel, DRAG_TYPE_BLOCK } from "./BlockLibraryPanel";
 import { ScriptTextarea } from "./ScriptTextarea";
 
@@ -488,45 +489,22 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
                   </label>
                   <label className="form-field" style={{ gridColumn: "1 / -1" }}>
                     <span>Headers (JSON)</span>
-                    <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                      <textarea
-                        value={String(form.REST_HEADERS ?? "{}")}
-                        onChange={(e) => setForm((f) => ({ ...f, REST_HEADERS: e.target.value }))}
-                        rows={2}
-                        style={{ flex: 1, fontFamily: "monospace" }}
-                        autoCapitalize="off"
-                        autoCorrect="off"
-                        autoComplete="off"
-                        spellCheck={false}
-                      />
-                      <button
-                        type="button"
-                        className="text-button"
-                        style={{ flexShrink: 0, padding: "6px 10px" }}
-                        onClick={() => {
-                          try {
-                            const raw = String(form.REST_HEADERS ?? "{}").trim() || "{}";
-                            setForm((f) => ({ ...f, REST_HEADERS: JSON.stringify(JSON.parse(raw), null, 2) }));
-                          } catch {
-                            // 非法 JSON 不覆盖
-                          }
-                        }}
-                      >
-                        格式化
-                      </button>
-                    </div>
+                    <JsonEditor
+                      value={String(form.REST_HEADERS ?? "{}")}
+                      onChange={(v) => setForm((f) => ({ ...f, REST_HEADERS: v }))}
+                      height={80}
+                      minHeight={60}
+                      showFormatButton
+                    />
                   </label>
                   <label className="form-field" style={{ gridColumn: "1 / -1" }}>
                     <span>Body</span>
-                    <textarea
+                    <JsonEditor
                       value={String(form.REST_BODY ?? "")}
-                      onChange={(e) => setForm((f) => ({ ...f, REST_BODY: e.target.value }))}
-                      rows={3}
-                      style={{ fontFamily: "monospace" }}
-                      autoCapitalize="off"
-                      autoCorrect="off"
-                      autoComplete="off"
-                      spellCheck={false}
+                      onChange={(v) => setForm((f) => ({ ...f, REST_BODY: v }))}
+                      height={100}
+                      minHeight={60}
+                      showFormatButton
                     />
                   </label>
                   <label className="form-field">
@@ -908,17 +886,6 @@ export default function RuleGoScratchEditorPage() {
     setError(null);
     setTestResult(null);
     setTestModalOpen(true);
-  };
-
-  const formatJsonField = (raw: string): string | null => {
-    const s = raw.trim();
-    if (!s) return "{}";
-    try {
-      const parsed = JSON.parse(s);
-      return JSON.stringify(parsed, null, 2);
-    } catch {
-      return null;
-    }
   };
 
   const handleTestRun = async () => {
@@ -1519,59 +1486,25 @@ export default function RuleGoScratchEditorPage() {
               </label>
               <label className="form-field">
                 <span>元数据 (metadata) JSON</span>
-                <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                  <textarea
-                    value={testMetadataJson}
-                    onChange={(e) => setTestMetadataJson(e.target.value)}
-                    rows={3}
-                    style={{ flex: 1, fontFamily: "monospace", fontSize: 13 }}
-                    placeholder='{"key": "value"}'
-                    autoCapitalize="off"
-                    autoCorrect="off"
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                  <button
-                    type="button"
-                    className="text-button"
-                    style={{ flexShrink: 0, padding: "6px 10px" }}
-                    onClick={() => {
-                      const formatted = formatJsonField(testMetadataJson);
-                      if (formatted !== null) setTestMetadataJson(formatted);
-                      else setError("元数据不是合法 JSON，无法格式化");
-                    }}
-                  >
-                    格式化
-                  </button>
-                </div>
+                <JsonEditor
+                  value={testMetadataJson}
+                  onChange={setTestMetadataJson}
+                  height={100}
+                  minHeight={80}
+                  showFormatButton
+                  onFormatError={(msg) => setError(msg)}
+                />
               </label>
               <label className="form-field">
                 <span>消息体 (data) JSON</span>
-                <div style={{ display: "flex", gap: 8, alignItems: "flex-start" }}>
-                  <textarea
-                    value={testDataJson}
-                    onChange={(e) => setTestDataJson(e.target.value)}
-                    rows={4}
-                    style={{ flex: 1, fontFamily: "monospace", fontSize: 13 }}
-                    placeholder='{}'
-                    autoCapitalize="off"
-                    autoCorrect="off"
-                    autoComplete="off"
-                    spellCheck={false}
-                  />
-                  <button
-                    type="button"
-                    className="text-button"
-                    style={{ flexShrink: 0, padding: "6px 10px" }}
-                    onClick={() => {
-                      const formatted = formatJsonField(testDataJson);
-                      if (formatted !== null) setTestDataJson(formatted);
-                      else setError("消息体不是合法 JSON，无法格式化");
-                    }}
-                  >
-                    格式化
-                  </button>
-                </div>
+                <JsonEditor
+                  value={testDataJson}
+                  onChange={setTestDataJson}
+                  height={140}
+                  minHeight={80}
+                  showFormatButton
+                  onFormatError={(msg) => setError(msg)}
+                />
               </label>
               <div className="modal-actions" style={{ marginTop: 8 }}>
                 <button type="button" className="text-button" onClick={() => setTestModalOpen(false)}>

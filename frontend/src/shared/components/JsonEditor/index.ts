@@ -1,2 +1,1 @@
-export { Layout } from "./Layout";
 export { JsonEditor } from "./JsonEditor";
