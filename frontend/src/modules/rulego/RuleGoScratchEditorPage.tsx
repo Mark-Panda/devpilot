@@ -68,6 +68,301 @@ const scratchTheme = new ScratchBlocks.Theme(
 
 ScratchBlocks.ScratchMsgs?.setLocale?.("zh-cn");
 
+type BlockConfigModalProps = {
+  blockId: string | null;
+  workspaceRef: React.RefObject<WorkspaceSvg | null>;
+  onClose: () => void;
+  onSaved?: () => void;
+};
+
+type CaseItem = { case: string; then: string };
+
+function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved }: BlockConfigModalProps) {
+  const block = blockId && workspaceRef.current ? workspaceRef.current.getBlockById(blockId) : null;
+  const [form, setForm] = useState<Record<string, string | boolean>>({});
+  const [switchCases, setSwitchCases] = useState<CaseItem[]>([{ case: "true", then: "Case1" }]);
+
+  useEffect(() => {
+    if (!block) {
+      setForm({});
+      setSwitchCases([{ case: "true", then: "Case1" }]);
+      return;
+    }
+    const get = (name: string) => String(block.getFieldValue(name) ?? "").trim();
+    const getBool = (name: string) => block.getFieldValue(name) === "TRUE";
+    const next: Record<string, string | boolean> = {
+      NODE_ID: get("NODE_ID"),
+      NODE_NAME: get("NODE_NAME"),
+      DEBUG: block.getFieldValue ? getBool("DEBUG") : true,
+    };
+    if (
+      block.type === "rulego_jsFilter" ||
+      block.type === "rulego_jsTransform" ||
+      block.type === "rulego_jsSwitch"
+    ) {
+      next.JS_SCRIPT = get("JS_SCRIPT");
+    }
+    if (block.type === "rulego_restApiCall") {
+      next.REST_URL = get("REST_URL");
+      next.REST_METHOD = get("REST_METHOD");
+      next.REST_HEADERS = get("REST_HEADERS");
+      next.REST_QUERY = get("REST_QUERY");
+      next.REST_BODY = get("REST_BODY");
+      next.REST_TIMEOUT = get("REST_TIMEOUT");
+      next.REST_MAX_PARALLEL = get("REST_MAX_PARALLEL");
+    }
+    if (block.type === "rulego_switch") {
+      try {
+        const raw = get("CASES_JSON") || (block as Block & { casesJson_?: string }).casesJson_ || "";
+        const arr = raw ? JSON.parse(raw) : [];
+        const list = Array.isArray(arr)
+          ? arr.map((c: unknown) => ({
+              case: String((c as { case?: string })?.case ?? "true"),
+              then: String((c as { then?: string })?.then ?? "Case1"),
+            }))
+          : [{ case: "true", then: "Case1" }];
+        setSwitchCases(list.length > 0 ? list : [{ case: "true", then: "Case1" }]);
+      } catch {
+        setSwitchCases([{ case: "true", then: "Case1" }]);
+      }
+    }
+    setForm(next);
+  }, [block, blockId]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!block) return;
+    const set = (name: string, value: string | boolean) => {
+      if (typeof value === "boolean") {
+        block.setFieldValue(value ? "TRUE" : "FALSE", name);
+      } else {
+        block.setFieldValue(value, name);
+      }
+    };
+    Object.entries(form).forEach(([key, value]) => {
+      if (form[key] !== undefined && key !== "CASES_JSON") set(key, value as string | boolean);
+    });
+    if (block.type === "rulego_switch") {
+      const casesJson = JSON.stringify(switchCases, null, 2);
+      (block as Block & { casesJson_?: string }).casesJson_ = casesJson;
+      block.setFieldValue(casesJson, "CASES_JSON");
+      const b = block as Block & { domToMutation?: (xml: Element) => void };
+      if (typeof b.domToMutation === "function") {
+        const xml = document.createElement("mutation");
+        xml.setAttribute("casecount", String(Math.max(1, Math.min(6, switchCases.length))));
+        b.domToMutation(xml);
+      }
+    }
+    onSaved?.();
+    onClose();
+  };
+
+  if (!blockId) return null;
+
+  return (
+    <div
+      className="modal-overlay"
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+    >
+      <div className="modal" onClick={(ev) => ev.stopPropagation()} style={{ maxWidth: 560 }}>
+        <div className="modal-header">
+          <h3>编辑块配置 · {block?.type ?? blockId}</h3>
+          <button type="button" className="text-button" onClick={onClose} aria-label="关闭">
+            ×
+          </button>
+        </div>
+        <form className="modal-body" onSubmit={handleSubmit}>
+          {!block ? (
+            <p className="confirm-text">块不存在或已被删除，请先在画布中选中一个块。</p>
+          ) : (
+            <div className="form-grid">
+              <label className="form-field">
+                <span>节点 ID</span>
+                <input
+                  value={String(form.NODE_ID ?? "")}
+                  onChange={(e) => setForm((f) => ({ ...f, NODE_ID: e.target.value }))}
+                />
+              </label>
+              <label className="form-field">
+                <span>节点名称</span>
+                <input
+                  value={String(form.NODE_NAME ?? "")}
+                  onChange={(e) => setForm((f) => ({ ...f, NODE_NAME: e.target.value }))}
+                />
+              </label>
+              {block.type === "rulego_switch" && (
+                <div className="form-field" style={{ gridColumn: "1 / -1" }}>
+                  <span className="form-label">条件分支 (cases)</span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    {switchCases.map((item, index) => (
+                      <div
+                        key={index}
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "1fr auto auto",
+                          gap: 8,
+                          alignItems: "start",
+                        }}
+                      >
+                        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                          <span style={{ fontSize: 12, color: "#64748b" }}>条件表达式 (case)</span>
+                          <input
+                            value={item.case}
+                            onChange={(e) =>
+                              setSwitchCases((prev) => {
+                                const next = [...prev];
+                                next[index] = { ...next[index], case: e.target.value };
+                                return next;
+                              })
+                            }
+                            placeholder="如 msg.temperature > 50"
+                            style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #e2e8f0" }}
+                          />
+                        </label>
+                        <label style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 90 }}>
+                          <span style={{ fontSize: 12, color: "#64748b" }}>路由名 (then)</span>
+                          <input
+                            value={item.then}
+                            onChange={(e) =>
+                              setSwitchCases((prev) => {
+                                const next = [...prev];
+                                next[index] = { ...next[index], then: e.target.value };
+                                return next;
+                              })
+                            }
+                            placeholder="Case1"
+                            style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #e2e8f0" }}
+                          />
+                        </label>
+                        <button
+                          type="button"
+                          className="text-button"
+                          style={{ marginTop: 20, padding: "6px 10px" }}
+                          onClick={() =>
+                            setSwitchCases((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)))
+                          }
+                          disabled={switchCases.length <= 1}
+                          title="删除该条件"
+                        >
+                          删除
+                        </button>
+                      </div>
+                    ))}
+                    <button
+                      type="button"
+                      className="text-button"
+                      style={{ alignSelf: "flex-start", padding: "8px 12px", border: "1px dashed #cbd5e1", borderRadius: 8 }}
+                      onClick={() =>
+                        setSwitchCases((prev) => [...prev, { case: "true", then: `Case${prev.length + 1}` }])
+                      }
+                      disabled={switchCases.length >= 6}
+                    >
+                      + 添加 Case
+                    </button>
+                  </div>
+                  <small className="form-hint">
+                    画布上会同步显示对应数量的 Case 槽位；Default / Failure 为固定槽位。最多 6 个 case。参考{" "}
+                    <a href="https://rulego.cc/pages/switch/#%E9%85%8D%E7%BD%AE%E7%A4%BA%E4%BE%8B" target="_blank" rel="noopener noreferrer">
+                      RuleGo 条件分支
+                    </a>
+                  </small>
+                </div>
+              )}
+              {(block.type === "rulego_jsFilter" ||
+                block.type === "rulego_jsTransform" ||
+                block.type === "rulego_jsSwitch") && (
+                <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+                  <span>脚本 (JS_SCRIPT)</span>
+                  <textarea
+                    value={String(form.JS_SCRIPT ?? "")}
+                    onChange={(e) => setForm((f) => ({ ...f, JS_SCRIPT: e.target.value }))}
+                    rows={8}
+                    style={{ fontFamily: "monospace", fontSize: 13 }}
+                  />
+                </label>
+              )}
+              {block.type === "rulego_restApiCall" && (
+                <>
+                  <label className="form-field">
+                    <span>URL</span>
+                    <input
+                      value={String(form.REST_URL ?? "")}
+                      onChange={(e) => setForm((f) => ({ ...f, REST_URL: e.target.value }))}
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span>方法</span>
+                    <select
+                      value={String(form.REST_METHOD ?? "POST")}
+                      onChange={(e) => setForm((f) => ({ ...f, REST_METHOD: e.target.value }))}
+                    >
+                      <option value="GET">GET</option>
+                      <option value="POST">POST</option>
+                      <option value="PUT">PUT</option>
+                      <option value="DELETE">DELETE</option>
+                    </select>
+                  </label>
+                  <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+                    <span>Headers (JSON)</span>
+                    <textarea
+                      value={String(form.REST_HEADERS ?? "{}")}
+                      onChange={(e) => setForm((f) => ({ ...f, REST_HEADERS: e.target.value }))}
+                      rows={2}
+                      style={{ fontFamily: "monospace" }}
+                    />
+                  </label>
+                  <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+                    <span>Body</span>
+                    <textarea
+                      value={String(form.REST_BODY ?? "")}
+                      onChange={(e) => setForm((f) => ({ ...f, REST_BODY: e.target.value }))}
+                      rows={3}
+                      style={{ fontFamily: "monospace" }}
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span>超时 (ms)</span>
+                    <input
+                      type="number"
+                      value={String(form.REST_TIMEOUT ?? "30000")}
+                      onChange={(e) => setForm((f) => ({ ...f, REST_TIMEOUT: e.target.value }))}
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span>最大并发</span>
+                    <input
+                      value={String(form.REST_MAX_PARALLEL ?? "200")}
+                      onChange={(e) => setForm((f) => ({ ...f, REST_MAX_PARALLEL: e.target.value }))}
+                    />
+                  </label>
+                </>
+              )}
+              <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={Boolean(form.DEBUG)}
+                  onChange={(e) => setForm((f) => ({ ...f, DEBUG: e.target.checked }))}
+                />
+                <span>调试</span>
+              </label>
+            </div>
+          )}
+          <div className="modal-actions">
+            <button type="button" className="text-button" onClick={onClose}>
+              取消
+            </button>
+            <button type="submit" className="primary-button" disabled={!block}>
+              确定
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 const toolbox = {
   kind: "categoryToolbox",
   contents: [
@@ -136,6 +431,8 @@ export default function RuleGoScratchEditorPage() {
   const [json, setJson] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [configModalBlockId, setConfigModalBlockId] = useState<string | null>(null);
+  const lastTouchedBlockIdRef = useRef<string | null>(null);
 
   const editingRule = useMemo(() => rules.find((rule) => rule.id === id), [rules, id]);
 
@@ -177,245 +474,197 @@ export default function RuleGoScratchEditorPage() {
   useEffect(() => {
     if (!containerRef.current || workspaceRef.current) return;
 
-    const buildNodeJson = (options: {
-      label: string;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const BlocklyF = ScratchBlocks as any;
+
+    const buildMinimalNodeInit = (options: {
       defaultId: string;
       defaultName: string;
       script?: string;
       category: "rulego_nodes" | "rulego_routes" | "rulego_data" | "rulego_endpoints" | "rulego_routers";
-      extraFields?: Array<Record<string, unknown>>;
+      restFields?: Array<{ name: string; value: string; dropdown?: [string, string][] }>;
     }) => {
-      const args0 = [
-        { type: "field_input", name: "NODE_ID", text: options.defaultId },
-        { type: "field_input", name: "NODE_NAME", text: options.defaultName },
-      ] as Array<Record<string, unknown>>;
-
-      if (options.script) {
-        args0.push({ type: "field_input", name: "JS_SCRIPT", text: options.script });
-      }
-
-      if (options.extraFields?.length) {
-        args0.push(...options.extraFields);
-      }
-
-      args0.push({ type: "field_checkbox", name: "DEBUG", checked: true });
-      args0.push({
-        type: "field_dropdown",
-        name: "LINK_TYPE",
-        options: [
-          ["Success", "Success"],
-          ["Failure", "Failure"],
-          ["True", "True"],
-          ["False", "False"],
-        ],
-      });
-      args0.push({ type: "field_input", name: "LINK_LABEL", text: "" });
-
-      const baseIndex = 2;
-      const scriptIndex = options.script ? baseIndex + 1 : null;
-      const extraStartIndex = baseIndex + (options.script ? 1 : 0) + 1;
-      const debugIndex = baseIndex + (options.script ? 1 : 0) + (options.extraFields?.length ?? 0) + 1;
-      const linkTypeIndex = debugIndex + 1;
-      const linkLabelIndex = debugIndex + 2;
-
-      const suffix = options.script ? ` 脚本 %${scriptIndex}` : "";
-      const extraSuffix = options.extraFields
-        ? options.extraFields.map((field, index) => ` ${String(field.name)} %${extraStartIndex + index}`).join("")
-        : "";
-
-      return {
-        message0: `${options.label} %1 名称 %2${suffix}${extraSuffix} 调试 %${debugIndex} 关系 %${linkTypeIndex} 标签 %${linkLabelIndex}`,
-        args0,
-        previousStatement: null,
-        nextStatement: null,
-        extensions: ["shape_statement"],
-        style: options.category,
+      return function (this: Block) {
+        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput(options.defaultName), "NODE_NAME");
+        const config = this.appendDummyInput("CONFIG");
+        config.appendField(new BlocklyF.FieldTextInput(options.defaultId), "NODE_ID");
+        if (options.script) config.appendField(new BlocklyF.FieldTextInput(options.script), "JS_SCRIPT");
+        if (options.restFields?.length) {
+          options.restFields.forEach((f) => {
+            if (f.dropdown) config.appendField(new BlocklyF.FieldDropdown(f.dropdown), f.name);
+            else config.appendField(new BlocklyF.FieldTextInput(f.value), f.name);
+          });
+        }
+        config.appendField(new BlocklyF.FieldCheckbox(true), "DEBUG");
+        config.appendField(
+          new BlocklyF.FieldDropdown([["Success", "Success"], ["Failure", "Failure"], ["True", "True"], ["False", "False"]]),
+          "LINK_TYPE"
+        );
+        config.appendField(new BlocklyF.FieldTextInput(""), "LINK_LABEL");
+        const configInput = this.getInput("CONFIG");
+        if (configInput?.setVisible) configInput.setVisible(false);
+        this.setPreviousStatement(true);
+        this.setNextStatement(true);
+        if (typeof this.setStyle === "function") this.setStyle(options.category);
       };
     };
 
     ScratchBlocks.Blocks.rulego_jsFilter = {
-      init: function (this: Block) {
-        this.jsonInit(
-          buildNodeJson({
-            label: "jsFilter",
-            defaultId: "s1",
-            defaultName: "Filter",
-            script: "return msg!='bb';",
-            category: "rulego_nodes",
-          })
-        );
-      },
+      init: buildMinimalNodeInit({
+        defaultId: "s1",
+        defaultName: "Filter",
+        script: "return msg!='bb';",
+        category: "rulego_nodes",
+      }),
     };
 
     ScratchBlocks.Blocks.rulego_jsTransform = {
-      init: function (this: Block) {
-        this.jsonInit(
-          buildNodeJson({
-            label: "jsTransform",
-            defaultId: "s2",
-            defaultName: "Transform",
-            script:
-              "metadata['test']='test02';\nmetadata['index']=50;\nmsgType='TEST_MSG_TYPE2';\nvar msg2=JSON.parse(msg);\nmsg2['aa']=66;\nreturn {'msg':msg2,'metadata':metadata,'msgType':msgType};",
-            category: "rulego_nodes",
-          })
-        );
-      },
+      init: buildMinimalNodeInit({
+        defaultId: "s2",
+        defaultName: "Transform",
+        script:
+          "metadata['test']='test02';\nmetadata['index']=50;\nmsgType='TEST_MSG_TYPE2';\nvar msg2=JSON.parse(msg);\nmsg2['aa']=66;\nreturn {'msg':msg2,'metadata':metadata,'msgType':msgType};",
+        category: "rulego_nodes",
+      }),
     };
 
     ScratchBlocks.Blocks.rulego_jsSwitch = {
       init: function (this: Block) {
-        this.jsonInit(
-          buildNodeJson({
-            label: "jsSwitch",
-            defaultId: "s3",
-            defaultName: "Switch",
-            script: "return msgType;",
-            category: "rulego_nodes",
-          })
-        );
+        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput("Switch"), "NODE_NAME");
+        const config = this.appendDummyInput("CONFIG");
+        config.appendField(new BlocklyF.FieldTextInput("s3"), "NODE_ID");
+        config.appendField(new BlocklyF.FieldTextInput("return msgType;"), "JS_SCRIPT");
+        config.appendField(new BlocklyF.FieldCheckbox(true), "DEBUG");
+        this.appendStatementInput("branch_success").appendField("成功");
+        this.appendStatementInput("branch_failure").appendField("失败");
+        const configInput = this.getInput("CONFIG");
+        if (configInput?.setVisible) configInput.setVisible(false);
+        this.setPreviousStatement(true);
+        this.setNextStatement(true);
+        if (typeof this.setStyle === "function") this.setStyle("rulego_nodes");
       },
     };
 
+    const MAX_SWITCH_CASES = 6;
+
     ScratchBlocks.Blocks.rulego_switch = {
-      init: function (this: Block) {
-        this.jsonInit(
-          buildNodeJson({
-            label: "switch",
-            defaultId: "sw1",
-            defaultName: "Switch",
-            category: "rulego_routes",
-          })
+      init: function (this: Block & { caseCount_?: number; casesJson_?: string; updateShape_?: () => void }) {
+        this.caseCount_ = 1;
+        this.casesJson_ = '[{"case":"true","then":"Case1"}]';
+        this.updateShape_?.();
+      },
+      mutationToDom: function (this: Block & { caseCount_?: number; casesJson_?: string }) {
+        const xml = document.createElement("mutation");
+        xml.setAttribute("casecount", String(Math.max(1, Math.min(MAX_SWITCH_CASES, this.caseCount_ ?? 1))));
+        const casesEl = document.createElement("cases");
+        casesEl.textContent = this.casesJson_ ?? this.getFieldValue?.("CASES_JSON") ?? "[]";
+        xml.appendChild(casesEl);
+        return xml;
+      },
+      domToMutation: function (this: Block & { caseCount_?: number; casesJson_?: string; updateShape_?: () => void }, xml: Element) {
+        const count = Math.max(1, Math.min(MAX_SWITCH_CASES, parseInt(xml.getAttribute("casecount") || "1", 10)));
+        const casesEl = xml.querySelector("cases");
+        this.caseCount_ = count;
+        this.casesJson_ = casesEl?.textContent?.trim() || this.casesJson_ || "[]";
+        this.updateShape_?.();
+      },
+      updateShape_: function (this: Block & { caseCount_?: number; casesJson_?: string }) {
+        const n = Math.max(1, Math.min(MAX_SWITCH_CASES, this.caseCount_ ?? 1));
+        let casesJson = "";
+        try {
+          casesJson = String(this.getFieldValue?.("CASES_JSON") ?? this.casesJson_ ?? "[]").trim() || '[{"case":"true","then":"Case1"}]';
+        } catch {
+          casesJson = this.casesJson_ || '[{"case":"true","then":"Case1"}]';
+        }
+        let nodeName = "条件分支";
+        let nodeId = "sw1";
+        try {
+          nodeName = String(this.getFieldValue?.("NODE_NAME") ?? "条件分支");
+          nodeId = String(this.getFieldValue?.("NODE_ID") ?? "sw1");
+        } catch {}
+        const inputNames = this.inputList?.map((inp: { name: string }) => inp.name) ?? [];
+        inputNames.forEach((name: string) => this.removeInput(name));
+        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput(nodeName), "NODE_NAME");
+        const configInput = this.appendDummyInput("CONFIG");
+        configInput.appendField(new BlocklyF.FieldTextInput(nodeId), "NODE_ID");
+        configInput.appendField(new BlocklyF.FieldCheckbox(true), "DEBUG");
+        const casesInput = this.appendDummyInput("CASES").appendField(
+          new BlocklyF.FieldTextInput(casesJson),
+          "CASES_JSON"
         );
+        if (configInput.setVisible) configInput.setVisible(false);
+        if (casesInput.setVisible) casesInput.setVisible(false);
+        for (let i = 0; i < n; i++) {
+          this.appendStatementInput(`branch_case_${i}`).appendField(`Case${i + 1}`);
+        }
+        this.appendStatementInput("branch_default").appendField("Default");
+        this.appendStatementInput("branch_failure").appendField("Failure");
+        (this as Block).setPreviousStatement(true);
+        (this as Block).setNextStatement(true);
+        if (typeof this.setStyle === "function") this.setStyle("rulego_routes");
       },
     };
 
     ScratchBlocks.Blocks.rulego_break = {
-      init: function (this: Block) {
-        this.jsonInit(
-          buildNodeJson({
-            label: "break",
-            defaultId: "br1",
-            defaultName: "Break",
-            category: "rulego_routes",
-          })
-        );
-      },
+      init: buildMinimalNodeInit({ defaultId: "br1", defaultName: "Break", category: "rulego_routes" }),
     };
 
     ScratchBlocks.Blocks.rulego_join = {
-      init: function (this: Block) {
-        this.jsonInit(
-          buildNodeJson({
-            label: "join",
-            defaultId: "jn1",
-            defaultName: "Join",
-            category: "rulego_routes",
-          })
-        );
-      },
+      init: buildMinimalNodeInit({ defaultId: "jn1", defaultName: "Join", category: "rulego_routes" }),
     };
 
     ScratchBlocks.Blocks.rulego_for = {
-      init: function (this: Block) {
-        this.jsonInit(
-          buildNodeJson({
-            label: "for",
-            defaultId: "for1",
-            defaultName: "For",
-            category: "rulego_data",
-          })
-        );
-      },
+      init: buildMinimalNodeInit({ defaultId: "for1", defaultName: "For", category: "rulego_data" }),
     };
 
     ScratchBlocks.Blocks.rulego_groupAction = {
-      init: function (this: Block) {
-        this.jsonInit(
-          buildNodeJson({
-            label: "groupAction",
-            defaultId: "grp1",
-            defaultName: "Group",
-            category: "rulego_data",
-          })
-        );
-      },
+      init: buildMinimalNodeInit({ defaultId: "grp1", defaultName: "Group", category: "rulego_data" }),
     };
 
     ScratchBlocks.Blocks.rulego_restApiCall = {
-      init: function (this: Block) {
-        this.jsonInit(
-          buildNodeJson({
-            label: "restApiCall",
-            defaultId: "rest1",
-            defaultName: "Rest API",
-            category: "rulego_nodes",
-            extraFields: [
-              { type: "field_input", name: "REST_URL", text: "http://localhost:9099/api" },
-              {
-                type: "field_dropdown",
-                name: "REST_METHOD",
-                options: [
-                  ["GET", "GET"],
-                  ["POST", "POST"],
-                  ["PUT", "PUT"],
-                  ["DELETE", "DELETE"],
-                ],
-              },
-              { type: "field_input", name: "REST_HEADERS", text: "{}" },
-              { type: "field_input", name: "REST_QUERY", text: "{}" },
-              { type: "field_input", name: "REST_BODY", text: "" },
-              { type: "field_input", name: "REST_TIMEOUT", text: "30000" },
-              { type: "field_input", name: "REST_MAX_PARALLEL", text: "200" },
-            ],
-          })
-        );
-      },
+      init: buildMinimalNodeInit({
+        defaultId: "rest1",
+        defaultName: "Rest API",
+        category: "rulego_nodes",
+        restFields: [
+          { name: "REST_URL", value: "http://localhost:9099/api" },
+          { name: "REST_METHOD", value: "POST", dropdown: [["GET", "GET"], ["POST", "POST"], ["PUT", "PUT"], ["DELETE", "DELETE"]] },
+          { name: "REST_HEADERS", value: "{}" },
+          { name: "REST_QUERY", value: "{}" },
+          { name: "REST_BODY", value: "" },
+          { name: "REST_TIMEOUT", value: "30000" },
+          { name: "REST_MAX_PARALLEL", value: "200" },
+        ],
+      }),
     };
 
     ScratchBlocks.Blocks.rulego_endpoint = {
       init: function (this: Block) {
-        this.jsonInit({
-          message0: "endpoint %1 名称 %2 协议 %3 处理器 %4 路由 %5",
-          args0: [
-            { type: "field_input", name: "NODE_ID", text: "ep1" },
-            { type: "field_input", name: "NODE_NAME", text: "Endpoint" },
-            { type: "field_input", name: "EP_PROTOCOL", text: "http" },
-            { type: "field_input", name: "EP_PROCESSORS", text: "[]" },
-            { type: "input_statement", name: "ROUTERS" },
-          ],
-          previousStatement: null,
-          nextStatement: null,
-          style: "rulego_endpoints",
-          extensions: ["shape_statement"],
-        });
+        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput("Endpoint"), "NODE_NAME");
+        const config = this.appendDummyInput("CONFIG");
+        config.appendField(new BlocklyF.FieldTextInput("ep1"), "NODE_ID");
+        config.appendField(new BlocklyF.FieldTextInput("http"), "EP_PROTOCOL");
+        config.appendField(new BlocklyF.FieldTextInput("[]"), "EP_PROCESSORS");
+        this.appendStatementInput("ROUTERS").appendField("路由");
+        if (config.setVisible) config.setVisible(false);
+        this.setPreviousStatement(true);
+        this.setNextStatement(true);
+        if (typeof this.setStyle === "function") this.setStyle("rulego_endpoints");
       },
     };
 
     ScratchBlocks.Blocks.rulego_router = {
       init: function (this: Block) {
-        this.jsonInit({
-          message0: "router %1 名称 %2 路径 %3 方法 %4 处理器 %5",
-          args0: [
-            { type: "field_input", name: "NODE_ID", text: "rt1" },
-            { type: "field_input", name: "NODE_NAME", text: "Router" },
-            { type: "field_input", name: "ROUTER_PATH", text: "/api" },
-            {
-              type: "field_dropdown",
-              name: "ROUTER_METHOD",
-              options: [
-                ["GET", "GET"],
-                ["POST", "POST"],
-                ["PUT", "PUT"],
-                ["DELETE", "DELETE"],
-              ],
-            },
-            { type: "field_input", name: "ROUTER_PROCESSORS", text: "[]" },
-          ],
-          previousStatement: null,
-          nextStatement: null,
-          style: "rulego_routers",
-          extensions: ["shape_statement"],
-        });
+        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput("Router"), "NODE_NAME");
+        const config = this.appendDummyInput("CONFIG");
+        config.appendField(new BlocklyF.FieldTextInput("rt1"), "NODE_ID");
+        config.appendField(new BlocklyF.FieldTextInput("/api"), "ROUTER_PATH");
+        config.appendField(new BlocklyF.FieldDropdown([["GET", "GET"], ["POST", "POST"], ["PUT", "PUT"], ["DELETE", "DELETE"]]), "ROUTER_METHOD");
+        config.appendField(new BlocklyF.FieldTextInput("[]"), "ROUTER_PROCESSORS");
+        if (config.setVisible) config.setVisible(false);
+        this.setPreviousStatement(true);
+        this.setNextStatement(true);
+        if (typeof this.setStyle === "function") this.setStyle("rulego_routers");
       },
     };
 
@@ -442,14 +691,17 @@ export default function RuleGoScratchEditorPage() {
     setJson(JSON.stringify(initialState, null, 2));
     setDsl(buildRuleGoDsl(workspace));
 
-    const handleChange = () => {
+    const handleChange = (ev?: { blockId?: string }) => {
+      if (ev?.blockId) lastTouchedBlockIdRef.current = ev.blockId;
       const state = ScratchBlocks.serialization.workspaces.save(workspace);
       setJson(JSON.stringify(state, null, 2));
       const nextDsl = buildRuleGoDsl(workspace);
       setDsl(nextDsl);
     };
 
-    workspace.addChangeListener(handleChange);
+    workspace.addChangeListener((ev: unknown) => {
+      handleChange(ev as { blockId?: string });
+    });
 
     return () => {
       workspace.removeChangeListener(handleChange);
@@ -591,6 +843,16 @@ export default function RuleGoScratchEditorPage() {
       configuration.timeout = Number(getFieldValue(block, "REST_TIMEOUT") || "0");
     }
 
+    if (block.type === "rulego_switch") {
+      const casesJson =
+        getFieldValue(block, "CASES_JSON") ||
+        String((block as Block & { casesJson_?: string }).casesJson_ ?? "").trim();
+      const cases = parseJsonValue(casesJson, []) as Array<{ case?: string; then?: string }>;
+      if (Array.isArray(cases) && cases.length > 0) {
+        configuration.cases = cases.map((c) => ({ case: String(c?.case ?? ""), then: String(c?.then ?? "") }));
+      }
+    }
+
     return {
       id: nodeId,
       type: nodeType,
@@ -648,6 +910,23 @@ export default function RuleGoScratchEditorPage() {
       block.setFieldValue(JSON.stringify(node.configuration?.query ?? {}), "REST_QUERY");
       block.setFieldValue(String(node.configuration?.body ?? ""), "REST_BODY");
       block.setFieldValue(String(node.configuration?.timeout ?? 30000), "REST_TIMEOUT");
+    }
+
+    if (node.type === "switch") {
+      const cases = (node.configuration?.cases ?? []) as Array<{ case?: string; then?: string }>;
+      const casesArr = cases.length ? cases : [{ case: "true", then: "Case1" }];
+      const casesJson = JSON.stringify(casesArr, null, 2);
+      (block as Block & { casesJson_?: string }).casesJson_ = casesJson;
+      block.setFieldValue(casesJson, "CASES_JSON");
+      const domToMutation = (block as Block & { domToMutation?: (xml: Element) => void }).domToMutation;
+      if (typeof domToMutation === "function") {
+        const xml = document.createElement("mutation");
+        xml.setAttribute("casecount", String(Math.max(1, Math.min(6, casesArr.length))));
+        const casesEl = document.createElement("cases");
+        casesEl.textContent = casesJson;
+        xml.appendChild(casesEl);
+        domToMutation.call(block, xml);
+      }
     }
 
     const position = (node.additionalInfo as { position?: { x: number; y: number } } | undefined)?.position;
@@ -712,12 +991,41 @@ export default function RuleGoScratchEditorPage() {
     connections.forEach((connection) => {
       const fromBlock = nodeMap.get(String(connection.fromId));
       const toBlock = nodeMap.get(String(connection.toId));
-      if (fromBlock && toBlock && fromBlock.nextConnection && toBlock.previousConnection) {
-        fromBlock.setFieldValue(String(connection.type ?? "Success"), "LINK_TYPE");
-        if (connection.label) {
-          fromBlock.setFieldValue(String(connection.label), "LINK_LABEL");
+      if (!fromBlock || !toBlock || !toBlock.previousConnection) return;
+      const type = String(connection.type ?? "Success");
+      if (fromBlock.type === "rulego_switch") {
+        let inputName: string;
+        if (type === "Default") inputName = "branch_default";
+        else if (type === "Failure") inputName = "branch_failure";
+        else {
+          const casesJson =
+            String(fromBlock.getFieldValue("CASES_JSON") ?? "").trim() ||
+            String((fromBlock as Block & { casesJson_?: string }).casesJson_ ?? "").trim();
+          const cases = (() => {
+            if (!casesJson) return [];
+            try {
+              return JSON.parse(casesJson) as Array<{ then?: string }>;
+            } catch {
+              return [];
+            }
+          })();
+          const idx = cases.findIndex((c) => String(c?.then ?? "") === type);
+          inputName = idx >= 0 ? `branch_case_${idx}` : type === "Case1" ? "branch_case_0" : type === "Case2" ? "branch_case_1" : type === "Case3" ? "branch_case_2" : type === "Case4" ? "branch_case_3" : type === "Case5" ? "branch_case_4" : type === "Case6" ? "branch_case_5" : "branch_default";
         }
-        fromBlock.nextConnection.connect(toBlock.previousConnection);
+        const input = fromBlock.getInput(inputName);
+        if (input?.connection) {
+          input.connection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
+        }
+      } else if (fromBlock.type === "rulego_jsSwitch") {
+        const inputName = type === "Failure" ? "branch_failure" : "branch_success";
+        const input = fromBlock.getInput(inputName);
+        if (input?.connection) {
+          input.connection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
+        }
+      } else if (fromBlock.nextConnection) {
+        fromBlock.setFieldValue(type, "LINK_TYPE");
+        if (connection.label) fromBlock.setFieldValue(String(connection.label), "LINK_LABEL");
+        fromBlock.nextConnection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
       }
     });
 
@@ -814,6 +1122,38 @@ export default function RuleGoScratchEditorPage() {
       seen.add(block.id);
     };
 
+    const MAX_SWITCH_CASES_DSL = 6;
+    const addConnectionsFromBlock = (fromBlock: Block) => {
+      const fromId = getFieldValue(fromBlock, "NODE_ID") || fromBlock.id;
+      const addConn = (toBlock: Block | null, type: string, label?: string) => {
+        if (!toBlock) return;
+        const toId = getFieldValue(toBlock, "NODE_ID") || toBlock.id;
+        connections.push(label ? { fromId, toId, type, label } : { fromId, toId, type });
+      };
+      if (fromBlock.type === "rulego_switch") {
+        const casesJson =
+          getFieldValue(fromBlock, "CASES_JSON") ||
+          String((fromBlock as Block & { casesJson_?: string }).casesJson_ ?? "").trim();
+        const cases = parseJsonValue(casesJson, []) as Array<{ then?: string }>;
+        for (let i = 0; i < Math.min(MAX_SWITCH_CASES_DSL, cases.length); i++) {
+          const thenType = cases[i]?.then ? String(cases[i].then) : `Case${i + 1}`;
+          addConn(fromBlock.getInputTargetBlock(`branch_case_${i}`) ?? null, thenType);
+        }
+        addConn(fromBlock.getInputTargetBlock("branch_default") ?? null, "Default");
+        addConn(fromBlock.getInputTargetBlock("branch_failure") ?? null, "Failure");
+      } else if (fromBlock.type === "rulego_jsSwitch") {
+        addConn(fromBlock.getInputTargetBlock("branch_success") ?? null, "Success");
+        addConn(fromBlock.getInputTargetBlock("branch_failure") ?? null, "Failure");
+      } else {
+        const next = fromBlock.getNextBlock();
+        if (next) {
+          const linkType = getFieldValue(fromBlock, "LINK_TYPE") || getDefaultConnectionType(fromBlock.type);
+          const label = getFieldValue(fromBlock, "LINK_LABEL");
+          addConn(next, linkType, label || undefined);
+        }
+      }
+    };
+
     const walkChain = (block: Block | null) => {
       let current = block;
       while (current) {
@@ -823,20 +1163,35 @@ export default function RuleGoScratchEditorPage() {
           continue;
         }
         addNode(current);
-        const next = current.getNextBlock();
-        if (next) {
-          if (next.type === "rulego_endpoint") {
-            addEndpoint(next);
-          } else {
-            addNode(next);
+        addConnectionsFromBlock(current);
+        if (current.type === "rulego_switch") {
+          for (let i = 0; i < MAX_SWITCH_CASES_DSL; i++) {
+            let branchBlock = current.getInputTargetBlock(`branch_case_${i}`);
+            while (branchBlock) {
+              walkChain(branchBlock);
+              branchBlock = branchBlock.getNextBlock();
+            }
           }
-          const fromId = getFieldValue(current, "NODE_ID") || current.id;
-          const toId = getFieldValue(next, "NODE_ID") || next.id;
-          const linkType = getFieldValue(current, "LINK_TYPE") || getDefaultConnectionType(current.type);
-          const label = getFieldValue(current, "LINK_LABEL");
-          connections.push(label ? { fromId, toId, type: linkType, label } : { fromId, toId, type: linkType });
+          ["branch_default", "branch_failure"].forEach((inputName) => {
+            let branchBlock = current.getInputTargetBlock(inputName);
+            while (branchBlock) {
+              walkChain(branchBlock);
+              branchBlock = branchBlock.getNextBlock();
+            }
+          });
+          current = null;
+        } else if (current.type === "rulego_jsSwitch") {
+          ["branch_success", "branch_failure"].forEach((inputName) => {
+            let branchBlock = current.getInputTargetBlock(inputName);
+            while (branchBlock) {
+              walkChain(branchBlock);
+              branchBlock = branchBlock.getNextBlock();
+            }
+          });
+          current = null;
+        } else {
+          current = current.getNextBlock();
         }
-        current = next;
       }
     };
 
@@ -889,6 +1244,22 @@ export default function RuleGoScratchEditorPage() {
       <div className="rulego-editor-layout">
         <div className="rulego-editor-canvas" ref={containerRef} />
         <div className="rulego-editor-side">
+          <div className="form-field" style={{ marginBottom: 8 }}>
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => {
+                const ws = workspaceRef.current;
+                const selectedId =
+                  (ws as { getSelected?: () => Block | null })?.getSelected?.()?.id ??
+                  lastTouchedBlockIdRef.current;
+                if (selectedId) setConfigModalBlockId(selectedId);
+              }}
+            >
+              编辑块配置
+            </button>
+            <small className="form-hint">先在画布中点击选中一个块，再点此按钮在弹框中编辑脚本、URL 等</small>
+          </div>
           <label className="form-field">
             <span>规则名称</span>
             <input value={name} onChange={(event) => setName(event.target.value)} />
@@ -915,6 +1286,13 @@ export default function RuleGoScratchEditorPage() {
           {error ? <div className="form-error">{error}</div> : null}
         </div>
       </div>
+      {configModalBlockId !== null && (
+        <BlockConfigModal
+          blockId={configModalBlockId}
+          workspaceRef={workspaceRef}
+          onClose={() => setConfigModalBlockId(null)}
+        />
+      )}
     </div>
   );
 }

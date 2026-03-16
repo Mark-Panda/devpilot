@@ -1,4 +1,4 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
 
 const menuItems = [
@@ -17,24 +17,29 @@ type LayoutProps = {
 };
 
 export default function Layout({ children }: LayoutProps) {
+  const location = useLocation();
+  const isRuleGoEditor = location.pathname.startsWith("/rulego/editor");
+
   return (
-    <div className="app-shell">
-      <aside className="app-sidebar">
-        <div className="app-brand">DevPilot</div>
-        <nav className="app-nav">
-          {menuItems.map((item) => (
-            <NavLink
-              key={item.path}
-              to={item.path}
-              className={({ isActive }) =>
-                `app-nav-item${isActive ? " is-active" : ""}`
-              }
-            >
-              {item.label}
-            </NavLink>
-          ))}
-        </nav>
-      </aside>
+    <div className={`app-shell${isRuleGoEditor ? " app-shell-full" : ""}`}>
+      {!isRuleGoEditor && (
+        <aside className="app-sidebar">
+          <div className="app-brand">DevPilot</div>
+          <nav className="app-nav">
+            {menuItems.map((item) => (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                className={({ isActive }) =>
+                  `app-nav-item${isActive ? " is-active" : ""}`
+                }
+              >
+                {item.label}
+              </NavLink>
+            ))}
+          </nav>
+        </aside>
+      )}
       <main className="app-content">{children}</main>
     </div>
   );

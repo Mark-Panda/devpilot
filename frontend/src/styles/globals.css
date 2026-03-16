@@ -22,6 +22,11 @@ body {
   min-height: 100vh;
 }
 
+.app-shell-full .app-content {
+  padding: 16px 20px;
+  max-width: 100%;
+}
+
 .app-sidebar {
   width: 240px;
   background: #0f172a;
@@ -347,6 +352,21 @@ body {
   background: #111827;
   color: #e5e7eb;
   padding: 8px 6px;
+  width: auto;
+  min-width: 0;
+  max-width: 160px;
+}
+
+.rulego-editor-canvas .blocklyFlyout {
+  max-width: 160px;
+}
+
+.rulego-editor-canvas .blocklyFlyoutBackground {
+  fill: #0b1220;
+}
+
+.rulego-editor-canvas .blocklyScrollbarHandle {
+  fill: #334155;
 }
 
 .rulego-editor-canvas .blocklyTreeRow {
@@ -374,8 +394,4 @@ body {
 
 .rulego-editor-canvas .blocklyTreeSelected {
   background: rgba(148, 163, 184, 0.25) !important;
-}
-
-.rulego-editor-canvas .blocklyFlyoutBackground {
-  fill: #0b1220;
 }
