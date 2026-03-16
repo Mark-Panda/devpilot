@@ -18,6 +18,7 @@ const CATEGORY_STYLES: Record<string, { bg: string; border: string }> = {
 const BLOCK_LABELS: Record<string, string> = {
   rulego_startTrigger: "开始",
   rulego_restApiCall: "HTTP客户端",
+  rulego_llm: "大模型 LLM",
   rulego_delay: "延迟",
   rulego_jsTransform: "脚本转换器",
   rulego_jsFilter: "Filter",

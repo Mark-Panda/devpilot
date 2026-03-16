@@ -8,6 +8,7 @@ alwaysApply: false
 
 以下 `node.type` 已在后端 RuleGo 引擎中注册，规则链 DSL 中可使用。前端块 `nodeType` 需与其中一项一致。
 
+- ai/llm
 - break
 - cacheDelete
 - cacheGet

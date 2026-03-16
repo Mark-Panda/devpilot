@@ -98,6 +98,14 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
       next.REST_TIMEOUT = get("REST_TIMEOUT");
       next.REST_MAX_PARALLEL = get("REST_MAX_PARALLEL");
     }
+    if (block.type === "rulego_llm") {
+      next.LLM_URL = get("LLM_URL") || "https://ai.gitee.com/v1";
+      next.LLM_KEY = get("LLM_KEY");
+      next.LLM_MODEL = get("LLM_MODEL");
+      next.LLM_SYSTEM_PROMPT = get("LLM_SYSTEM_PROMPT");
+      next.LLM_MESSAGES_JSON = get("LLM_MESSAGES_JSON") || "[]";
+      next.LLM_PARAMS_JSON = get("LLM_PARAMS_JSON") || "{}";
+    }
     if (block.type === "rulego_delay") {
       next.DELAY_MS = get("DELAY_MS") || "60000";
       next.DELAY_OVERWRITE = getBool("DELAY_OVERWRITE");
@@ -526,6 +534,76 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
                       autoCorrect="off"
                       autoComplete="off"
                     />
+                  </label>
+                </>
+              )}
+              {block.type === "rulego_llm" && (
+                <>
+                  <label className="form-field">
+                    <span>请求地址 (url)</span>
+                    <input
+                      value={String(form.LLM_URL ?? "https://ai.gitee.com/v1")}
+                      onChange={(e) => setForm((f) => ({ ...f, LLM_URL: e.target.value }))}
+                      placeholder="https://ai.gitee.com/v1"
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      autoComplete="off"
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span>API Key (key)</span>
+                    <input
+                      type="password"
+                      value={String(form.LLM_KEY ?? "")}
+                      onChange={(e) => setForm((f) => ({ ...f, LLM_KEY: e.target.value }))}
+                      placeholder="或使用 ${vars.token}"
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      autoComplete="off"
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span>模型 (model)</span>
+                    <input
+                      value={String(form.LLM_MODEL ?? "")}
+                      onChange={(e) => setForm((f) => ({ ...f, LLM_MODEL: e.target.value }))}
+                      placeholder="如 gpt-4o、DeepSeek-R1"
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      autoComplete="off"
+                    />
+                  </label>
+                  <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+                    <span>系统提示 (systemPrompt)</span>
+                    <textarea
+                      value={String(form.LLM_SYSTEM_PROMPT ?? "")}
+                      onChange={(e) => setForm((f) => ({ ...f, LLM_SYSTEM_PROMPT: e.target.value }))}
+                      placeholder="可选，支持 ${} 占位符"
+                      rows={3}
+                      style={{ width: "100%", resize: "vertical", padding: 8, borderRadius: 6, border: "1px solid #e2e8f0" }}
+                    />
+                  </label>
+                  <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+                    <span>上下文消息 (messages) — JSON 数组</span>
+                    <JsonEditor
+                      value={String(form.LLM_MESSAGES_JSON ?? "[]")}
+                      onChange={(v) => setForm((f) => ({ ...f, LLM_MESSAGES_JSON: v }))}
+                      height={120}
+                      minHeight={80}
+                      showFormatButton
+                    />
+                    <small className="form-hint">每项: {`{ "role": "user" | "assistant", "content": "..." }`}，留空 [] 则使用 msg.Data 作为单条用户消息</small>
+                  </label>
+                  <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+                    <span>大模型参数 (params)</span>
+                    <JsonEditor
+                      value={String(form.LLM_PARAMS_JSON ?? "{}")}
+                      onChange={(v) => setForm((f) => ({ ...f, LLM_PARAMS_JSON: v }))}
+                      height={140}
+                      minHeight={80}
+                      showFormatButton
+                    />
+                    <small className="form-hint">temperature, topP, maxTokens, responseFormat(text/json_object/json_schema) 等，参考 RuleGo LLM 文档</small>
                   </label>
                 </>
               )}

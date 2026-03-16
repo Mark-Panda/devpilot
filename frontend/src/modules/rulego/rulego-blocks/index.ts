@@ -10,6 +10,7 @@ import "./blocks/join";
 import "./blocks/for";
 import "./blocks/groupAction";
 import "./blocks/restApiCall";
+import "./blocks/llm";
 import "./blocks/delay";
 import "./blocks/switch";
 import "./blocks/startTrigger";
@@ -47,6 +48,7 @@ export const toolbox = {
       categorystyle: "rulego_action",
       contents: [
         { kind: "block" as const, type: "rulego_restApiCall" },
+        { kind: "block" as const, type: "rulego_llm" },
         { kind: "block" as const, type: "rulego_delay" },
         { kind: "block" as const, type: "rulego_jsTransform" },
         { kind: "block" as const, type: "rulego_jsFilter" },
