@@ -959,3 +959,292 @@ body {
 .js-editor-root .monaco-editor {
   background: #ffffff !important;
 }
+
+/* RuleGo 执行日志列表 */
+.rulego-logs-table .table-head.rulego-logs-head,
+.rulego-logs-table .table-row.rulego-logs-row {
+  grid-template-columns: 1.4fr 0.7fr 0.6fr 1.4fr minmax(100px, auto);
+}
+
+.rulego-log-trigger {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  background: #e0e7ff;
+  color: #4338ca;
+}
+
+.rulego-log-status {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.rulego-log-status.success {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.rulego-log-status.failure {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.rulego-log-time {
+  font-size: 13px;
+  color: #64748b;
+}
+
+.rulego-logs-pagination {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.rulego-logs-page-info {
+  font-size: 13px;
+  color: #64748b;
+}
+
+/* RuleGo 执行明细 */
+.rulego-log-detail-page {
+  max-width: 960px;
+}
+
+.rulego-log-detail-summary {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px 24px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+  margin-bottom: 24px;
+}
+
+.rulego-log-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px 24px;
+  margin-bottom: 20px;
+}
+
+.rulego-log-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.rulego-log-detail-label {
+  font-size: 12px;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.rulego-log-detail-value {
+  font-size: 14px;
+  color: #1e293b;
+}
+
+.rulego-log-detail-error {
+  padding: 12px 16px;
+  background: #fef2f2;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  font-size: 13px;
+  color: #991b1b;
+}
+
+.rulego-log-detail-error pre {
+  margin: 8px 0 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.rulego-log-detail-io {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rulego-log-detail-nodes {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 20px 24px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+
+.rulego-log-nodes-title {
+  margin: 0 0 16px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.rulego-log-nodes-empty {
+  margin: 0;
+  color: #94a3b8;
+  font-size: 14px;
+}
+
+.rulego-log-nodes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rulego-log-node-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #f8fafc;
+}
+
+.rulego-log-node-card.has-error {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.rulego-log-node-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border: none;
+  background: transparent;
+  font-size: 14px;
+  color: #334155;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.rulego-log-node-header:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.rulego-log-node-chevron {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.rulego-log-node-index {
+  font-weight: 600;
+  color: #6366f1;
+  min-width: 28px;
+}
+
+.rulego-log-node-title {
+  font-size: 14px;
+  color: #334155;
+}
+
+.rulego-log-node-id-secondary {
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  color: #94a3b8;
+  margin-left: 6px;
+}
+
+.rulego-log-node-relation {
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  background: #e0e7ff;
+  color: #4338ca;
+}
+
+.rulego-log-node-error-badge {
+  margin-left: auto;
+  padding: 2px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  background: #fecaca;
+  color: #991b1b;
+}
+
+.rulego-log-node-body {
+  padding: 0 16px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.rulego-log-node-section {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .rulego-log-node-section {
+    grid-template-columns: 1fr;
+  }
+}
+
+.rulego-log-json-block {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #ffffff;
+}
+
+.rulego-log-json-title {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: none;
+  background: #f1f5f9;
+  font-size: 12px;
+  font-weight: 600;
+  color: #475569;
+  text-align: left;
+  cursor: pointer;
+}
+
+.rulego-log-json-chevron {
+  font-size: 10px;
+  color: #94a3b8;
+}
+
+.rulego-log-json-body {
+  margin: 0;
+  padding: 12px;
+  font-family: ui-monospace, "SF Mono", Monaco, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #334155;
+  background: #ffffff;
+  overflow-x: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.rulego-log-node-error {
+  padding: 10px 12px;
+  background: #fef2f2;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #991b1b;
+}
+
+.rulego-log-node-error pre {
+  margin: 6px 0 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.rulego-log-node-meta {
+  font-size: 12px;
+  color: #94a3b8;
+}

@@ -41,6 +41,42 @@ CREATE TABLE IF NOT EXISTS rulego_rules (
 );
 `
 
+const createRuleGoExecutionLogTable = `
+CREATE TABLE IF NOT EXISTS rulego_execution_logs (
+  id TEXT PRIMARY KEY,
+  rule_id TEXT NOT NULL,
+  rule_name TEXT NOT NULL DEFAULT '',
+  trigger_type TEXT NOT NULL DEFAULT 'manual',
+  input_data TEXT NOT NULL DEFAULT '',
+  input_metadata TEXT NOT NULL DEFAULT '{}',
+  output_data TEXT NOT NULL DEFAULT '',
+  output_metadata TEXT NOT NULL DEFAULT '{}',
+  success INTEGER NOT NULL DEFAULT 0,
+  error_message TEXT NOT NULL DEFAULT '',
+  started_at TEXT NOT NULL,
+  finished_at TEXT NOT NULL DEFAULT ''
+);
+`
+
+const createRuleGoExecutionNodeLogTable = `
+CREATE TABLE IF NOT EXISTS rulego_execution_node_logs (
+  id TEXT PRIMARY KEY,
+  execution_id TEXT NOT NULL,
+  order_index INTEGER NOT NULL DEFAULT 0,
+  node_id TEXT NOT NULL,
+  node_name TEXT NOT NULL DEFAULT '',
+  relation_type TEXT NOT NULL DEFAULT '',
+  input_data TEXT NOT NULL DEFAULT '',
+  input_metadata TEXT NOT NULL DEFAULT '{}',
+  output_data TEXT NOT NULL DEFAULT '',
+  output_metadata TEXT NOT NULL DEFAULT '{}',
+  error_message TEXT NOT NULL DEFAULT '',
+  started_at TEXT NOT NULL,
+  finished_at TEXT NOT NULL DEFAULT '',
+  FOREIGN KEY (execution_id) REFERENCES rulego_execution_logs(id)
+);
+`
+
 func Migrate(db *sql.DB) error {
 	if _, err := db.Exec(createRouteRewriteTable); err != nil {
 		return err
@@ -53,6 +89,18 @@ func Migrate(db *sql.DB) error {
 	}
 	_, err := db.Exec(`ALTER TABLE rulego_rules ADD COLUMN editor_json TEXT NOT NULL DEFAULT ''`)
 	if err != nil && !isDuplicateColumnError(err) {
+		return err
+	}
+	if _, err := db.Exec(createRuleGoExecutionLogTable); err != nil {
+		return err
+	}
+	if _, err := db.Exec(createRuleGoExecutionNodeLogTable); err != nil {
+		return err
+	}
+	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_rulego_exec_node_exec ON rulego_execution_node_logs(execution_id)`); err != nil {
+		return err
+	}
+	if _, err := db.Exec(`CREATE INDEX IF NOT EXISTS idx_rulego_exec_logs_started ON rulego_execution_logs(started_at DESC)`); err != nil {
 		return err
 	}
 	return nil

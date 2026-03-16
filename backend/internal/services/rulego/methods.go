@@ -11,11 +11,16 @@ import (
 )
 
 type Service struct {
-	store *Store
+	store       *Store
+	execLogStore *ExecutionLogStore
 }
 
-func NewService(store *Store) *Service {
-	return &Service{store: store}
+func NewService(store *Store, execLogStore *ExecutionLogStore) *Service {
+	s := &Service{store: store, execLogStore: execLogStore}
+	if execLogStore != nil {
+		SetGlobalExecutionLogStore(execLogStore)
+	}
+	return s
 }
 
 type CreateRuleGoRuleInput struct {
@@ -113,4 +118,62 @@ func validateRule(rule models.RuleGoRule) error {
 
 func IsNotFound(err error) bool {
 	return errors.Is(err, sqlite.ErrNotFound)
+}
+
+// ListExecutionLogsResult 执行日志分页结果
+type ListExecutionLogsResult struct {
+	Items []models.RuleGoExecutionLog `json:"items"`
+	Total int                         `json:"total"`
+}
+
+// ListExecutionLogs 分页查询执行日志，按开始时间倒序
+func (s *Service) ListExecutionLogs(limit, offset int) (ListExecutionLogsResult, error) {
+	if s.execLogStore == nil {
+		return ListExecutionLogsResult{Items: nil, Total: 0}, nil
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	items, err := s.execLogStore.ListExecutionLogs(context.Background(), limit, offset)
+	if err != nil {
+		return ListExecutionLogsResult{}, err
+	}
+	total, err := s.execLogStore.CountExecutionLogs(context.Background())
+	if err != nil {
+		return ListExecutionLogsResult{}, err
+	}
+	return ListExecutionLogsResult{Items: items, Total: total}, nil
+}
+
+// GetExecutionLogResponse 单条执行日志及其节点步骤
+type GetExecutionLogResponse struct {
+	Log   models.RuleGoExecutionLog    `json:"log"`
+	Nodes []models.RuleGoExecutionNodeLog `json:"nodes"`
+}
+
+// GetExecutionLog 获取单条执行日志及所有节点步骤（入参/出参）
+func (s *Service) GetExecutionLog(executionID string) (GetExecutionLogResponse, error) {
+	if s.execLogStore == nil {
+		return GetExecutionLogResponse{}, sqlite.ErrNotFound
+	}
+	logRow, err := s.execLogStore.GetExecutionLogByID(context.Background(), executionID)
+	if err != nil {
+		return GetExecutionLogResponse{}, err
+	}
+	nodes, err := s.execLogStore.GetNodeLogsByExecutionID(context.Background(), executionID)
+	if err != nil {
+		return GetExecutionLogResponse{}, err
+	}
+	return GetExecutionLogResponse{Log: logRow, Nodes: nodes}, nil
+}
+
+// DeleteExecutionLog 删除一条执行日志及其所有节点步骤
+func (s *Service) DeleteExecutionLog(executionID string) error {
+	if s.execLogStore == nil {
+		return sqlite.ErrNotFound
+	}
+	return s.execLogStore.DeleteExecutionLog(context.Background(), executionID)
 }

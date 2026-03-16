@@ -1,9 +1,12 @@
 import {
   CreateRuleGoRule,
+  DeleteExecutionLog,
   DeleteRuleGoRule,
   ExecuteRule,
   ExecuteRuleDefinition,
+  GetExecutionLog,
   GetRuleGoRule,
+  ListExecutionLogs,
   ListRuleGoRules,
   LoadRuleChain,
   UnloadRuleChain,
@@ -12,6 +15,8 @@ import {
 import type { models } from "../../../wailsjs/go/models";
 
 type RuleGoRule = models.RuleGoRule;
+export type RuleGoExecutionLog = models.RuleGoExecutionLog;
+export type RuleGoExecutionNodeLog = models.RuleGoExecutionNodeLog;
 
 type CreateRuleGoRuleInput = {
   name: string;
@@ -90,4 +95,26 @@ export async function loadRuleChain(ruleId: string): Promise<void> {
 /** 从引擎池卸载指定规则链 */
 export async function unloadRuleChain(ruleId: string): Promise<void> {
   return UnloadRuleChain(ruleId);
+}
+
+/** 分页查询执行日志 */
+export async function listExecutionLogs(
+  limit: number,
+  offset: number
+): Promise<{ items: RuleGoExecutionLog[]; total: number }> {
+  const res = await ListExecutionLogs(limit, offset);
+  return { items: res.items ?? [], total: res.total ?? 0 };
+}
+
+/** 获取单条执行日志及节点步骤 */
+export async function getExecutionLog(
+  executionId: string
+): Promise<{ log: RuleGoExecutionLog; nodes: RuleGoExecutionNodeLog[] }> {
+  const res = await GetExecutionLog(executionId);
+  return { log: res.log, nodes: res.nodes ?? [] };
+}
+
+/** 删除一条执行日志及其节点步骤 */
+export async function deleteExecutionLog(executionId: string): Promise<void> {
+  return DeleteExecutionLog(executionId);
 }

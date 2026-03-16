@@ -11,14 +11,8 @@ import (
 	"github.com/rulego/rulego/api/types"
 
 	"devpilot/backend/internal/store/sqlite"
+	"devpilot/backend/internal/store/sqlite/models"
 )
-
-// ExecuteRuleInput 执行规则链的入参
-type ExecuteRuleInput struct {
-	MessageType string            `json:"message_type"` // 消息类型，默认 "default"
-	Metadata    map[string]string `json:"metadata"`     // 元数据键值
-	Data        string            `json:"data"`          // 消息体，通常为 JSON 字符串
-}
 
 // ExecuteRuleOutput 执行规则链的出参
 type ExecuteRuleOutput struct {
@@ -26,6 +20,13 @@ type ExecuteRuleOutput struct {
 	Data    string `json:"data"`    // 末端节点产出数据
 	Error   string `json:"error"`   // 若失败时的错误信息
 	Elapsed int64  `json:"elapsed"` // 耗时毫秒
+}
+
+// ExecuteRuleInput 执行规则链的入参
+type ExecuteRuleInput struct {
+	MessageType string            `json:"message_type"` // 消息类型，默认 "default"
+	Metadata    map[string]string `json:"metadata"`     // 元数据键值
+	Data        string            `json:"data"`         // 消息体，通常为 JSON 字符串
 }
 
 // ExecuteRule 根据规则 ID 同步执行一次规则链，返回末端结果或错误。
@@ -70,6 +71,18 @@ func (s *Service) ExecuteRule(ruleID string, input ExecuteRuleInput) (ExecuteRul
 		data = "{}"
 	}
 
+	var execLog models.RuleGoExecutionLog
+	if s.execLogStore != nil {
+		execLog, _ = s.execLogStore.CreateExecutionLog(context.Background(), models.RuleGoExecutionLog{
+			RuleID:        ruleID,
+			RuleName:      rule.Name,
+			TriggerType:   "manual",
+			InputData:     data,
+			InputMetadata: MetadataToJSON(input.Metadata),
+		})
+		metadata.PutValue("_execution_id", execLog.ID)
+	}
+
 	start := time.Now()
 	var lastMsg types.RuleMsg
 	var lastErr error
@@ -87,7 +100,24 @@ func (s *Service) ExecuteRule(ruleID string, input ExecuteRuleInput) (ExecuteRul
 
 	elapsed := time.Since(start).Milliseconds()
 	mu.Lock()
-	defer mu.Unlock()
+	finishAt := time.Now().UTC().Format("2006-01-02T15:04:05Z07:00")
+	mu.Unlock()
+
+	if s.execLogStore != nil && execLog.ID != "" {
+		outData := ""
+		outMeta := "{}"
+		if lastErr == nil && lastMsg.GetData() != "" {
+			outData = lastMsg.GetData()
+			if lastMsg.Metadata != nil {
+				outMeta = MetadataToJSON(lastMsg.Metadata.GetReadOnlyValues())
+			}
+		}
+		errStr := ""
+		if lastErr != nil {
+			errStr = lastErr.Error()
+		}
+		_ = s.execLogStore.UpdateExecutionLog(context.Background(), execLog.ID, outData, outMeta, errStr, finishAt, lastErr == nil)
+	}
 
 	out := ExecuteRuleOutput{Elapsed: elapsed}
 	if lastErr != nil {
@@ -133,6 +163,18 @@ func (s *Service) ExecuteRuleDefinition(definition string, input ExecuteRuleInpu
 		data = "{}"
 	}
 
+	var execLog models.RuleGoExecutionLog
+	if s.execLogStore != nil {
+		execLog, _ = s.execLogStore.CreateExecutionLog(context.Background(), models.RuleGoExecutionLog{
+			RuleID:        testRuleID,
+			RuleName:      "测试执行",
+			TriggerType:   "test",
+			InputData:     data,
+			InputMetadata: MetadataToJSON(input.Metadata),
+		})
+		metadata.PutValue("_execution_id", execLog.ID)
+	}
+
 	start := time.Now()
 	var lastMsg types.RuleMsg
 	var lastErr error
@@ -148,7 +190,25 @@ func (s *Service) ExecuteRuleDefinition(definition string, input ExecuteRuleInpu
 	)
 	elapsed := time.Since(start).Milliseconds()
 	mu.Lock()
-	defer mu.Unlock()
+	finishAt := time.Now().UTC().Format("2006-01-02T15:04:05Z07:00")
+	mu.Unlock()
+
+	if s.execLogStore != nil && execLog.ID != "" {
+		outData := ""
+		outMeta := "{}"
+		if lastErr == nil && lastMsg.GetData() != "" {
+			outData = lastMsg.GetData()
+			if lastMsg.Metadata != nil {
+				outMeta = MetadataToJSON(lastMsg.Metadata.GetReadOnlyValues())
+			}
+		}
+		errStr := ""
+		if lastErr != nil {
+			errStr = lastErr.Error()
+		}
+		_ = s.execLogStore.UpdateExecutionLog(context.Background(), execLog.ID, outData, outMeta, errStr, finishAt, lastErr == nil)
+	}
+
 	out := ExecuteRuleOutput{Elapsed: elapsed}
 	if lastErr != nil {
 		out.Success = false

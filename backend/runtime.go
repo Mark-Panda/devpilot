@@ -33,7 +33,8 @@ func InitRuntime(dbPath string) (*Runtime, error) {
 	modelStore := model_management.NewStore(db.DB)
 	modelService := model_management.NewService(modelStore)
 	ruleGoStore := rulego.NewStore(db.DB)
-	ruleGoService := rulego.NewService(ruleGoStore)
+	ruleGoExecLogStore := rulego.NewExecutionLogStore(db.DB)
+	ruleGoService := rulego.NewService(ruleGoStore, ruleGoExecLogStore)
 	if n, err := ruleGoService.LoadAllEnabledRuleChains(); err != nil {
 		log.Printf("[rulego] 启动加载启用规则链: 已加载 %d 条，错误: %v", n, err)
 	} else {

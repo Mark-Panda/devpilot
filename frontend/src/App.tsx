@@ -2,7 +2,7 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./shared/components";
 import { RouteRewritePage } from "./modules/route-rewrite";
 import { ModelManagementPage } from "./modules/model-management";
-import { RuleGoPage, RuleGoScratchEditorPage } from "./modules/rulego";
+import { RuleGoPage, RuleGoScratchEditorPage, RuleGoLogsPage, RuleGoLogDetailPage } from "./modules/rulego";
 import { PlaceholderPage } from "./modules/placeholder";
 
 export default function App() {
@@ -33,6 +33,8 @@ export default function App() {
           <Route path="/rulego" element={<RuleGoPage />} />
           <Route path="/rulego/editor" element={<RuleGoScratchEditorPage />} />
           <Route path="/rulego/editor/:id" element={<RuleGoScratchEditorPage />} />
+          <Route path="/rulego/logs" element={<RuleGoLogsPage />} />
+          <Route path="/rulego/logs/:id" element={<RuleGoLogDetailPage />} />
           <Route
             path="*"
             element={<PlaceholderPage title="未找到页面" />}
