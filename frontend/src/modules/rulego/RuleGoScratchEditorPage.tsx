@@ -73,7 +73,67 @@ const scratchTheme = new ScratchBlocks.Theme(
   }
 );
 
-ScratchBlocks.ScratchMsgs?.setLocale?.("zh-cn");
+(ScratchBlocks as { ScratchMsgs?: { setLocale?: (locale: string) => void } }).ScratchMsgs?.setLocale?.("zh-cn");
+
+/** 脚本输入框：Monaco 编辑器，JavaScript 语法高亮 */
+function JsScriptEditor({
+  value,
+  onChange,
+  height = 220,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  height?: number;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
+  const syncingRef = useRef(false);
+
+  useEffect(() => {
+    if (!containerRef.current) return;
+    const editor = monaco.editor.create(containerRef.current, {
+      value: value,
+      language: "javascript",
+      minimap: { enabled: false },
+      automaticLayout: true,
+      scrollBeyondLastLine: false,
+      fontSize: 13,
+      lineNumbers: "on",
+      roundedSelection: true,
+      padding: { top: 8, bottom: 8 },
+    });
+    editorRef.current = editor;
+    const sub = editor.onDidChangeModelContent(() => {
+      if (syncingRef.current) return;
+      onChange(editor.getValue());
+    });
+    return () => {
+      sub.dispose();
+      editor.dispose();
+      editorRef.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!editorRef.current) return;
+    if (editorRef.current.getValue() === value) return;
+    syncingRef.current = true;
+    editorRef.current.setValue(value);
+    syncingRef.current = false;
+  }, [value]);
+
+  return (
+    <div
+      ref={containerRef}
+      style={{
+        height,
+        border: "1px solid #e2e8f0",
+        borderRadius: 10,
+        overflow: "hidden",
+      }}
+    />
+  );
+}
 
 type BlockConfigModalProps = {
   blockId: string | null;
@@ -100,7 +160,7 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved }: BlockConf
     const next: Record<string, string | boolean> = {
       NODE_ID: get("NODE_ID"),
       NODE_NAME: get("NODE_NAME"),
-      DEBUG: block.getFieldValue ? getBool("DEBUG") : true,
+      DEBUG: block.getField("DEBUG") ? getBool("DEBUG") : true,
     };
     if (
       block.type === "rulego_jsFilter" ||
@@ -459,11 +519,9 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved }: BlockConf
                 block.type === "rulego_jsSwitch") && (
                 <label className="form-field" style={{ gridColumn: "1 / -1" }}>
                   <span>脚本 (JS_SCRIPT)</span>
-                  <textarea
+                  <JsScriptEditor
                     value={String(form.JS_SCRIPT ?? "")}
-                    onChange={(e) => setForm((f) => ({ ...f, JS_SCRIPT: e.target.value }))}
-                    rows={8}
-                    style={{ fontFamily: "monospace", fontSize: 13 }}
+                    onChange={(v) => setForm((f) => ({ ...f, JS_SCRIPT: v }))}
                   />
                 </label>
               )}
@@ -882,9 +940,9 @@ export default function RuleGoScratchEditorPage() {
 
       if (previousRouter) {
         const input = block.getInput("ROUTERS");
-        const previousConnection = previousRouter.previousConnection as unknown as ScratchBlocks.Connection | null;
-        if (input?.connection && previousConnection) {
-          input.connection.connect(previousConnection);
+        const prevConn = (previousRouter as BlockSvg & { previousConnection: unknown }).previousConnection as unknown as ScratchBlocks.Connection | null;
+        if (input?.connection && prevConn) {
+          input.connection.connect(prevConn);
         }
       }
     });
@@ -892,19 +950,20 @@ export default function RuleGoScratchEditorPage() {
     connections.forEach((connection) => {
       const fromBlock = nodeMap.get(String(connection.fromId));
       const toBlock = nodeMap.get(String(connection.toId));
-      if (!fromBlock || !toBlock || !toBlock.previousConnection) return;
+      const toPrev = toBlock ? (toBlock as BlockSvg).previousConnection : null;
+      if (!fromBlock || !toBlock || !toPrev) return;
       const type = String(connection.type ?? "Success");
       const def = getBlockDef(fromBlock.type);
       const inputName = def?.getInputNameForConnectionType?.(type, fromBlock);
       if (inputName) {
         const input = fromBlock.getInput(inputName);
         if (input?.connection) {
-          input.connection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
+          input.connection.connect(toPrev as ScratchBlocks.Connection);
         }
       } else if (fromBlock.nextConnection) {
         fromBlock.setFieldValue(type, "LINK_TYPE");
         if (connection.label) fromBlock.setFieldValue(String(connection.label), "LINK_LABEL");
-        fromBlock.nextConnection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
+        fromBlock.nextConnection.connect(toPrev as ScratchBlocks.Connection);
       }
     });
 
@@ -1059,8 +1118,9 @@ export default function RuleGoScratchEditorPage() {
         const def = getBlockDef(current.type);
         const walkInputs = def?.getWalkInputs(current);
         if (walkInputs && walkInputs.length > 0) {
+          const cur = current;
           walkInputs.forEach((inputName: string) => {
-            let branchBlock = current.getInputTargetBlock(inputName);
+            let branchBlock = cur.getInputTargetBlock(inputName);
             while (branchBlock) {
               walkChain(branchBlock);
               branchBlock = branchBlock.getNextBlock();
