@@ -948,3 +948,14 @@ body {
 .rulego-editor-side .confirm-text {
   color: #94a3b8;
 }
+
+/* JS 脚本编辑器：强制文字深色、白底，避免被 rulego-editor-side 等父级浅色覆盖 */
+.js-editor-root .monaco-editor,
+.js-editor-root .monaco-editor .view-lines,
+.js-editor-root .monaco-editor .view-line,
+.js-editor-root .monaco-editor .view-line span {
+  color: #1e293b !important;
+}
+.js-editor-root .monaco-editor {
+  background: #ffffff !important;
+}

@@ -10,9 +10,8 @@ import {
   getBlockDef,
   getBlockTypeFromNodeType,
 } from "./rulego-blocks";
-import { JsonEditor } from "../../shared/components";
+import { JsEditor, JsonEditor } from "../../shared/components";
 import { BlockLibraryPanel, DRAG_TYPE_BLOCK } from "./BlockLibraryPanel";
-import { ScriptTextarea } from "./ScriptTextarea";
 
 const scratchTheme = new ScratchBlocks.Theme(
   "scratch",
@@ -437,9 +436,12 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
                 block.type === "rulego_jsSwitch") && (
                   <label className="form-field" style={{ gridColumn: "1 / -1" }}>
                     <span>脚本 (JS_SCRIPT)</span>
-                    <ScriptTextarea
+                    <JsEditor
                       value={String(form.JS_SCRIPT ?? "")}
                       onChange={(v) => setForm((f) => ({ ...f, JS_SCRIPT: v }))}
+                      height={220}
+                      minHeight={120}
+                      showFormatButton
                     />
                   </label>
                 )}
