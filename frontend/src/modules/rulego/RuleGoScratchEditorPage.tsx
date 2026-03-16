@@ -682,7 +682,7 @@ export default function RuleGoScratchEditorPage() {
         minScale: 0.4,
         scaleSpeed: 1.1,
       },
-      trashcan: true,
+      trashcan: false,
       grid: { spacing: 20, length: 3, colour: "#334155", snap: true },
     }) as WorkspaceSvg;
 
@@ -1222,14 +1222,8 @@ export default function RuleGoScratchEditorPage() {
           <button className="rulego-toolbar-btn primary" type="button" onClick={handleSave} disabled={saving}>
             保存
           </button>
-          <button className="rulego-toolbar-btn" type="button" title="导入">
-            导入
-          </button>
           <button className="rulego-toolbar-btn" type="button" title="测试" onClick={handleTestClick}>
             测试
-          </button>
-          <button className="rulego-toolbar-btn" type="button" title="部署">
-            部署
           </button>
         </div>
         <div className="rulego-editor-view-controls">
@@ -1273,15 +1267,16 @@ export default function RuleGoScratchEditorPage() {
           <button
             className="rulego-toolbar-btn text"
             type="button"
+            title="弹出 RuleGo DSL"
             onClick={() => {
               if (workspaceRef.current) {
                 ensureRuleGoNodeIdsAreUuid(workspaceRef.current);
-                setDsl(buildRuleGoDsl(workspaceRef.current));
+                setDsl(buildRuleGoDsl(workspaceRef.current, name, debugMode));
               }
               setViewDslOpen(true);
             }}
           >
-            查看 DSL
+            导出
           </button>
           <button
             className="rulego-toolbar-btn text"
