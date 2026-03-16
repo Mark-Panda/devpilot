@@ -613,7 +613,7 @@ export default function RuleGoScratchEditorPage() {
         scaleSpeed: 1.1,
       },
       trashcan: true,
-      grid: { spacing: 20, length: 3, colour: "#e2e8f0", snap: true },
+      grid: { spacing: 20, length: 3, colour: "#334155", snap: true },
     }) as WorkspaceSvg;
 
     workspaceRef.current = workspace;

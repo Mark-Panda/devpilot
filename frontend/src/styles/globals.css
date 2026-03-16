@@ -338,7 +338,7 @@ body {
 }
 
 .rulego-editor-canvas {
-  background: #0f172a;
+  background: #1e293b;
   border-radius: 12px;
   overflow: hidden;
   min-height: 640px;
@@ -367,7 +367,7 @@ body {
 }
 
 .rulego-editor-canvas .blocklyToolboxDiv {
-  background: #111827;
+  background: #1e293b;
   color: #e5e7eb;
   padding: 8px 6px;
   width: auto;
@@ -394,7 +394,21 @@ body {
 }
 
 .rulego-editor-canvas .blocklyFlyoutBackground {
-  fill: #0b1220;
+  fill: #1e293b;
+}
+
+/* 画布工作区主背景与网格统一为深色 */
+.rulego-editor-canvas .blocklySvg {
+  background-color: #1e293b !important;
+}
+
+.rulego-editor-canvas .blocklyMainBackground {
+  fill: #1e293b !important;
+  stroke: #334155 !important;
+}
+
+.rulego-editor-canvas .injectionDiv {
+  background-color: #1e293b !important;
 }
 
 .rulego-editor-canvas .blocklyScrollbarHandle {
@@ -428,12 +442,13 @@ body {
   background: rgba(148, 163, 184, 0.25) !important;
 }
 
-/* 可视化规则编辑器 - 图中类似布局（三栏 + 顶部工具栏） */
+/* 可视化规则编辑器 - 图中类似布局（三栏 + 顶部工具栏），统一深色背景 */
 .rulego-editor-visual {
   min-height: 100%;
   display: flex;
   flex-direction: column;
   gap: 0;
+  background: #1e293b;
 }
 
 .rulego-editor-header-bar {
@@ -558,7 +573,7 @@ body {
   grid-template-columns: auto 1fr;
   grid-template-rows: auto auto 1fr;
   gap: 0;
-  background: #0f172a;
+  background: #1e293b;
   min-height: 0;
   overflow: hidden;
 }
@@ -584,7 +599,7 @@ body {
   padding: 8px 10px;
   border-radius: 8px;
   border: 1px solid #334155;
-  background: #1e293b;
+  background: #334155;
   color: #e2e8f0;
   font-size: 13px;
 }
@@ -649,9 +664,9 @@ body {
 }
 
 .rulego-editor-side .rulego-panel-title {
-  color: #0f172a;
+  color: #e2e8f0;
   padding-bottom: 8px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid #334155;
   margin-bottom: 8px;
 }
 
@@ -673,14 +688,14 @@ body {
 }
 
 .rulego-editor-side {
-  background: #ffffff;
+  background: #1e293b;
   border-radius: 0 0 12px 0;
-  border-left: 1px solid #e2e8f0;
+  border-left: 1px solid #334155;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.04);
+  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.2);
   overflow: auto;
 }
 
@@ -700,7 +715,7 @@ body {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #0f172a;
+  color: #e2e8f0;
 }
 
 .block-config-inline-form {
@@ -723,5 +738,51 @@ body {
   justify-content: flex-end;
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid #334155;
+}
+
+/* 属性面板内表单统一深色主题 */
+.rulego-editor-side .form-grid,
+.rulego-editor-side .form-field,
+.rulego-editor-side .form-label,
+.rulego-editor-side .form-hint,
+.rulego-editor-side label span {
+  color: #e2e8f0;
+}
+
+.rulego-editor-side .form-field input,
+.rulego-editor-side .form-field textarea,
+.rulego-editor-side .form-field select {
+  background: #334155;
+  border-color: #475569;
+  color: #e2e8f0;
+}
+
+.rulego-editor-side .form-field input::placeholder,
+.rulego-editor-side .form-field textarea::placeholder {
+  color: #94a3b8;
+}
+
+.rulego-editor-side .form-field input.readonly-input {
+  background: #1e293b;
+  color: #94a3b8;
+}
+
+.rulego-editor-side .form-hint,
+.rulego-editor-side small.form-hint {
+  color: #94a3b8;
+}
+
+.rulego-editor-side .form-hint a {
+  color: #93c5fd;
+}
+
+.rulego-editor-side .form-error {
+  background: rgba(239, 68, 68, 0.15);
+  color: #fca5a5;
+  border-color: #ef4444;
+}
+
+.rulego-editor-side .confirm-text {
+  color: #94a3b8;
 }
