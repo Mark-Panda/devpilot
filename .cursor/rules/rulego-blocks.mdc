@@ -1,0 +1,69 @@
+---
+description: RuleGo 可视化编辑器组件块实现规范（Blockly/Scratch 块、DSL 双向转换、工具箱与配置面板）
+globs: frontend/src/modules/rulego/**/*
+alwaysApply: false
+---
+
+# RuleGo 可视化组件块实现规范
+
+## 目录与职责
+
+- **`rulego-blocks/`**：块定义与注册
+  - `index.ts`：统一入口，`registerAllBlocks`、`toolbox`、导出 `getBlockDef` / `getNodeType` / `getBlockTypeFromNodeType`
+  - `registry.ts`：`BlockTypeDef` 的 Map 注册，`registerBlockType(def)`
+  - `types.ts`：`BlockTypeDef`、`BlockHelpers`、`ConnectionBranch`、`BlockTypeCategory`
+  - `blocks/*.ts`：各组件块实现，每个文件末尾 `registerBlockType(def)`
+- **`BlockLibraryPanel.tsx`**：左侧积木库，从 `rulegoToolbox` 派生分类与块列表，拖拽类型到画布
+- **`RuleGoScratchEditorPage.tsx`**：画布、DSL 构建/加载、块配置模态框、主题
+
+## BlockTypeDef 约定
+
+每个块必须实现：
+
+| 字段 | 说明 |
+|------|------|
+| `blockType` | 如 `rulego_jsFilter`，与 Blockly 块 type 一致 |
+| `nodeType` | 如 `jsFilter`，对应 RuleGo DSL 的 node.type |
+| `category` | 五类之一：`rulego_trigger` / `rulego_action` / `rulego_condition` / `rulego_data` / `rulego_flow` |
+| `register(ScratchBlocks, BlocklyF)` | 在 `Blocks[blockType]` 上定义 `init`（及可选 mutationToDom/domToMutation/updateShape_） |
+| `getConfiguration(block, helpers)` | 从块字段读出 configuration 对象，供 DSL 使用 |
+| `setConfiguration(block, node, helpers)` | 从 DSL node 写回块字段（加载/粘贴时） |
+| `getConnectionBranches(block, helpers)` | 返回 `{ inputName, connectionType }[]`；`null` 表示仅用 nextStatement + LINK_TYPE |
+| `getInputNameForConnectionType?(type, block)` | DSL 加载时由 connection.type 得到要连接的 input 名 |
+| `getWalkInputs(block)` | `walkChain` 递归的 input 名；`null` 表示只走 nextStatement |
+| `defaultConnectionType?` | nextStatement 链的默认连接类型（如 "Success"） |
+
+**通用块字段**：`NODE_ID`、`NODE_NAME`、`DEBUG`。配置区建议放在 `CONFIG` dummyInput，并 `setVisible(false)` 隐藏。
+
+## 块 init 结构模式
+
+- **HEAD**：`appendDummyInput("HEAD").appendField(FieldTextInput(defaultName), "NODE_NAME")`
+- **CONFIG**：`appendDummyInput("CONFIG")`，依次 `appendField`：NODE_ID、业务字段、DEBUG 等
+- **分支**：`appendStatementInput("branch_xxx").appendField("标签")`，如 `branch_failure`、`branch_do`、`branch_case_0`
+- **连接**：`setPreviousStatement(true); setNextStatement(true); setStyle(category)`
+
+多分支/动态槽位（如 switch、groupAction）用块上的 `mutationToDom`/`domToMutation` + `updateShape_` 动态增删 statementInput。
+
+## 工具箱与主题
+
+- 工具箱在 `rulego-blocks/index.ts` 的 `toolbox`，`categoryToolbox` + 多个 `category`（name、categorystyle、contents 为 block type 列表）
+- 主题在 `RuleGoScratchEditorPage.tsx` 的 `scratchTheme`，按 category 设置 colourPrimary/Secondary/Tertiary
+- `BlockLibraryPanel` 的 `BLOCK_LABELS` 与 `CATEGORY_STYLES` 需与 toolbox/category 一致
+
+## DSL 双向转换
+
+- **块 → DSL**：`buildRuleGoDsl(workspace)` 从 `getTopBlocks(true)` 起，`walkChain` 遍历；对每个块用 `getBlockDef(type).getConfiguration` 和 `getConnectionBranches` 收集 nodes/connections；endpoint 特殊处理 ROUTERS 子块与 routers 数组
+- **DSL → 块**：`loadWorkspaceFromRuleGoDsl(ruleDsl, workspace)` 先 `createBlockForNode` 建块并 `setConfiguration`，再按 connections 用 `getInputNameForConnectionType` 或 nextConnection + LINK_TYPE 连线；for 的 Do、groupAction 的 nodeIds 在后续 pass 里连 branch_do / branch_i
+
+## 新增组件块步骤
+
+1. 在 `rulego-blocks/blocks/` 新建 `xxx.ts`，实现 `BlockTypeDef` 并 `registerBlockType(def)`
+2. 在 `rulego-blocks/index.ts` 中 `import "./blocks/xxx"`，并在 `toolbox.contents` 对应 category 的 `contents` 中增加 `{ kind: "block", type: "rulego_xxx" }`
+3. 若需在「块配置」模态中编辑：在 `RuleGoScratchEditorPage.tsx` 的 `BlockConfigModal` 内按 `block.type` 增加表单字段的读取（useEffect 中 setForm）与回写（handleSubmit 中 set）
+4. 在 `BlockLibraryPanel.tsx` 的 `BLOCK_LABELS` 中增加该块的显示名
+
+## 注意
+
+- 连接类型（connectionType）需与后端 RuleGo 约定一致（如 Success、Failure、True、False、Do、Case1…）
+- 使用 `blockHelpers.getFieldValue` / `getBooleanField` / `parseJsonValue` 读取字段，避免直接 `block.getFieldValue` 在编辑器逻辑中散落
+- 动态形状块（switch/groupAction）序列化依赖 mutationToDom/domToMutation，保存/加载画布 XML 时会被调用
