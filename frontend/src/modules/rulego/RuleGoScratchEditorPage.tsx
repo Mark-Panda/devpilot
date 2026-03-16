@@ -763,7 +763,7 @@ export default function RuleGoScratchEditorPage() {
           editorJson: json.trim(),
         });
       }
-      navigate("/rulego");
+      // 保存后继续留在可视化编辑器；失败时仅通过 setError 展示提示
     } catch (err) {
       setError((err as Error).message || "保存失败");
     } finally {
