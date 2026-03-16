@@ -5,6 +5,13 @@ import type { WorkspaceSvg, Block, BlockSvg } from "blockly/core";
 import * as monaco from "monaco-editor";
 import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import { useRuleGoRules } from "./useRuleGoRules";
+import {
+  registerAllBlocks,
+  toolbox as rulegoToolbox,
+  getBlockDef,
+  getNodeType as getNodeTypeFromRegistry,
+  getBlockTypeFromNodeType,
+} from "./rulego-blocks";
 
 const monacoGlobal = globalThis as typeof globalThis & {
   MonacoEnvironment?: {
@@ -538,58 +545,6 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved }: BlockConf
   );
 }
 
-const toolbox = {
-  kind: "categoryToolbox",
-  contents: [
-    {
-      kind: "category",
-      name: "规则链节点",
-      categorystyle: "rulego_nodes",
-      contents: [
-        { kind: "block", type: "rulego_jsFilter" },
-        { kind: "block", type: "rulego_jsTransform" },
-        { kind: "block", type: "rulego_jsSwitch" },
-        { kind: "block", type: "rulego_restApiCall" },
-      ],
-    },
-    {
-      kind: "category",
-      name: "条件与路由",
-      categorystyle: "rulego_routes",
-      contents: [
-        { kind: "block", type: "rulego_switch" },
-        { kind: "block", type: "rulego_break" },
-        { kind: "block", type: "rulego_join" },
-      ],
-    },
-    {
-      kind: "category",
-      name: "数据处理",
-      categorystyle: "rulego_data",
-      contents: [
-        { kind: "block", type: "rulego_for" },
-        { kind: "block", type: "rulego_groupAction" },
-      ],
-    },
-    {
-      kind: "category",
-      name: "Endpoints",
-      categorystyle: "rulego_endpoints",
-      contents: [
-        { kind: "block", type: "rulego_endpoint" },
-      ],
-    },
-    {
-      kind: "category",
-      name: "Routers",
-      categorystyle: "rulego_routers",
-      contents: [
-        { kind: "block", type: "rulego_router" },
-      ],
-    },
-  ],
-};
-
 export default function RuleGoScratchEditorPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -608,7 +563,6 @@ export default function RuleGoScratchEditorPage() {
   const [error, setError] = useState<string | null>(null);
   const [configModalBlockId, setConfigModalBlockId] = useState<string | null>(null);
   const lastTouchedBlockIdRef = useRef<string | null>(null);
-  const MAX_GROUP_SLOTS = 8;
 
   const editingRule = useMemo(() => rules.find((rule) => rule.id === id), [rules, id]);
 
@@ -652,301 +606,10 @@ export default function RuleGoScratchEditorPage() {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const BlocklyF = ScratchBlocks as any;
-
-    const buildMinimalNodeInit = (options: {
-      defaultId: string;
-      defaultName: string;
-      script?: string;
-      category: "rulego_nodes" | "rulego_routes" | "rulego_data" | "rulego_endpoints" | "rulego_routers";
-      restFields?: Array<{ name: string; value: string; dropdown?: [string, string][] }>;
-    }) => {
-      return function (this: Block) {
-        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput(options.defaultName), "NODE_NAME");
-        const config = this.appendDummyInput("CONFIG");
-        config.appendField(new BlocklyF.FieldTextInput(options.defaultId), "NODE_ID");
-        if (options.script) config.appendField(new BlocklyF.FieldTextInput(options.script), "JS_SCRIPT");
-        if (options.restFields?.length) {
-          options.restFields.forEach((f) => {
-            if (f.dropdown) config.appendField(new BlocklyF.FieldDropdown(f.dropdown), f.name);
-            else config.appendField(new BlocklyF.FieldTextInput(f.value), f.name);
-          });
-        }
-        config.appendField(new BlocklyF.FieldCheckbox(true), "DEBUG");
-        config.appendField(
-          new BlocklyF.FieldDropdown([["Success", "Success"], ["Failure", "Failure"], ["True", "True"], ["False", "False"]]),
-          "LINK_TYPE"
-        );
-        config.appendField(new BlocklyF.FieldTextInput(""), "LINK_LABEL");
-        const configInput = this.getInput("CONFIG");
-        if (configInput?.setVisible) configInput.setVisible(false);
-        this.setPreviousStatement(true);
-        this.setNextStatement(true);
-        if (typeof this.setStyle === "function") this.setStyle(options.category);
-      };
-    };
-
-    ScratchBlocks.Blocks.rulego_jsFilter = {
-      init: function (this: Block) {
-        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput("Filter"), "NODE_NAME");
-        const config = this.appendDummyInput("CONFIG");
-        config.appendField(new BlocklyF.FieldTextInput("s1"), "NODE_ID");
-        config.appendField(new BlocklyF.FieldTextInput("return msg.temperature > 50;"), "JS_SCRIPT");
-        config.appendField(new BlocklyF.FieldCheckbox(true), "DEBUG");
-        this.appendStatementInput("branch_true").appendField("True");
-        this.appendStatementInput("branch_false").appendField("False");
-        this.appendStatementInput("branch_failure").appendField("Failure");
-        const configInput = this.getInput("CONFIG");
-        if (configInput?.setVisible) configInput.setVisible(false);
-        this.setPreviousStatement(true);
-        if (typeof this.setStyle === "function") this.setStyle("rulego_nodes");
-      },
-    };
-
-    ScratchBlocks.Blocks.rulego_jsTransform = {
-      init: function (this: Block) {
-        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput("脚本转换器"), "NODE_NAME");
-        const config = this.appendDummyInput("CONFIG");
-        config.appendField(new BlocklyF.FieldTextInput("s2"), "NODE_ID");
-        config.appendField(
-          new BlocklyF.FieldTextInput(
-            "metadata['name']='test02';\nmetadata['index']=22;\nmsg['addField']='addValue2';\nreturn {'msg':msg,'metadata':metadata,'msgType':msgType};"
-          ),
-          "JS_SCRIPT"
-        );
-        config.appendField(new BlocklyF.FieldCheckbox(true), "DEBUG");
-        this.appendStatementInput("branch_success").appendField("Success");
-        this.appendStatementInput("branch_failure").appendField("Failure");
-        const configInput = this.getInput("CONFIG");
-        if (configInput?.setVisible) configInput.setVisible(false);
-        this.setPreviousStatement(true);
-        if (typeof this.setStyle === "function") this.setStyle("rulego_nodes");
-      },
-    };
-
-    ScratchBlocks.Blocks.rulego_jsSwitch = {
-      init: function (this: Block) {
-        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput("脚本路由"), "NODE_NAME");
-        const config = this.appendDummyInput("CONFIG");
-        config.appendField(new BlocklyF.FieldTextInput("s3"), "NODE_ID");
-        config.appendField(new BlocklyF.FieldTextInput("return ['Success'];"), "JS_SCRIPT");
-        config.appendField(new BlocklyF.FieldCheckbox(true), "DEBUG");
-        this.appendStatementInput("branch_success").appendField("Success");
-        this.appendStatementInput("branch_failure").appendField("Failure");
-        this.appendStatementInput("branch_default").appendField("Default");
-        const configInput = this.getInput("CONFIG");
-        if (configInput?.setVisible) configInput.setVisible(false);
-        this.setPreviousStatement(true);
-        this.setNextStatement(true);
-        if (typeof this.setStyle === "function") this.setStyle("rulego_nodes");
-      },
-    };
-
-    const MAX_SWITCH_CASES = 6;
-
-    ScratchBlocks.Blocks.rulego_switch = {
-      init: function (this: Block & { caseCount_?: number; casesJson_?: string; updateShape_?: () => void }) {
-        this.caseCount_ = 1;
-        this.casesJson_ = '[{"case":"true","then":"Case1"}]';
-        this.updateShape_?.();
-      },
-      mutationToDom: function (this: Block & { caseCount_?: number; casesJson_?: string }) {
-        const xml = document.createElement("mutation");
-        xml.setAttribute("casecount", String(Math.max(1, Math.min(MAX_SWITCH_CASES, this.caseCount_ ?? 1))));
-        const casesEl = document.createElement("cases");
-        casesEl.textContent = this.casesJson_ ?? this.getFieldValue?.("CASES_JSON") ?? "[]";
-        xml.appendChild(casesEl);
-        return xml;
-      },
-      domToMutation: function (this: Block & { caseCount_?: number; casesJson_?: string; updateShape_?: () => void }, xml: Element) {
-        const count = Math.max(1, Math.min(MAX_SWITCH_CASES, parseInt(xml.getAttribute("casecount") || "1", 10)));
-        const casesEl = xml.querySelector("cases");
-        this.caseCount_ = count;
-        this.casesJson_ = casesEl?.textContent?.trim() || this.casesJson_ || "[]";
-        this.updateShape_?.();
-      },
-      updateShape_: function (this: Block & { caseCount_?: number; casesJson_?: string }) {
-        const n = Math.max(1, Math.min(MAX_SWITCH_CASES, this.caseCount_ ?? 1));
-        let casesJson = "";
-        try {
-          casesJson = String(this.getFieldValue?.("CASES_JSON") ?? this.casesJson_ ?? "[]").trim() || '[{"case":"true","then":"Case1"}]';
-        } catch {
-          casesJson = this.casesJson_ || '[{"case":"true","then":"Case1"}]';
-        }
-        let nodeName = "条件分支";
-        let nodeId = "sw1";
-        try {
-          nodeName = String(this.getFieldValue?.("NODE_NAME") ?? "条件分支");
-          nodeId = String(this.getFieldValue?.("NODE_ID") ?? "sw1");
-        } catch {}
-        const inputNames = this.inputList?.map((inp: { name: string }) => inp.name) ?? [];
-        inputNames.forEach((name: string) => this.removeInput(name));
-        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput(nodeName), "NODE_NAME");
-        const configInput = this.appendDummyInput("CONFIG");
-        configInput.appendField(new BlocklyF.FieldTextInput(nodeId), "NODE_ID");
-        configInput.appendField(new BlocklyF.FieldCheckbox(true), "DEBUG");
-        const casesInput = this.appendDummyInput("CASES").appendField(
-          new BlocklyF.FieldTextInput(casesJson),
-          "CASES_JSON"
-        );
-        if (configInput.setVisible) configInput.setVisible(false);
-        if (casesInput.setVisible) casesInput.setVisible(false);
-        for (let i = 0; i < n; i++) {
-          this.appendStatementInput(`branch_case_${i}`).appendField(`Case${i + 1}`);
-        }
-        this.appendStatementInput("branch_default").appendField("Default");
-        this.appendStatementInput("branch_failure").appendField("Failure");
-        (this as Block).setPreviousStatement(true);
-        (this as Block).setNextStatement(true);
-        if (typeof this.setStyle === "function") this.setStyle("rulego_routes");
-      },
-    };
-
-    ScratchBlocks.Blocks.rulego_break = {
-      init: buildMinimalNodeInit({ defaultId: "br1", defaultName: "Break", category: "rulego_routes" }),
-    };
-
-    ScratchBlocks.Blocks.rulego_join = {
-      init: function (this: Block) {
-        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput("汇聚"), "NODE_NAME");
-        const config = this.appendDummyInput("CONFIG");
-        config.appendField(new BlocklyF.FieldTextInput("jn1"), "NODE_ID");
-        config.appendField(new BlocklyF.FieldNumber("0", 0, 3600, 1), "JOIN_TIMEOUT");
-        config.appendField(new BlocklyF.FieldCheckbox(false), "JOIN_MERGE_TO_MAP");
-        config.appendField(new BlocklyF.FieldCheckbox(true), "DEBUG");
-        this.appendStatementInput("branch_success").appendField("Success");
-        this.appendStatementInput("branch_failure").appendField("Failure");
-        const configInput = this.getInput("CONFIG");
-        if (configInput?.setVisible) configInput.setVisible(false);
-        this.setPreviousStatement(true);
-        if (typeof this.setStyle === "function") this.setStyle("rulego_routes");
-      },
-    };
-
-    ScratchBlocks.Blocks.rulego_for = {
-      init: function (this: Block) {
-        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput("遍历"), "NODE_NAME");
-        const config = this.appendDummyInput("CONFIG");
-        config.appendField(new BlocklyF.FieldTextInput("for1"), "NODE_ID");
-        config.appendField(new BlocklyF.FieldTextInput("1..3"), "FOR_RANGE");
-        config.appendField(new BlocklyF.FieldTextInput(""), "FOR_DO");
-        config.appendField(new BlocklyF.FieldDropdown([["忽略", "0"], ["追加", "1"], ["覆盖", "2"], ["异步", "3"]]), "FOR_MODE");
-        config.appendField(new BlocklyF.FieldCheckbox(true), "DEBUG");
-        this.appendStatementInput("branch_do").appendField("do 遍历体");
-        this.appendStatementInput("branch_success").appendField("Success");
-        this.appendStatementInput("branch_failure").appendField("Failure");
-        const configInput = this.getInput("CONFIG");
-        if (configInput?.setVisible) configInput.setVisible(false);
-        this.setPreviousStatement(true);
-        this.setNextStatement(true);
-        if (typeof this.setStyle === "function") this.setStyle("rulego_data");
-      },
-    };
-
-    ScratchBlocks.Blocks.rulego_groupAction = {
-      init: function (this: Block & { groupCount_?: number; updateShape_?: () => void }) {
-        this.groupCount_ = 1;
-        const typeDef = ScratchBlocks.Blocks.rulego_groupAction as { updateShape_?: (this: Block) => void };
-        (this as Block & { updateShape_?: () => void }).updateShape_ = () => typeDef.updateShape_?.call(this);
-        this.updateShape_?.();
-      },
-      mutationToDom: function (this: Block & { groupCount_?: number }) {
-        const xml = document.createElement("mutation");
-        xml.setAttribute("slotcount", String(Math.max(1, Math.min(MAX_GROUP_SLOTS, this.groupCount_ ?? 1))));
-        return xml;
-      },
-      domToMutation: function (this: Block & { groupCount_?: number; updateShape_?: () => void }, xml: Element) {
-        this.groupCount_ = Math.max(1, Math.min(MAX_GROUP_SLOTS, parseInt(xml.getAttribute("slotcount") || "1", 10)));
-        this.updateShape_?.();
-      },
-      updateShape_: function (this: Block & { groupCount_?: number }) {
-        const n = Math.max(1, Math.min(MAX_GROUP_SLOTS, this.groupCount_ ?? 1));
-        const nodeId = this.getFieldValue?.("NODE_ID") ?? "grp1";
-        const nodeName = this.getFieldValue?.("NODE_NAME") ?? "节点组";
-        const matchRel = this.getFieldValue?.("MATCH_RELATION_TYPE") ?? "Success";
-        const matchNum = this.getFieldValue?.("MATCH_NUM") ?? "0";
-        const timeout = this.getFieldValue?.("GROUP_TIMEOUT") ?? "0";
-        const mergeToMap = this.getFieldValue?.("GROUP_MERGE_TO_MAP") === "TRUE";
-        const debug = this.getFieldValue?.("DEBUG") === "TRUE";
-        const inputNames = this.inputList?.map((inp: { name: string }) => inp.name) ?? [];
-        inputNames.forEach((name: string) => this.removeInput(name));
-        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput(nodeName), "NODE_NAME");
-        const configInput = this.appendDummyInput("CONFIG");
-        configInput.appendField(new BlocklyF.FieldTextInput(nodeId), "NODE_ID");
-        configInput.appendField(new BlocklyF.FieldDropdown([["Success", "Success"], ["Failure", "Failure"]]), "MATCH_RELATION_TYPE");
-        configInput.appendField(new BlocklyF.FieldNumber("0", 0, 99, 1), "MATCH_NUM");
-        configInput.appendField(new BlocklyF.FieldNumber("0", 0, 3600, 1), "GROUP_TIMEOUT");
-        configInput.appendField(new BlocklyF.FieldCheckbox(false), "GROUP_MERGE_TO_MAP");
-        configInput.appendField(new BlocklyF.FieldCheckbox(true), "DEBUG");
-        if (configInput.setVisible) configInput.setVisible(false);
-        for (let i = 0; i < n; i++) {
-          this.appendStatementInput(`branch_${i}`).appendField(`组内节点${i + 1}`);
-        }
-        this.appendStatementInput("branch_success").appendField("Success");
-        this.appendStatementInput("branch_failure").appendField("Failure");
-        this.setPreviousStatement(true);
-        this.setFieldValue(matchRel, "MATCH_RELATION_TYPE");
-        this.setFieldValue(matchNum, "MATCH_NUM");
-        this.setFieldValue(timeout, "GROUP_TIMEOUT");
-        this.setFieldValue(mergeToMap ? "TRUE" : "FALSE", "GROUP_MERGE_TO_MAP");
-        this.setFieldValue(debug ? "TRUE" : "FALSE", "DEBUG");
-        if (typeof this.setStyle === "function") this.setStyle("rulego_data");
-      },
-    };
-
-    ScratchBlocks.Blocks.rulego_restApiCall = {
-      init: function (this: Block) {
-        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput("HTTP客户端"), "NODE_NAME");
-        const config = this.appendDummyInput("CONFIG");
-        config.appendField(new BlocklyF.FieldTextInput("rest1"), "NODE_ID");
-        config.appendField(new BlocklyF.FieldTextInput("http://localhost:9099/api"), "REST_URL");
-        config.appendField(new BlocklyF.FieldDropdown([["GET", "GET"], ["POST", "POST"], ["PUT", "PUT"], ["DELETE", "DELETE"]]), "REST_METHOD");
-        config.appendField(new BlocklyF.FieldTextInput("{}"), "REST_HEADERS");
-        config.appendField(new BlocklyF.FieldTextInput("{}"), "REST_QUERY");
-        config.appendField(new BlocklyF.FieldTextInput(""), "REST_BODY");
-        config.appendField(new BlocklyF.FieldTextInput("30000"), "REST_TIMEOUT");
-        config.appendField(new BlocklyF.FieldTextInput("200"), "REST_MAX_PARALLEL");
-        config.appendField(new BlocklyF.FieldCheckbox(true), "DEBUG");
-        this.appendStatementInput("branch_success").appendField("Success");
-        this.appendStatementInput("branch_failure").appendField("Failure");
-        const configInput = this.getInput("CONFIG");
-        if (configInput?.setVisible) configInput.setVisible(false);
-        this.setPreviousStatement(true);
-        if (typeof this.setStyle === "function") this.setStyle("rulego_nodes");
-      },
-    };
-
-    ScratchBlocks.Blocks.rulego_endpoint = {
-      init: function (this: Block) {
-        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput("Endpoint"), "NODE_NAME");
-        const config = this.appendDummyInput("CONFIG");
-        config.appendField(new BlocklyF.FieldTextInput("ep1"), "NODE_ID");
-        config.appendField(new BlocklyF.FieldTextInput("http"), "EP_PROTOCOL");
-        config.appendField(new BlocklyF.FieldTextInput("[]"), "EP_PROCESSORS");
-        this.appendStatementInput("ROUTERS").appendField("路由");
-        if (config.setVisible) config.setVisible(false);
-        this.setPreviousStatement(true);
-        this.setNextStatement(true);
-        if (typeof this.setStyle === "function") this.setStyle("rulego_endpoints");
-      },
-    };
-
-    ScratchBlocks.Blocks.rulego_router = {
-      init: function (this: Block) {
-        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput("Router"), "NODE_NAME");
-        const config = this.appendDummyInput("CONFIG");
-        config.appendField(new BlocklyF.FieldTextInput("rt1"), "NODE_ID");
-        config.appendField(new BlocklyF.FieldTextInput("/api"), "ROUTER_PATH");
-        config.appendField(new BlocklyF.FieldDropdown([["GET", "GET"], ["POST", "POST"], ["PUT", "PUT"], ["DELETE", "DELETE"]]), "ROUTER_METHOD");
-        config.appendField(new BlocklyF.FieldTextInput("[]"), "ROUTER_PROCESSORS");
-        if (config.setVisible) config.setVisible(false);
-        this.setPreviousStatement(true);
-        this.setNextStatement(true);
-        if (typeof this.setStyle === "function") this.setStyle("rulego_routers");
-      },
-    };
+    registerAllBlocks(ScratchBlocks, BlocklyF);
 
     const workspace = ScratchBlocks.inject(containerRef.current, {
-      toolbox,
+      toolbox: rulegoToolbox,
       media: "/scratch-blocks/",
       renderer: "scratch",
       theme: scratchTheme,
@@ -969,6 +632,7 @@ export default function RuleGoScratchEditorPage() {
     setDsl(buildRuleGoDsl(workspace));
 
     const handleChange = (ev?: { blockId?: string }) => {
+      ensureRuleGoNodeIdsAreUuid(workspace);
       if (ev?.blockId) lastTouchedBlockIdRef.current = ev.blockId;
       const state = ScratchBlocks.serialization.workspaces.save(workspace);
       setJson(JSON.stringify(state, null, 2));
@@ -1012,6 +676,7 @@ export default function RuleGoScratchEditorPage() {
       try {
         const ruleDsl = JSON.parse(editingRule.definition);
         loadWorkspaceFromRuleGoDsl(ruleDsl, workspaceRef.current);
+        ensureRuleGoNodeIdsAreUuid(workspaceRef.current);
         setDsl(buildRuleGoDsl(workspaceRef.current));
       } catch (err) {
         setError((err as Error).message || "RuleGo DSL 解析失败");
@@ -1060,108 +725,59 @@ export default function RuleGoScratchEditorPage() {
     }
   };
 
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+  const fallbackUuid = () =>
+    "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+      const r = (Math.random() * 16) | 0;
+      const v = c === "x" ? r : (r & 0x3) | 0x8;
+      return v.toString(16);
+    });
+  const ensureRuleGoNodeIdsAreUuid = (workspace: WorkspaceSvg) => {
+    const allBlocks = workspace.getAllBlocks(false);
+    allBlocks.forEach((block: Block) => {
+      if (block.type.startsWith("rulego_") && block.getField("NODE_ID")) {
+        const currentId = String(block.getFieldValue("NODE_ID") ?? "").trim();
+        if (currentId && !UUID_REGEX.test(currentId)) {
+          const uuid = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : fallbackUuid();
+          block.setFieldValue(uuid, "NODE_ID");
+        }
+      }
+    });
+  };
+
   const getFieldValue = (block: Block, name: string) => String(block.getFieldValue(name) ?? "").trim();
 
   const getBooleanField = (block: Block, name: string) => getFieldValue(block, name) === "TRUE";
 
-  const getNodeType = (blockType: string) => {
-    switch (blockType) {
-      case "rulego_jsFilter":
-        return "jsFilter";
-      case "rulego_jsTransform":
-        return "jsTransform";
-      case "rulego_jsSwitch":
-        return "jsSwitch";
-      case "rulego_switch":
-        return "switch";
-      case "rulego_break":
-        return "break";
-      case "rulego_join":
-        return "join";
-      case "rulego_for":
-        return "for";
-      case "rulego_groupAction":
-        return "groupAction";
-      case "rulego_restApiCall":
-        return "restApiCall";
-      case "rulego_endpoint":
-        return "endpoint";
-      case "rulego_router":
-        return "router";
-      default:
-        return "";
+  const parseJsonValue = (value: string, fallback: unknown) => {
+    if (!value.trim()) return fallback;
+    try {
+      return JSON.parse(value);
+    } catch {
+      return fallback;
     }
   };
 
-  const getDefaultConnectionType = (blockType: string) => {
-    if (blockType === "rulego_jsFilter") return "True";
-    return "Success";
+  const blockHelpers: { getFieldValue: (b: Block, n: string) => string; getBooleanField: (b: Block, n: string) => boolean; parseJsonValue: (v: string, f: unknown) => unknown } = {
+    getFieldValue,
+    getBooleanField,
+    parseJsonValue,
   };
+
+  const getNodeType = (blockType: string) => getNodeTypeFromRegistry(blockType);
+
+  const getDefaultConnectionType = (blockType: string) => getBlockDef(blockType)?.defaultConnectionType ?? "Success";
 
   const buildRuleGoNode = (block: Block) => {
-    const nodeType = getNodeType(block.type);
-    if (!nodeType) return null;
+    const def = getBlockDef(block.type);
+    if (!def) return null;
     const nodeId = getFieldValue(block, "NODE_ID") || block.id;
-    const nodeName = getFieldValue(block, "NODE_NAME") || nodeType;
+    const nodeName = getFieldValue(block, "NODE_NAME") || def.nodeType;
     const debugMode = getBooleanField(block, "DEBUG");
-
-    const configuration: Record<string, unknown> = {};
-    if (block.type === "rulego_jsFilter" || block.type === "rulego_jsTransform" || block.type === "rulego_jsSwitch") {
-      configuration.jsScript = getFieldValue(block, "JS_SCRIPT");
-    }
-
-    if (block.type === "rulego_restApiCall") {
-      configuration.restEndpointUrlPattern = getFieldValue(block, "REST_URL");
-      configuration.requestMethod = getFieldValue(block, "REST_METHOD");
-      configuration.maxParallelRequestsCount = Number(getFieldValue(block, "REST_MAX_PARALLEL") || "0");
-      configuration.headers = parseJsonValue(getFieldValue(block, "REST_HEADERS"), {});
-      configuration.query = parseJsonValue(getFieldValue(block, "REST_QUERY"), {});
-      configuration.body = getFieldValue(block, "REST_BODY");
-      configuration.timeout = Number(getFieldValue(block, "REST_TIMEOUT") || "0");
-    }
-
-    if (block.type === "rulego_switch") {
-      const casesJson =
-        getFieldValue(block, "CASES_JSON") ||
-        String((block as Block & { casesJson_?: string }).casesJson_ ?? "").trim();
-      const cases = parseJsonValue(casesJson, []) as Array<{ case?: string; then?: string }>;
-      if (Array.isArray(cases) && cases.length > 0) {
-        configuration.cases = cases.map((c) => ({ case: String(c?.case ?? ""), then: String(c?.then ?? "") }));
-      }
-    }
-
-    if (block.type === "rulego_for") {
-      configuration.range = getFieldValue(block, "FOR_RANGE") || "1..3";
-      const doBlock = block.getInputTargetBlock("branch_do");
-      configuration.do = doBlock
-        ? (getFieldValue(doBlock, "NODE_ID") || doBlock.id)
-        : (getFieldValue(block, "FOR_DO") || "s3");
-      const modeStr = getFieldValue(block, "FOR_MODE");
-      configuration.mode = modeStr === "" ? 0 : Number(modeStr) || 0;
-    }
-
-    if (block.type === "rulego_join") {
-      configuration.timeout = Number(getFieldValue(block, "JOIN_TIMEOUT") ?? 0) || 0;
-      configuration.mergeToMap = getBooleanField(block, "JOIN_MERGE_TO_MAP");
-    }
-
-    if (block.type === "rulego_groupAction") {
-      const slotCount = Math.max(1, Math.min(MAX_GROUP_SLOTS, (block as Block & { groupCount_?: number }).groupCount_ ?? 1));
-      const nodeIds: string[] = [];
-      for (let i = 0; i < slotCount; i++) {
-        const b = block.getInputTargetBlock(`branch_${i}`);
-        if (b) nodeIds.push(getFieldValue(b, "NODE_ID") || b.id);
-      }
-      configuration.nodeIds = nodeIds.length ? nodeIds : (getFieldValue(block, "GROUP_NODE_IDS") || "").split(",").filter(Boolean);
-      configuration.matchRelationType = getFieldValue(block, "MATCH_RELATION_TYPE") || "Success";
-      configuration.matchNum = Number(getFieldValue(block, "MATCH_NUM") ?? 0) || 0;
-      configuration.timeout = Number(getFieldValue(block, "GROUP_TIMEOUT") ?? 0) || 0;
-      configuration.mergeToMap = getBooleanField(block, "GROUP_MERGE_TO_MAP");
-    }
-
+    const configuration = def.getConfiguration(block, blockHelpers);
     return {
       id: nodeId,
-      type: nodeType,
+      type: def.nodeType,
       name: nodeName,
       debugMode,
       configuration,
@@ -1179,21 +795,7 @@ export default function RuleGoScratchEditorPage() {
       additionalInfo?: Record<string, unknown>;
     }
   ): BlockSvg => {
-    const typeToBlock: Record<string, string> = {
-      jsFilter: "rulego_jsFilter",
-      jsTransform: "rulego_jsTransform",
-      jsSwitch: "rulego_jsSwitch",
-      restApiCall: "rulego_restApiCall",
-      switch: "rulego_switch",
-      break: "rulego_break",
-      join: "rulego_join",
-      for: "rulego_for",
-      groupAction: "rulego_groupAction",
-      endpoint: "rulego_endpoint",
-      router: "rulego_router",
-    };
-
-    const blockType = typeToBlock[node.type];
+    const blockType = getBlockTypeFromNodeType(node.type);
     if (!blockType) {
       throw new Error(`不支持的组件类型: ${node.type}`);
     }
@@ -1203,62 +805,9 @@ export default function RuleGoScratchEditorPage() {
     block.setFieldValue(node.name || node.type, "NODE_NAME");
     block.setFieldValue(node.debugMode ? "TRUE" : "FALSE", "DEBUG");
 
-    if (node.type === "jsFilter" || node.type === "jsTransform" || node.type === "jsSwitch") {
-      const script = String(node.configuration?.jsScript ?? "");
-      block.setFieldValue(script, "JS_SCRIPT");
-    }
-
-    if (node.type === "restApiCall") {
-      block.setFieldValue(String(node.configuration?.restEndpointUrlPattern ?? ""), "REST_URL");
-      block.setFieldValue(String(node.configuration?.requestMethod ?? "POST"), "REST_METHOD");
-      block.setFieldValue(String(node.configuration?.maxParallelRequestsCount ?? 0), "REST_MAX_PARALLEL");
-      block.setFieldValue(JSON.stringify(node.configuration?.headers ?? {}), "REST_HEADERS");
-      block.setFieldValue(JSON.stringify(node.configuration?.query ?? {}), "REST_QUERY");
-      block.setFieldValue(String(node.configuration?.body ?? ""), "REST_BODY");
-      block.setFieldValue(String(node.configuration?.timeout ?? 30000), "REST_TIMEOUT");
-    }
-
-    if (node.type === "switch") {
-      const cases = (node.configuration?.cases ?? []) as Array<{ case?: string; then?: string }>;
-      const casesArr = cases.length ? cases : [{ case: "true", then: "Case1" }];
-      const casesJson = JSON.stringify(casesArr, null, 2);
-      (block as Block & { casesJson_?: string }).casesJson_ = casesJson;
-      block.setFieldValue(casesJson, "CASES_JSON");
-      const domToMutation = (block as Block & { domToMutation?: (xml: Element) => void }).domToMutation;
-      if (typeof domToMutation === "function") {
-        const xml = document.createElement("mutation");
-        xml.setAttribute("casecount", String(Math.max(1, Math.min(6, casesArr.length))));
-        const casesEl = document.createElement("cases");
-        casesEl.textContent = casesJson;
-        xml.appendChild(casesEl);
-        domToMutation.call(block, xml);
-      }
-    }
-
-    if (node.type === "for") {
-      block.setFieldValue(String(node.configuration?.range ?? "1..3"), "FOR_RANGE");
-      block.setFieldValue(String(node.configuration?.do ?? "s3"), "FOR_DO");
-      block.setFieldValue(String(node.configuration?.mode ?? 0), "FOR_MODE");
-    }
-
-    if (node.type === "join") {
-      block.setFieldValue(String(node.configuration?.timeout ?? 0), "JOIN_TIMEOUT");
-      block.setFieldValue(node.configuration?.mergeToMap ? "TRUE" : "FALSE", "JOIN_MERGE_TO_MAP");
-    }
-
-    if (node.type === "groupAction") {
-      block.setFieldValue(String(node.configuration?.matchRelationType ?? "Success"), "MATCH_RELATION_TYPE");
-      block.setFieldValue(String(node.configuration?.matchNum ?? 0), "MATCH_NUM");
-      block.setFieldValue(String(node.configuration?.timeout ?? 0), "GROUP_TIMEOUT");
-      block.setFieldValue(node.configuration?.mergeToMap ? "TRUE" : "FALSE", "GROUP_MERGE_TO_MAP");
-      const nodeIds = (node.configuration?.nodeIds ?? []) as string[];
-      const slotCount = Math.max(1, Math.min(MAX_GROUP_SLOTS, nodeIds.length || 1));
-      const b = block as Block & { domToMutation?: (xml: Element) => void };
-      if (typeof b.domToMutation === "function") {
-        const xml = document.createElement("mutation");
-        xml.setAttribute("slotcount", String(slotCount));
-        b.domToMutation(xml);
-      }
+    const def = getBlockDef(blockType);
+    if (def?.setConfiguration) {
+      def.setConfiguration(block, node, blockHelpers);
     }
 
     const position = (node.additionalInfo as { position?: { x: number; y: number } } | undefined)?.position;
@@ -1325,55 +874,9 @@ export default function RuleGoScratchEditorPage() {
       const toBlock = nodeMap.get(String(connection.toId));
       if (!fromBlock || !toBlock || !toBlock.previousConnection) return;
       const type = String(connection.type ?? "Success");
-      if (fromBlock.type === "rulego_switch") {
-        let inputName: string;
-        if (type === "Default") inputName = "branch_default";
-        else if (type === "Failure") inputName = "branch_failure";
-        else {
-          const casesJson =
-            String(fromBlock.getFieldValue("CASES_JSON") ?? "").trim() ||
-            String((fromBlock as Block & { casesJson_?: string }).casesJson_ ?? "").trim();
-          const cases = (() => {
-            if (!casesJson) return [];
-            try {
-              return JSON.parse(casesJson) as Array<{ then?: string }>;
-            } catch {
-              return [];
-            }
-          })();
-          const idx = cases.findIndex((c) => String(c?.then ?? "") === type);
-          inputName = idx >= 0 ? `branch_case_${idx}` : type === "Case1" ? "branch_case_0" : type === "Case2" ? "branch_case_1" : type === "Case3" ? "branch_case_2" : type === "Case4" ? "branch_case_3" : type === "Case5" ? "branch_case_4" : type === "Case6" ? "branch_case_5" : "branch_default";
-        }
-        const input = fromBlock.getInput(inputName);
-        if (input?.connection) {
-          input.connection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
-        }
-      } else if (fromBlock.type === "rulego_jsFilter") {
-        const inputName = type === "True" ? "branch_true" : type === "False" ? "branch_false" : "branch_failure";
-        const input = fromBlock.getInput(inputName);
-        if (input?.connection) {
-          input.connection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
-        }
-      } else if (fromBlock.type === "rulego_jsSwitch") {
-        const inputName = type === "Failure" ? "branch_failure" : type === "Default" ? "branch_default" : "branch_success";
-        const input = fromBlock.getInput(inputName);
-        if (input?.connection) {
-          input.connection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
-        }
-      } else if (fromBlock.type === "rulego_for") {
-        const inputName = type === "Do" ? "branch_do" : type === "Failure" ? "branch_failure" : "branch_success";
-        const input = fromBlock.getInput(inputName);
-        if (input?.connection) {
-          input.connection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
-        }
-      } else if (fromBlock.type === "rulego_jsTransform" || fromBlock.type === "rulego_join" || fromBlock.type === "rulego_restApiCall") {
-        const inputName = type === "Failure" ? "branch_failure" : "branch_success";
-        const input = fromBlock.getInput(inputName);
-        if (input?.connection) {
-          input.connection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
-        }
-      } else if (fromBlock.type === "rulego_groupAction") {
-        const inputName = type === "Failure" ? "branch_failure" : "branch_success";
+      const def = getBlockDef(fromBlock.type);
+      const inputName = def?.getInputNameForConnectionType?.(type, fromBlock);
+      if (inputName) {
         const input = fromBlock.getInput(inputName);
         if (input?.connection) {
           input.connection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
@@ -1417,15 +920,6 @@ export default function RuleGoScratchEditorPage() {
     });
 
     workspace.refreshTheme();
-  };
-
-  const parseJsonValue = (value: string, fallback: unknown) => {
-    if (!value.trim()) return fallback;
-    try {
-      return JSON.parse(value);
-    } catch {
-      return fallback;
-    }
   };
 
   const buildRuleGoDsl = (workspace: WorkspaceSvg) => {
@@ -1509,7 +1003,6 @@ export default function RuleGoScratchEditorPage() {
       seen.add(block.id);
     };
 
-    const MAX_SWITCH_CASES_DSL = 6;
     const addConnectionsFromBlock = (fromBlock: Block) => {
       const fromId = getFieldValue(fromBlock, "NODE_ID") || fromBlock.id;
       const addConn = (toBlock: Block | null, type: string, label?: string) => {
@@ -1517,41 +1010,12 @@ export default function RuleGoScratchEditorPage() {
         const toId = getFieldValue(toBlock, "NODE_ID") || toBlock.id;
         connections.push(label ? { fromId, toId, type, label } : { fromId, toId, type });
       };
-      if (fromBlock.type === "rulego_switch") {
-        const casesJson =
-          getFieldValue(fromBlock, "CASES_JSON") ||
-          String((fromBlock as Block & { casesJson_?: string }).casesJson_ ?? "").trim();
-        const cases = parseJsonValue(casesJson, []) as Array<{ then?: string }>;
-        for (let i = 0; i < Math.min(MAX_SWITCH_CASES_DSL, cases.length); i++) {
-          const thenType = cases[i]?.then ? String(cases[i].then) : `Case${i + 1}`;
-          addConn(fromBlock.getInputTargetBlock(`branch_case_${i}`) ?? null, thenType);
-        }
-        addConn(fromBlock.getInputTargetBlock("branch_default") ?? null, "Default");
-        addConn(fromBlock.getInputTargetBlock("branch_failure") ?? null, "Failure");
-      } else if (fromBlock.type === "rulego_jsFilter") {
-        addConn(fromBlock.getInputTargetBlock("branch_true") ?? null, "True");
-        addConn(fromBlock.getInputTargetBlock("branch_false") ?? null, "False");
-        addConn(fromBlock.getInputTargetBlock("branch_failure") ?? null, "Failure");
-      } else if (fromBlock.type === "rulego_jsSwitch") {
-        addConn(fromBlock.getInputTargetBlock("branch_success") ?? null, "Success");
-        addConn(fromBlock.getInputTargetBlock("branch_failure") ?? null, "Failure");
-        addConn(fromBlock.getInputTargetBlock("branch_default") ?? null, "Default");
-      } else if (fromBlock.type === "rulego_for") {
-        addConn(fromBlock.getInputTargetBlock("branch_do") ?? null, "Do");
-        addConn(fromBlock.getInputTargetBlock("branch_success") ?? null, "Success");
-        addConn(fromBlock.getInputTargetBlock("branch_failure") ?? null, "Failure");
-      } else if (fromBlock.type === "rulego_jsTransform") {
-        addConn(fromBlock.getInputTargetBlock("branch_success") ?? null, "Success");
-        addConn(fromBlock.getInputTargetBlock("branch_failure") ?? null, "Failure");
-      } else if (fromBlock.type === "rulego_join") {
-        addConn(fromBlock.getInputTargetBlock("branch_success") ?? null, "Success");
-        addConn(fromBlock.getInputTargetBlock("branch_failure") ?? null, "Failure");
-      } else if (fromBlock.type === "rulego_groupAction") {
-        addConn(fromBlock.getInputTargetBlock("branch_success") ?? null, "Success");
-        addConn(fromBlock.getInputTargetBlock("branch_failure") ?? null, "Failure");
-      } else if (fromBlock.type === "rulego_restApiCall") {
-        addConn(fromBlock.getInputTargetBlock("branch_success") ?? null, "Success");
-        addConn(fromBlock.getInputTargetBlock("branch_failure") ?? null, "Failure");
+      const def = getBlockDef(fromBlock.type);
+      const branches = def?.getConnectionBranches(fromBlock, blockHelpers);
+      if (branches) {
+        branches.forEach(({ inputName, connectionType }) => {
+          addConn(fromBlock.getInputTargetBlock(inputName) ?? null, connectionType);
+        });
       } else {
         const next = fromBlock.getNextBlock();
         if (next) {
@@ -1572,72 +1036,10 @@ export default function RuleGoScratchEditorPage() {
         }
         addNode(current);
         addConnectionsFromBlock(current);
-        if (current.type === "rulego_switch") {
-          for (let i = 0; i < MAX_SWITCH_CASES_DSL; i++) {
-            let branchBlock = current.getInputTargetBlock(`branch_case_${i}`);
-            while (branchBlock) {
-              walkChain(branchBlock);
-              branchBlock = branchBlock.getNextBlock();
-            }
-          }
-          ["branch_default", "branch_failure"].forEach((inputName) => {
-            let branchBlock = current.getInputTargetBlock(inputName);
-            while (branchBlock) {
-              walkChain(branchBlock);
-              branchBlock = branchBlock.getNextBlock();
-            }
-          });
-          current = null;
-        } else if (current.type === "rulego_jsFilter") {
-          ["branch_true", "branch_false", "branch_failure"].forEach((inputName) => {
-            let branchBlock = current.getInputTargetBlock(inputName);
-            while (branchBlock) {
-              walkChain(branchBlock);
-              branchBlock = branchBlock.getNextBlock();
-            }
-          });
-          current = null;
-        } else if (current.type === "rulego_jsSwitch") {
-          ["branch_success", "branch_failure", "branch_default"].forEach((inputName) => {
-            let branchBlock = current.getInputTargetBlock(inputName);
-            while (branchBlock) {
-              walkChain(branchBlock);
-              branchBlock = branchBlock.getNextBlock();
-            }
-          });
-          current = null;
-        } else if (current.type === "rulego_jsTransform") {
-          ["branch_success", "branch_failure"].forEach((inputName) => {
-            let branchBlock = current.getInputTargetBlock(inputName);
-            while (branchBlock) {
-              walkChain(branchBlock);
-              branchBlock = branchBlock.getNextBlock();
-            }
-          });
-          current = null;
-        } else if (current.type === "rulego_join" || current.type === "rulego_restApiCall") {
-          ["branch_success", "branch_failure"].forEach((inputName) => {
-            let branchBlock = current.getInputTargetBlock(inputName);
-            while (branchBlock) {
-              walkChain(branchBlock);
-              branchBlock = branchBlock.getNextBlock();
-            }
-          });
-          current = null;
-        } else if (current.type === "rulego_groupAction") {
-          const gaInputs = (current.inputList ?? [])
-            .map((inp: { name: string }) => inp.name)
-            .filter((name: string) => name.startsWith("branch_"));
-          gaInputs.forEach((inputName: string) => {
-            let branchBlock = current.getInputTargetBlock(inputName);
-            while (branchBlock) {
-              walkChain(branchBlock);
-              branchBlock = branchBlock.getNextBlock();
-            }
-          });
-          current = null;
-        } else if (current.type === "rulego_for") {
-          ["branch_do", "branch_success", "branch_failure"].forEach((inputName) => {
+        const def = getBlockDef(current.type);
+        const walkInputs = def?.getWalkInputs(current);
+        if (walkInputs && walkInputs.length > 0) {
+          walkInputs.forEach((inputName: string) => {
             let branchBlock = current.getInputTargetBlock(inputName);
             while (branchBlock) {
               walkChain(branchBlock);
