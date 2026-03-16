@@ -98,6 +98,10 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
       next.REST_TIMEOUT = get("REST_TIMEOUT");
       next.REST_MAX_PARALLEL = get("REST_MAX_PARALLEL");
     }
+    if (block.type === "rulego_delay") {
+      next.DELAY_MS = get("DELAY_MS") || "60000";
+      next.DELAY_OVERWRITE = getBool("DELAY_OVERWRITE");
+    }
     if (block.type === "rulego_for") {
       next.FOR_RANGE = get("FOR_RANGE") || "1..3";
       const doBlock = block.getInputTargetBlock?.("branch_do");
@@ -432,6 +436,26 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
                     />
                   </label>
                 )}
+              {block.type === "rulego_delay" && (
+                <>
+                  <label className="form-field">
+                    <span>延迟时间 (ms)</span>
+                    <input
+                      value={String(form.DELAY_MS ?? "60000")}
+                      onChange={(e) => setForm((f) => ({ ...f, DELAY_MS: e.target.value }))}
+                      placeholder="60000 或 ${metadata.delay}"
+                    />
+                  </label>
+                  <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(form.DELAY_OVERWRITE)}
+                      onChange={(e) => setForm((f) => ({ ...f, DELAY_OVERWRITE: e.target.checked }))}
+                    />
+                    <span>周期内覆盖 (overwrite)</span>
+                  </label>
+                </>
+              )}
               {block.type === "rulego_restApiCall" && (
                 <>
                   <label className="form-field">
@@ -871,7 +895,6 @@ export default function RuleGoScratchEditorPage() {
 
     const nodes = ruleDsl.metadata.nodes as Array<any>;
     const connections = (ruleDsl.metadata.connections ?? []) as Array<any>;
-    const endpoints = (ruleDsl.metadata.endpoints ?? []) as Array<any>;
 
     workspace.clear();
 
@@ -880,39 +903,6 @@ export default function RuleGoScratchEditorPage() {
     nodes.forEach((node) => {
       const block = createBlockForNode(workspace, node);
       nodeMap.set(String(node.id), block);
-    });
-
-    endpoints.forEach((endpoint) => {
-      const block = createBlockForNode(workspace, endpoint);
-      nodeMap.set(String(endpoint.id), block);
-
-      const routers = (endpoint.routers ?? []) as Array<any>;
-      let previousRouter: BlockSvg | null = null;
-      routers.forEach((router) => {
-        const routerBlock = createBlockForNode(workspace, {
-          id: String(router.id ?? "router"),
-          type: "router",
-          name: String(router.name ?? "Router"),
-          debugMode: false,
-          configuration: router.configuration ?? {},
-          additionalInfo: router.additionalInfo ?? {},
-        });
-
-        const previousConnection = previousRouter?.nextConnection as unknown as ScratchBlocks.Connection | null;
-        const routerConnection = routerBlock.previousConnection as unknown as ScratchBlocks.Connection | null;
-        if (previousConnection && routerConnection) {
-          previousConnection.connect(routerConnection);
-        }
-        previousRouter = routerBlock;
-      });
-
-      if (previousRouter) {
-        const input = block.getInput("ROUTERS");
-        const prevConn = (previousRouter as BlockSvg & { previousConnection: unknown }).previousConnection as unknown as ScratchBlocks.Connection | null;
-        if (input?.connection && prevConn) {
-          input.connection.connect(prevConn);
-        }
-      }
     });
 
     connections.forEach((connection) => {
@@ -982,7 +972,6 @@ export default function RuleGoScratchEditorPage() {
       additionalInfo?: Record<string, unknown>;
     }> = [];
     const connections: Array<{ fromId: string; toId: string; type: string; label?: string }> = [];
-    const endpoints: Array<Record<string, unknown>> = [];
     const seen = new Set<string>();
 
     const addNode = (block: Block) => {
@@ -1001,52 +990,6 @@ export default function RuleGoScratchEditorPage() {
         },
       };
       nodes.push(nodeWithInfo);
-      seen.add(block.id);
-    };
-
-    const addEndpoint = (block: Block) => {
-      if (seen.has(block.id)) return;
-      const position = block.getRelativeToSurfaceXY();
-      const endpointId = getFieldValue(block, "NODE_ID") || block.id;
-      const endpointName = getFieldValue(block, "NODE_NAME") || "Endpoint";
-      const endpoint = {
-        id: endpointId,
-        type: getNodeType(block.type) || "endpoint",
-        name: endpointName,
-        debugMode: getBooleanField(block, "DEBUG"),
-        configuration: {
-          protocol: getFieldValue(block, "EP_PROTOCOL"),
-        },
-        processors: parseJsonValue(getFieldValue(block, "EP_PROCESSORS"), []),
-        routers: [] as Array<Record<string, unknown>>,
-        additionalInfo: {
-          blockId: block.id,
-          position: {
-            x: position.x,
-            y: position.y,
-          },
-        },
-      };
-
-      let routerBlock = block.getInputTargetBlock("ROUTERS");
-      while (routerBlock) {
-        if (routerBlock.type !== "rulego_router") {
-          routerBlock = routerBlock.getNextBlock();
-          continue;
-        }
-        endpoint.routers.push({
-          id: getFieldValue(routerBlock, "NODE_ID") || routerBlock.id,
-          name: getFieldValue(routerBlock, "NODE_NAME") || "Router",
-          configuration: {
-            path: getFieldValue(routerBlock, "ROUTER_PATH"),
-            method: getFieldValue(routerBlock, "ROUTER_METHOD"),
-          },
-          processors: parseJsonValue(getFieldValue(routerBlock, "ROUTER_PROCESSORS"), []),
-        });
-        routerBlock = routerBlock.getNextBlock();
-      }
-
-      endpoints.push(endpoint);
       seen.add(block.id);
     };
 
@@ -1078,11 +1021,6 @@ export default function RuleGoScratchEditorPage() {
     const walkChain = (block: Block | null) => {
       let current = block;
       while (current) {
-        if (current.type === "rulego_endpoint") {
-          addEndpoint(current);
-          current = current.getNextBlock();
-          continue;
-        }
         addNode(current);
         addConnectionsFromBlock(current);
         const def = getBlockDef(current.type);
@@ -1129,7 +1067,6 @@ export default function RuleGoScratchEditorPage() {
           nodes,
           connections,
           ruleChainConnections: [],
-          endpoints,
         },
       },
       null,

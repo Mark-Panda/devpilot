@@ -17,9 +17,8 @@ const CATEGORY_STYLES: Record<string, { bg: string; border: string }> = {
 
 const BLOCK_LABELS: Record<string, string> = {
   rulego_startTrigger: "开始",
-  rulego_endpoint: "Endpoint",
-  rulego_router: "Router",
   rulego_restApiCall: "HTTP客户端",
+  rulego_delay: "延迟",
   rulego_jsTransform: "脚本转换器",
   rulego_jsFilter: "Filter",
   rulego_switch: "多条件分支",
@@ -41,12 +40,12 @@ function getLibraryCategories(): CategoryItem[] {
   const contents = rulegoToolbox.kind === "categoryToolbox" ? rulegoToolbox.contents : [];
   if (!Array.isArray(contents)) return [];
   return contents
-    .filter((c): c is { kind: string; name: string; categorystyle: string; contents: Array<{ kind: string; type?: string }> } => "name" in c && "contents" in c)
+    .filter((c): c is { kind: "category"; name: string; categorystyle: string; contents: Array<{ kind: "block"; type: string }> } => "name" in c && "contents" in c)
     .map((c) => ({
       id: c.name,
       name: c.name,
       categorystyle: c.categorystyle || "rulego_data",
-      blocks: (c.contents || []).filter((b) => b.kind === "block" && b.type).map((b) => ({ type: b.type! })),
+      blocks: (c.contents || []).filter((b): b is { kind: "block"; type: string } => b.kind === "block" && !!b.type).map((b) => ({ type: b.type })),
     }));
 }
 

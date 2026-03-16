@@ -10,9 +10,8 @@ import "./blocks/join";
 import "./blocks/for";
 import "./blocks/groupAction";
 import "./blocks/restApiCall";
+import "./blocks/delay";
 import "./blocks/switch";
-import "./blocks/endpoint";
-import "./blocks/router";
 import "./blocks/startTrigger";
 
 import {
@@ -40,11 +39,7 @@ export const toolbox = {
       kind: "category" as const,
       name: "触发器",
       categorystyle: "rulego_trigger",
-      contents: [
-        { kind: "block" as const, type: "rulego_startTrigger" },
-        { kind: "block" as const, type: "rulego_endpoint" },
-        { kind: "block" as const, type: "rulego_router" },
-      ],
+      contents: [{ kind: "block" as const, type: "rulego_startTrigger" }],
     },
     {
       kind: "category" as const,
@@ -52,6 +47,7 @@ export const toolbox = {
       categorystyle: "rulego_action",
       contents: [
         { kind: "block" as const, type: "rulego_restApiCall" },
+        { kind: "block" as const, type: "rulego_delay" },
         { kind: "block" as const, type: "rulego_jsTransform" },
         { kind: "block" as const, type: "rulego_jsFilter" },
       ],
