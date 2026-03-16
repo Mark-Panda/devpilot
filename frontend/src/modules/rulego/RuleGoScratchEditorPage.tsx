@@ -111,6 +111,12 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved }: BlockConf
       next.REST_TIMEOUT = get("REST_TIMEOUT");
       next.REST_MAX_PARALLEL = get("REST_MAX_PARALLEL");
     }
+    if (block.type === "rulego_for") {
+      next.FOR_RANGE = get("FOR_RANGE") || "1..3";
+      const doBlock = block.getInputTargetBlock?.("branch_do");
+      next.FOR_DO = get("FOR_DO") || (doBlock ? String(doBlock.getFieldValue?.("NODE_ID") ?? doBlock.id) : "");
+      next.FOR_MODE = get("FOR_MODE") ?? "0";
+    }
     if (block.type === "rulego_switch") {
       try {
         const raw = get("CASES_JSON") || (block as Block & { casesJson_?: string }).casesJson_ || "";
@@ -269,6 +275,46 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved }: BlockConf
                     </a>
                   </small>
                 </div>
+              )}
+              {block.type === "rulego_for" && (
+                <>
+                  <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+                    <span>range（遍历目标表达式）</span>
+                    <input
+                      value={String(form.FOR_RANGE ?? "1..3")}
+                      onChange={(e) => setForm((f) => ({ ...f, FOR_RANGE: e.target.value }))}
+                      placeholder="${msg.items} 或 1..3"
+                    />
+                    <small className="form-hint">如 ${"{msg.items}"}、1..3、${"{metadata.items}"}</small>
+                  </label>
+                  <label className="form-field">
+                    <span>do（遍历体）</span>
+                    <input
+                      value={String(form.FOR_DO ?? "")}
+                      onChange={(e) => setForm((f) => ({ ...f, FOR_DO: e.target.value }))}
+                      placeholder="留空则用上方 do 槽位连接的块；或填 chain:rule01"
+                    />
+                    <small className="form-hint">在画布「do 遍历体」槽位中连接一个或多个块；或填写子规则链如 chain:chainId</small>
+                  </label>
+                  <label className="form-field">
+                    <span>mode（结果合并方式）</span>
+                    <select
+                      value={String(form.FOR_MODE ?? "0")}
+                      onChange={(e) => setForm((f) => ({ ...f, FOR_MODE: e.target.value }))}
+                    >
+                      <option value="0">0 - 忽略</option>
+                      <option value="1">1 - 追加</option>
+                      <option value="2">2 - 覆盖</option>
+                      <option value="3">3 - 异步</option>
+                    </select>
+                  </label>
+                  <small className="form-hint" style={{ gridColumn: "1 / -1" }}>
+                    参考{" "}
+                    <a href="https://rulego.cc/pages/for/#%E9%85%8D%E7%BD%AE%E7%A4%BA%E4%BE%8B" target="_blank" rel="noopener noreferrer">
+                      RuleGo 遍历组件
+                    </a>
+                  </small>
+                </>
               )}
               {(block.type === "rulego_jsFilter" ||
                 block.type === "rulego_jsTransform" ||
@@ -614,7 +660,23 @@ export default function RuleGoScratchEditorPage() {
     };
 
     ScratchBlocks.Blocks.rulego_for = {
-      init: buildMinimalNodeInit({ defaultId: "for1", defaultName: "For", category: "rulego_data" }),
+      init: function (this: Block) {
+        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput("遍历"), "NODE_NAME");
+        const config = this.appendDummyInput("CONFIG");
+        config.appendField(new BlocklyF.FieldTextInput("for1"), "NODE_ID");
+        config.appendField(new BlocklyF.FieldTextInput("1..3"), "FOR_RANGE");
+        config.appendField(new BlocklyF.FieldTextInput(""), "FOR_DO");
+        config.appendField(new BlocklyF.FieldDropdown([["忽略", "0"], ["追加", "1"], ["覆盖", "2"], ["异步", "3"]]), "FOR_MODE");
+        config.appendField(new BlocklyF.FieldCheckbox(true), "DEBUG");
+        this.appendStatementInput("branch_do").appendField("do 遍历体");
+        this.appendStatementInput("branch_success").appendField("Success");
+        this.appendStatementInput("branch_failure").appendField("Failure");
+        const configInput = this.getInput("CONFIG");
+        if (configInput?.setVisible) configInput.setVisible(false);
+        this.setPreviousStatement(true);
+        this.setNextStatement(true);
+        if (typeof this.setStyle === "function") this.setStyle("rulego_data");
+      },
     };
 
     ScratchBlocks.Blocks.rulego_groupAction = {
@@ -853,6 +915,16 @@ export default function RuleGoScratchEditorPage() {
       }
     }
 
+    if (block.type === "rulego_for") {
+      configuration.range = getFieldValue(block, "FOR_RANGE") || "1..3";
+      const doBlock = block.getInputTargetBlock("branch_do");
+      configuration.do = doBlock
+        ? (getFieldValue(doBlock, "NODE_ID") || doBlock.id)
+        : (getFieldValue(block, "FOR_DO") || "s3");
+      const modeStr = getFieldValue(block, "FOR_MODE");
+      configuration.mode = modeStr === "" ? 0 : Number(modeStr) || 0;
+    }
+
     return {
       id: nodeId,
       type: nodeType,
@@ -927,6 +999,12 @@ export default function RuleGoScratchEditorPage() {
         xml.appendChild(casesEl);
         domToMutation.call(block, xml);
       }
+    }
+
+    if (node.type === "for") {
+      block.setFieldValue(String(node.configuration?.range ?? "1..3"), "FOR_RANGE");
+      block.setFieldValue(String(node.configuration?.do ?? "s3"), "FOR_DO");
+      block.setFieldValue(String(node.configuration?.mode ?? 0), "FOR_MODE");
     }
 
     const position = (node.additionalInfo as { position?: { x: number; y: number } } | undefined)?.position;
@@ -1022,10 +1100,31 @@ export default function RuleGoScratchEditorPage() {
         if (input?.connection) {
           input.connection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
         }
+      } else if (fromBlock.type === "rulego_for") {
+        const inputName = type === "Do" ? "branch_do" : type === "Failure" ? "branch_failure" : "branch_success";
+        const input = fromBlock.getInput(inputName);
+        if (input?.connection) {
+          input.connection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
+        }
       } else if (fromBlock.nextConnection) {
         fromBlock.setFieldValue(type, "LINK_TYPE");
         if (connection.label) fromBlock.setFieldValue(String(connection.label), "LINK_LABEL");
         fromBlock.nextConnection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
+      }
+    });
+
+    nodes.forEach((node: { type?: string; id?: string; configuration?: { do?: string } }) => {
+      if (node.type !== "for" || !node.configuration?.do) return;
+      const fromBlock = nodeMap.get(String(node.id));
+      const toBlock = nodeMap.get(String(node.configuration.do));
+      if (!fromBlock || (fromBlock as Block).type !== "rulego_for" || !toBlock || !toBlock.previousConnection) return;
+      const hasDoConn = connections.some(
+        (c) => String(c.fromId) === String(node.id) && String(c.toId) === String(node.configuration?.do) && c.type === "Do"
+      );
+      if (hasDoConn) return;
+      const input = fromBlock.getInput("branch_do");
+      if (input?.connection) {
+        input.connection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
       }
     });
 
@@ -1144,6 +1243,10 @@ export default function RuleGoScratchEditorPage() {
       } else if (fromBlock.type === "rulego_jsSwitch") {
         addConn(fromBlock.getInputTargetBlock("branch_success") ?? null, "Success");
         addConn(fromBlock.getInputTargetBlock("branch_failure") ?? null, "Failure");
+      } else if (fromBlock.type === "rulego_for") {
+        addConn(fromBlock.getInputTargetBlock("branch_do") ?? null, "Do");
+        addConn(fromBlock.getInputTargetBlock("branch_success") ?? null, "Success");
+        addConn(fromBlock.getInputTargetBlock("branch_failure") ?? null, "Failure");
       } else {
         const next = fromBlock.getNextBlock();
         if (next) {
@@ -1182,6 +1285,15 @@ export default function RuleGoScratchEditorPage() {
           current = null;
         } else if (current.type === "rulego_jsSwitch") {
           ["branch_success", "branch_failure"].forEach((inputName) => {
+            let branchBlock = current.getInputTargetBlock(inputName);
+            while (branchBlock) {
+              walkChain(branchBlock);
+              branchBlock = branchBlock.getNextBlock();
+            }
+          });
+          current = null;
+        } else if (current.type === "rulego_for") {
+          ["branch_do", "branch_success", "branch_failure"].forEach((inputName) => {
             let branchBlock = current.getInputTargetBlock(inputName);
             while (branchBlock) {
               walkChain(branchBlock);
