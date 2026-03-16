@@ -164,7 +164,8 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved }: BlockConf
       }
     };
     Object.entries(form).forEach(([key, value]) => {
-      if (form[key] !== undefined && key !== "CASES_JSON" && key !== "GROUP_SLOT_COUNT") set(key, value as string | boolean);
+      if (form[key] !== undefined && key !== "CASES_JSON" && key !== "GROUP_SLOT_COUNT" && key !== "NODE_ID")
+        set(key, value as string | boolean);
     });
     if (block.type === "rulego_switch") {
       const casesJson = JSON.stringify(switchCases, null, 2);
@@ -212,7 +213,8 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved }: BlockConf
                 <span>节点 ID</span>
                 <input
                   value={String(form.NODE_ID ?? "")}
-                  onChange={(e) => setForm((f) => ({ ...f, NODE_ID: e.target.value }))}
+                  readOnly
+                  className="readonly-input"
                 />
               </label>
               <label className="form-field">
@@ -640,12 +642,30 @@ export default function RuleGoScratchEditorPage() {
       setDsl(nextDsl);
     };
 
-    workspace.addChangeListener((ev: unknown) => {
+    const changeListener = (ev: unknown) => {
       handleChange(ev as { blockId?: string });
-    });
+    };
+    workspace.addChangeListener(changeListener);
+
+    const container = containerRef.current;
+    const onDblClick = (e: MouseEvent) => {
+      const target = e.target as Node;
+      const blocks = workspace.getAllBlocks(false);
+      for (const block of blocks) {
+        if (!block.type.startsWith("rulego_")) continue;
+        const svgRoot = (block as BlockSvg).getSvgRoot?.();
+        if (svgRoot?.contains(target)) {
+          setConfigModalBlockId(block.id ?? null);
+          e.preventDefault();
+          return;
+        }
+      }
+    };
+    container.addEventListener("dblclick", onDblClick);
 
     return () => {
-      workspace.removeChangeListener(handleChange);
+      container.removeEventListener("dblclick", onDblClick);
+      workspace.removeChangeListener(changeListener);
       workspace.dispose();
       workspaceRef.current = null;
     };
@@ -1102,22 +1122,6 @@ export default function RuleGoScratchEditorPage() {
       <div className="rulego-editor-layout">
         <div className="rulego-editor-canvas" ref={containerRef} />
         <div className="rulego-editor-side">
-          <div className="form-field" style={{ marginBottom: 8 }}>
-            <button
-              type="button"
-              className="primary-button"
-              onClick={() => {
-                const ws = workspaceRef.current;
-                const selectedId =
-                  (ws as { getSelected?: () => Block | null })?.getSelected?.()?.id ??
-                  lastTouchedBlockIdRef.current;
-                if (selectedId) setConfigModalBlockId(selectedId);
-              }}
-            >
-              编辑块配置
-            </button>
-            <small className="form-hint">先在画布中点击选中一个块，再点此按钮在弹框中编辑脚本、URL 等</small>
-          </div>
           <label className="form-field">
             <span>规则名称</span>
             <input value={name} onChange={(event) => setName(event.target.value)} />
