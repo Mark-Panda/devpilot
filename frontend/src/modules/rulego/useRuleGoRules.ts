@@ -3,6 +3,8 @@ import {
   createRuleGoRule,
   deleteRuleGoRule,
   listRuleGoRules,
+  loadRuleChain,
+  unloadRuleChain,
   updateRuleGoRule,
 } from "./useRuleGoApi";
 import { useRuleGoStore } from "./store";
@@ -83,9 +85,17 @@ export function useRuleGoRules() {
     removeRule(id);
   };
 
+  const loadChain = async (id: string) => {
+    await loadRuleChain(id);
+  };
+
+  const unloadChain = async (id: string) => {
+    await unloadRuleChain(id);
+  };
+
   useEffect(() => {
     refresh();
   }, []);
 
-  return { rules, loading, error, refresh, create, update, remove };
+  return { rules, loading, error, refresh, create, update, remove, loadChain, unloadChain };
 }

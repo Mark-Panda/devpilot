@@ -2,8 +2,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as ScratchBlocks from "scratch-blocks";
 import type { WorkspaceSvg, Block, BlockSvg } from "blockly/core";
-import * as monaco from "monaco-editor";
-import EditorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 import { useRuleGoRules } from "./useRuleGoRules";
 import {
   registerAllBlocks,
@@ -12,18 +10,7 @@ import {
   getNodeType as getNodeTypeFromRegistry,
   getBlockTypeFromNodeType,
 } from "./rulego-blocks";
-
-const monacoGlobal = globalThis as typeof globalThis & {
-  MonacoEnvironment?: {
-    getWorker: (workerId: string, label: string) => Worker;
-  };
-};
-
-if (!monacoGlobal.MonacoEnvironment) {
-  monacoGlobal.MonacoEnvironment = {
-    getWorker: () => new EditorWorker(),
-  };
-}
+import { ScriptTextarea } from "./ScriptTextarea";
 
 const scratchTheme = new ScratchBlocks.Theme(
   "scratch",
@@ -74,66 +61,6 @@ const scratchTheme = new ScratchBlocks.Theme(
 );
 
 (ScratchBlocks as { ScratchMsgs?: { setLocale?: (locale: string) => void } }).ScratchMsgs?.setLocale?.("zh-cn");
-
-/** 脚本输入框：Monaco 编辑器，JavaScript 语法高亮 */
-function JsScriptEditor({
-  value,
-  onChange,
-  height = 220,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-  height?: number;
-}) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const editorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
-  const syncingRef = useRef(false);
-
-  useEffect(() => {
-    if (!containerRef.current) return;
-    const editor = monaco.editor.create(containerRef.current, {
-      value: value,
-      language: "javascript",
-      minimap: { enabled: false },
-      automaticLayout: true,
-      scrollBeyondLastLine: false,
-      fontSize: 13,
-      lineNumbers: "on",
-      roundedSelection: true,
-      padding: { top: 8, bottom: 8 },
-    });
-    editorRef.current = editor;
-    const sub = editor.onDidChangeModelContent(() => {
-      if (syncingRef.current) return;
-      onChange(editor.getValue());
-    });
-    return () => {
-      sub.dispose();
-      editor.dispose();
-      editorRef.current = null;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!editorRef.current) return;
-    if (editorRef.current.getValue() === value) return;
-    syncingRef.current = true;
-    editorRef.current.setValue(value);
-    syncingRef.current = false;
-  }, [value]);
-
-  return (
-    <div
-      ref={containerRef}
-      style={{
-        height,
-        border: "1px solid #e2e8f0",
-        borderRadius: 10,
-        overflow: "hidden",
-      }}
-    />
-  );
-}
 
 type BlockConfigModalProps = {
   blockId: string | null;
@@ -201,9 +128,9 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved }: BlockConf
         const arr = raw ? JSON.parse(raw) : [];
         const list = Array.isArray(arr)
           ? arr.map((c: unknown) => ({
-              case: String((c as { case?: string })?.case ?? "true"),
-              then: String((c as { then?: string })?.then ?? "Case1"),
-            }))
+            case: String((c as { case?: string })?.case ?? "true"),
+            then: String((c as { then?: string })?.then ?? "Case1"),
+          }))
           : [{ case: "true", then: "Case1" }];
         setSwitchCases(list.length > 0 ? list : [{ case: "true", then: "Case1" }]);
       } catch {
@@ -517,14 +444,14 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved }: BlockConf
               {(block.type === "rulego_jsFilter" ||
                 block.type === "rulego_jsTransform" ||
                 block.type === "rulego_jsSwitch") && (
-                <label className="form-field" style={{ gridColumn: "1 / -1" }}>
-                  <span>脚本 (JS_SCRIPT)</span>
-                  <JsScriptEditor
-                    value={String(form.JS_SCRIPT ?? "")}
-                    onChange={(v) => setForm((f) => ({ ...f, JS_SCRIPT: v }))}
-                  />
-                </label>
-              )}
+                  <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+                    <span>脚本 (JS_SCRIPT)</span>
+                    <ScriptTextarea
+                      value={String(form.JS_SCRIPT ?? "")}
+                      onChange={(v) => setForm((f) => ({ ...f, JS_SCRIPT: v }))}
+                    />
+                  </label>
+                )}
               {block.type === "rulego_restApiCall" && (
                 <>
                   <label className="form-field">
@@ -611,9 +538,6 @@ export default function RuleGoScratchEditorPage() {
   const { rules, create, update } = useRuleGoRules();
   const workspaceRef = useRef<WorkspaceSvg | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const dslEditorContainerRef = useRef<HTMLDivElement | null>(null);
-  const dslEditorRef = useRef<monaco.editor.IStandaloneCodeEditor | null>(null);
-  const syncingDslRef = useRef(false);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [enabled, setEnabled] = useState(true);
@@ -622,44 +546,11 @@ export default function RuleGoScratchEditorPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [configModalBlockId, setConfigModalBlockId] = useState<string | null>(null);
+  const [viewDslOpen, setViewDslOpen] = useState(false);
+  const [viewJsonOpen, setViewJsonOpen] = useState(false);
   const lastTouchedBlockIdRef = useRef<string | null>(null);
 
   const editingRule = useMemo(() => rules.find((rule) => rule.id === id), [rules, id]);
-
-  useEffect(() => {
-    if (!dslEditorContainerRef.current || dslEditorRef.current) return;
-
-    const editor = monaco.editor.create(dslEditorContainerRef.current, {
-      value: dsl,
-      language: "plaintext",
-      minimap: { enabled: false },
-      automaticLayout: true,
-      scrollBeyondLastLine: false,
-    });
-
-    dslEditorRef.current = editor;
-
-    const subscription = editor.onDidChangeModelContent(() => {
-      if (syncingDslRef.current) return;
-      setDsl(editor.getValue());
-    });
-
-    return () => {
-      subscription.dispose();
-      editor.dispose();
-      dslEditorRef.current = null;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!dslEditorRef.current) return;
-    const editor = dslEditorRef.current;
-    const currentValue = editor.getValue();
-    if (currentValue === dsl) return;
-    syncingDslRef.current = true;
-    editor.setValue(dsl);
-    syncingDslRef.current = false;
-  }, [dsl]);
 
   useEffect(() => {
     if (!containerRef.current || workspaceRef.current) return;
@@ -731,15 +622,19 @@ export default function RuleGoScratchEditorPage() {
 
   useEffect(() => {
     if (!workspaceRef.current) return;
-    if (!editingRule) return;
 
-    setName(editingRule.name);
-    setDescription(editingRule.description);
-    setEnabled(editingRule.enabled);
-    setDsl(editingRule.definition);
-    setJson(editingRule.editorJson);
+    if (editingRule) {
+      setName(editingRule.name);
+      setDescription(editingRule.description);
+      setEnabled(editingRule.enabled);
+      setDsl(editingRule.definition);
+      setJson(editingRule.editorJson);
+    } else {
+      setName("未命名规则");
+      setDescription("");
+    }
 
-    if (editingRule.editorJson) {
+    if (editingRule?.editorJson) {
       try {
         const state = JSON.parse(editingRule.editorJson);
         ScratchBlocks.serialization.workspaces.load(state, workspaceRef.current, { recordUndo: false });
@@ -750,7 +645,7 @@ export default function RuleGoScratchEditorPage() {
       }
     }
 
-    if (editingRule.definition) {
+    if (editingRule?.definition) {
       try {
         const ruleDsl = JSON.parse(editingRule.definition);
         loadWorkspaceFromRuleGoDsl(ruleDsl, workspaceRef.current);
@@ -1173,6 +1068,31 @@ export default function RuleGoScratchEditorPage() {
           <button className="text-button" type="button" onClick={() => navigate("/rulego")}>
             返回列表
           </button>
+          <button
+            className="text-button"
+            type="button"
+            onClick={() => {
+              if (workspaceRef.current) {
+                ensureRuleGoNodeIdsAreUuid(workspaceRef.current);
+                setDsl(buildRuleGoDsl(workspaceRef.current));
+              }
+              setViewDslOpen(true);
+            }}
+          >
+            查看 RuleGo DSL
+          </button>
+          <button
+            className="text-button"
+            type="button"
+            onClick={() => {
+              if (workspaceRef.current) {
+                setJson(JSON.stringify(ScratchBlocks.serialization.workspaces.save(workspaceRef.current), null, 2));
+              }
+              setViewJsonOpen(true);
+            }}
+          >
+            查看 Scratch JSON
+          </button>
           <button className="primary-button" type="button" onClick={handleSave} disabled={saving}>
             保存
           </button>
@@ -1182,32 +1102,42 @@ export default function RuleGoScratchEditorPage() {
       <div className="rulego-editor-layout">
         <div className="rulego-editor-canvas" ref={containerRef} />
         <div className="rulego-editor-side">
-          <label className="form-field">
-            <span>规则名称</span>
-            <input value={name} onChange={(event) => setName(event.target.value)} />
-          </label>
-          <label className="form-field">
-            <span>规则描述</span>
-            <input value={description} onChange={(event) => setDescription(event.target.value)} />
-          </label>
-          <label className="form-field">
-            <span>RuleGo DSL</span>
-            <div className="rulego-dsl-editor" ref={dslEditorContainerRef} />
-          </label>
-          <label className="form-field">
-            <span>Scratch JSON</span>
-            <textarea value={json} onChange={(event) => setJson(event.target.value)} rows={10} readOnly />
-          </label>
-          <label className="form-field">
-            <span>启用</span>
-            <select value={enabled ? "true" : "false"} onChange={(event) => setEnabled(event.target.value === "true")}>
-              <option value="true">启用</option>
-              <option value="false">停用</option>
-            </select>
-          </label>
           {error ? <div className="form-error">{error}</div> : null}
         </div>
       </div>
+
+      {viewDslOpen && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setViewDslOpen(false)}>
+          <div className="modal" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>RuleGo DSL</h3>
+              <button type="button" className="text-button" onClick={() => setViewDslOpen(false)} aria-label="关闭">
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <textarea readOnly value={dsl} rows={20} style={{ width: "100%", fontFamily: "monospace", fontSize: 13 }} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewJsonOpen && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setViewJsonOpen(false)}>
+          <div className="modal" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Scratch JSON</h3>
+              <button type="button" className="text-button" onClick={() => setViewJsonOpen(false)} aria-label="关闭">
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              <textarea readOnly value={json} rows={20} style={{ width: "100%", fontFamily: "monospace", fontSize: 13 }} />
+            </div>
+          </div>
+        </div>
+      )}
+
       {configModalBlockId !== null && (
         <BlockConfigModal
           blockId={configModalBlockId}

@@ -165,7 +165,19 @@ body {
 
 .table-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+/* RuleGo 规则管理：4 列（名称、描述、状态、操作），为操作列留足空间 */
+.rulego-table .table-head,
+.rulego-table .table-row {
+  grid-template-columns: 1.2fr 1.5fr 0.6fr minmax(280px, auto);
+}
+
+.rulego-table .table-actions {
+  overflow: visible;
+  white-space: nowrap;
 }
 
 .text-button {

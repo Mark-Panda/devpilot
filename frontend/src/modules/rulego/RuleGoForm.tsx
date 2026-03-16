@@ -14,7 +14,10 @@ type RuleGoFormProps = {
   initial?: RuleGoRule | null;
   onCancel: () => void;
   onSubmit: (values: FormValues) => Promise<void>;
+  /** 是否展示编辑器 JSON 字段 */
   showEditorJson?: boolean;
+  /** 是否展示规则定义（DSL）字段，表单编辑时可设为 false，仅改名称/描述/启用状态 */
+  showDefinition?: boolean;
 };
 
 export default function RuleGoForm({
@@ -23,6 +26,7 @@ export default function RuleGoForm({
   onCancel,
   onSubmit,
   showEditorJson = true,
+  showDefinition = true,
 }: RuleGoFormProps) {
   const [values, setValues] = useState<FormValues>({
     name: initial?.name ?? "",
@@ -46,14 +50,14 @@ export default function RuleGoForm({
 
   const canSubmit = useMemo(() => {
     if (!values.name.trim()) return false;
-    if (!values.definition.trim()) return false;
+    if (showDefinition && !values.definition.trim()) return false;
     if (showEditorJson && !values.editorJson.trim()) return false;
     return true;
-  }, [showEditorJson, values]);
+  }, [showEditorJson, showDefinition, values]);
 
   const validate = () => {
     if (!values.name.trim()) return "规则名称不能为空";
-    if (!values.definition.trim()) return "规则定义不能为空";
+    if (showDefinition && !values.definition.trim()) return "规则定义不能为空";
     if (showEditorJson && !values.editorJson.trim()) return "编辑器 JSON 不能为空";
     return null;
   };
@@ -68,14 +72,15 @@ export default function RuleGoForm({
 
     setSubmitting(true);
     setError(null);
+    const payload = {
+      name: values.name.trim(),
+      description: values.description.trim(),
+      enabled: values.enabled,
+      definition: showDefinition ? values.definition.trim() : (initial?.definition ?? ""),
+      editorJson: showEditorJson ? values.editorJson.trim() : (initial?.editorJson ?? ""),
+    };
     try {
-      await onSubmit({
-        name: values.name.trim(),
-        description: values.description.trim(),
-        enabled: values.enabled,
-        definition: values.definition.trim(),
-        editorJson: values.editorJson.trim(),
-      });
+      await onSubmit(payload);
     } catch (err) {
       setError((err as Error).message || "提交失败");
     } finally {
@@ -104,16 +109,18 @@ export default function RuleGoForm({
           />
           <small className="form-hint">用于说明该规则的使用场景</small>
         </label>
-        <label className="form-field">
-          <span>规则定义</span>
-          <textarea
-            value={values.definition}
-            onChange={(event) => setValues({ ...values, definition: event.target.value })}
-            placeholder="JSON / DSL"
-            rows={6}
-          />
-          <small className="form-hint">保存为 RuleGo DSL</small>
-        </label>
+        {showDefinition ? (
+          <label className="form-field">
+            <span>规则定义</span>
+            <textarea
+              value={values.definition}
+              onChange={(event) => setValues({ ...values, definition: event.target.value })}
+              placeholder="JSON / DSL"
+              rows={6}
+            />
+            <small className="form-hint">保存为 RuleGo DSL</small>
+          </label>
+        ) : null}
         {showEditorJson ? (
           <label className="form-field">
             <span>编辑器 JSON</span>

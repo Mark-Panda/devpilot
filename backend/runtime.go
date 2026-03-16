@@ -2,6 +2,7 @@ package backend
 
 import (
 	"fmt"
+	"log"
 
 	"devpilot/backend/internal/services/model_management"
 	"devpilot/backend/internal/services/route_rewrite"
@@ -33,6 +34,11 @@ func InitRuntime(dbPath string) (*Runtime, error) {
 	modelService := model_management.NewService(modelStore)
 	ruleGoStore := rulego.NewStore(db.DB)
 	ruleGoService := rulego.NewService(ruleGoStore)
+	if n, err := ruleGoService.LoadAllEnabledRuleChains(); err != nil {
+		log.Printf("[rulego] 启动加载启用规则链: 已加载 %d 条，错误: %v", n, err)
+	} else {
+		log.Printf("[rulego] 启动加载启用规则链: 共 %d 条", n)
+	}
 
 	return &Runtime{
 		routeRewrite: routeRewriteService,

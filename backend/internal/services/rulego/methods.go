@@ -54,6 +54,9 @@ func (s *Service) CreateRuleGoRule(input CreateRuleGoRuleInput) (models.RuleGoRu
 	if err != nil {
 		return models.RuleGoRule{}, err
 	}
+	if result.Enabled && result.Definition != "" {
+		_ = s.LoadRuleChain(result.ID)
+	}
 	return result, nil
 }
 
@@ -77,11 +80,25 @@ func (s *Service) UpdateRuleGoRule(id string, input UpdateRuleGoRuleInput) (mode
 		return models.RuleGoRule{}, err
 	}
 
-	return s.store.Update(context.Background(), id, rule)
+	result, err := s.store.Update(context.Background(), id, rule)
+	if err != nil {
+		return models.RuleGoRule{}, err
+	}
+	if result.Enabled && result.Definition != "" {
+		_ = s.LoadRuleChain(id)
+	} else {
+		_ = s.UnloadRuleChain(id)
+	}
+	return result, nil
 }
 
 func (s *Service) DeleteRuleGoRule(id string) error {
+	_ = s.UnloadRuleChain(id)
 	return s.store.Delete(context.Background(), id)
+}
+
+func (s *Service) GetRuleGoRule(id string) (models.RuleGoRule, error) {
+	return s.store.GetByID(context.Background(), id)
 }
 
 func validateRule(rule models.RuleGoRule) error {

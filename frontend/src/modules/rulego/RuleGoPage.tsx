@@ -6,10 +6,24 @@ import { useRuleGoRules } from "./useRuleGoRules";
 
 export default function RuleGoPage() {
   const navigate = useNavigate();
-  const { rules, loading, error, refresh, create, update, remove } = useRuleGoRules();
+  const { rules, loading, error, refresh, create, update, remove, loadChain, unloadChain } = useRuleGoRules();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<RuleGoRule | null>(null);
   const [confirmingRule, setConfirmingRule] = useState<RuleGoRule | null>(null);
+  const [actionFeedback, setActionFeedback] = useState<{ msg: string; isError?: boolean } | null>(null);
+  /** 本地记录的“已启用”规则 ID，用于切换按钮展示（与后端实际加载状态可能不同步） */
+  const [loadedIds, setLoadedIds] = useState<Set<string>>(new Set());
+
+  const withFeedback = async (fn: () => Promise<void>, successMsg: string) => {
+    try {
+      await fn();
+      setActionFeedback({ msg: successMsg });
+      setTimeout(() => setActionFeedback(null), 2500);
+    } catch (e) {
+      setActionFeedback({ msg: (e as Error).message, isError: true });
+      setTimeout(() => setActionFeedback(null), 3500);
+    }
+  };
 
   return (
     <div className="page">
@@ -42,12 +56,11 @@ export default function RuleGoPage() {
         </div>
       </div>
 
-      <div className="table-card">
+      <div className="table-card rulego-table">
         <div className="table-head">
           <div className="table-cell">名称</div>
           <div className="table-cell">描述</div>
           <div className="table-cell">状态</div>
-          <div className="table-cell">规则定义</div>
           <div className="table-cell">操作</div>
         </div>
         {loading ? (
@@ -61,14 +74,13 @@ export default function RuleGoPage() {
                 <div className="table-cell">{rule.name}</div>
                 <div className="table-cell">{rule.description || "-"}</div>
                 <div className="table-cell">{rule.enabled ? "启用" : "停用"}</div>
-                <div className="table-cell">{rule.definition}</div>
                 <div className="table-cell table-actions">
                   <button
                     className="text-button"
                     type="button"
                     onClick={() => navigate(`/rulego/editor/${rule.id}`)}
                   >
-                    可视化编辑
+                    编辑
                   </button>
                   <button
                     className="text-button"
@@ -80,6 +92,39 @@ export default function RuleGoPage() {
                   >
                     表单编辑
                   </button>
+                  {rule.enabled && rule.definition ? (
+                    loadedIds.has(rule.id) ? (
+                      <button
+                        className="text-button"
+                        type="button"
+                        onClick={() =>
+                          withFeedback(async () => {
+                            await unloadChain(rule.id);
+                            setLoadedIds((prev) => {
+                              const next = new Set(prev);
+                              next.delete(rule.id);
+                              return next;
+                            });
+                          }, "已禁用")
+                        }
+                      >
+                        禁用
+                      </button>
+                    ) : (
+                      <button
+                        className="text-button"
+                        type="button"
+                        onClick={() =>
+                          withFeedback(async () => {
+                            await loadChain(rule.id);
+                            setLoadedIds((prev) => new Set(prev).add(rule.id));
+                          }, "已启用")
+                        }
+                      >
+                        启用
+                      </button>
+                    )
+                  ) : null}
                   <button
                     className="text-button danger"
                     type="button"
@@ -93,6 +138,11 @@ export default function RuleGoPage() {
           </div>
         )}
         {error ? <div className="table-error">{error}</div> : null}
+        {actionFeedback ? (
+          <div className={actionFeedback.isError ? "table-error" : "form-hint"} style={{ marginTop: 8 }}>
+            {actionFeedback.msg}
+          </div>
+        ) : null}
       </div>
 
       {modalOpen ? (
@@ -117,6 +167,7 @@ export default function RuleGoPage() {
               mode={editingRule ? "edit" : "create"}
               initial={editingRule}
               showEditorJson={false}
+              showDefinition={!editingRule}
               onCancel={() => setModalOpen(false)}
               onSubmit={async (values) => {
                 if (editingRule) {
