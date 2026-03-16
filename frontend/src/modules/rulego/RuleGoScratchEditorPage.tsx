@@ -117,6 +117,17 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved }: BlockConf
       next.FOR_DO = get("FOR_DO") || (doBlock ? String(doBlock.getFieldValue?.("NODE_ID") ?? doBlock.id) : "");
       next.FOR_MODE = get("FOR_MODE") ?? "0";
     }
+    if (block.type === "rulego_join") {
+      next.JOIN_TIMEOUT = get("JOIN_TIMEOUT") || "0";
+      next.JOIN_MERGE_TO_MAP = getBool("JOIN_MERGE_TO_MAP");
+    }
+    if (block.type === "rulego_groupAction") {
+      next.MATCH_RELATION_TYPE = get("MATCH_RELATION_TYPE") || "Success";
+      next.MATCH_NUM = get("MATCH_NUM") || "0";
+      next.GROUP_TIMEOUT = get("GROUP_TIMEOUT") || "0";
+      next.GROUP_MERGE_TO_MAP = getBool("GROUP_MERGE_TO_MAP");
+      next.GROUP_SLOT_COUNT = String((block as Block & { groupCount_?: number }).groupCount_ ?? 1);
+    }
     if (block.type === "rulego_switch") {
       try {
         const raw = get("CASES_JSON") || (block as Block & { casesJson_?: string }).casesJson_ || "";
@@ -146,7 +157,7 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved }: BlockConf
       }
     };
     Object.entries(form).forEach(([key, value]) => {
-      if (form[key] !== undefined && key !== "CASES_JSON") set(key, value as string | boolean);
+      if (form[key] !== undefined && key !== "CASES_JSON" && key !== "GROUP_SLOT_COUNT") set(key, value as string | boolean);
     });
     if (block.type === "rulego_switch") {
       const casesJson = JSON.stringify(switchCases, null, 2);
@@ -158,6 +169,12 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved }: BlockConf
         xml.setAttribute("casecount", String(Math.max(1, Math.min(6, switchCases.length))));
         b.domToMutation(xml);
       }
+    }
+    if (block.type === "rulego_groupAction" && form.GROUP_SLOT_COUNT !== undefined) {
+      const slotCount = Math.max(1, Math.min(8, parseInt(String(form.GROUP_SLOT_COUNT), 10) || 1));
+      const b = block as Block & { groupCount_?: number; updateShape_?: () => void };
+      b.groupCount_ = slotCount;
+      b.updateShape_?.();
     }
     onSaved?.();
     onClose();
@@ -275,6 +292,118 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved }: BlockConf
                     </a>
                   </small>
                 </div>
+              )}
+              {block.type === "rulego_join" && (
+                <>
+                  <label className="form-field">
+                    <span>timeout（秒，0 表示不超时）</span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={String(form.JOIN_TIMEOUT ?? "0")}
+                      onChange={(e) => setForm((f) => ({ ...f, JOIN_TIMEOUT: e.target.value }))}
+                    />
+                  </label>
+                  <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(form.JOIN_MERGE_TO_MAP)}
+                      onChange={(e) => setForm((f) => ({ ...f, JOIN_MERGE_TO_MAP: e.target.checked }))}
+                    />
+                    <span>mergeToMap（结果合并为 Map）</span>
+                  </label>
+                  <small className="form-hint" style={{ gridColumn: "1 / -1" }}>
+                    参考 <a href="https://rulego.cc/pages/join/" target="_blank" rel="noopener noreferrer">RuleGo 汇聚</a>
+                  </small>
+                </>
+              )}
+              {block.type === "rulego_groupAction" && (
+                <>
+                  <label className="form-field">
+                    <span>matchRelationType</span>
+                    <select
+                      value={String(form.MATCH_RELATION_TYPE ?? "Success")}
+                      onChange={(e) => setForm((f) => ({ ...f, MATCH_RELATION_TYPE: e.target.value }))}
+                    >
+                      <option value="Success">Success</option>
+                      <option value="Failure">Failure</option>
+                    </select>
+                  </label>
+                  <label className="form-field">
+                    <span>matchNum（0=全部匹配）</span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={String(form.MATCH_NUM ?? "0")}
+                      onChange={(e) => setForm((f) => ({ ...f, MATCH_NUM: e.target.value }))}
+                    />
+                  </label>
+                  <label className="form-field">
+                    <span>timeout（秒）</span>
+                    <input
+                      type="number"
+                      min={0}
+                      value={String(form.GROUP_TIMEOUT ?? "0")}
+                      onChange={(e) => setForm((f) => ({ ...f, GROUP_TIMEOUT: e.target.value }))}
+                    />
+                  </label>
+                  <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <input
+                      type="checkbox"
+                      checked={Boolean(form.GROUP_MERGE_TO_MAP)}
+                      onChange={(e) => setForm((f) => ({ ...f, GROUP_MERGE_TO_MAP: e.target.checked }))}
+                    />
+                    <span>mergeToMap</span>
+                  </label>
+                  <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                    <span>组内节点槽位数量</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={8}
+                      value={String(form.GROUP_SLOT_COUNT ?? "1")}
+                      onChange={(e) =>
+                        setForm((f) => ({
+                          ...f,
+                          GROUP_SLOT_COUNT: String(Math.max(1, Math.min(8, parseInt(e.target.value, 10) || 1))),
+                        }))
+                      }
+                      style={{ width: 56 }}
+                    />
+                    <button
+                      type="button"
+                      className="text-button"
+                      style={{ padding: "4px 8px" }}
+                      onClick={() =>
+                        setForm((f) => ({
+                          ...f,
+                          GROUP_SLOT_COUNT: String(Math.min(8, (parseInt(String(f.GROUP_SLOT_COUNT ?? "1"), 10) || 1) + 1)),
+                        }))
+                      }
+                      disabled={parseInt(String(form.GROUP_SLOT_COUNT ?? "1"), 10) >= 8}
+                    >
+                      +1
+                    </button>
+                    <button
+                      type="button"
+                      className="text-button"
+                      style={{ padding: "4px 8px" }}
+                      onClick={() =>
+                        setForm((f) => ({
+                          ...f,
+                          GROUP_SLOT_COUNT: String(Math.max(1, (parseInt(String(f.GROUP_SLOT_COUNT ?? "1"), 10) || 1) - 1)),
+                        }))
+                      }
+                      disabled={parseInt(String(form.GROUP_SLOT_COUNT ?? "1"), 10) <= 1}
+                    >
+                      -1
+                    </button>
+                  </label>
+                  <small className="form-hint" style={{ gridColumn: "1 / -1" }}>
+                    画布上会同步显示对应数量的「组内节点N」槽位（1～8）。参考{" "}
+                    <a href="https://rulego.cc/pages/group-action/" target="_blank" rel="noopener noreferrer">RuleGo 节点组</a>
+                  </small>
+                </>
               )}
               {block.type === "rulego_for" && (
                 <>
@@ -479,6 +608,7 @@ export default function RuleGoScratchEditorPage() {
   const [error, setError] = useState<string | null>(null);
   const [configModalBlockId, setConfigModalBlockId] = useState<string | null>(null);
   const lastTouchedBlockIdRef = useRef<string | null>(null);
+  const MAX_GROUP_SLOTS = 8;
 
   const editingRule = useMemo(() => rules.find((rule) => rule.id === id), [rules, id]);
 
@@ -556,33 +686,53 @@ export default function RuleGoScratchEditorPage() {
     };
 
     ScratchBlocks.Blocks.rulego_jsFilter = {
-      init: buildMinimalNodeInit({
-        defaultId: "s1",
-        defaultName: "Filter",
-        script: "return msg!='bb';",
-        category: "rulego_nodes",
-      }),
+      init: function (this: Block) {
+        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput("Filter"), "NODE_NAME");
+        const config = this.appendDummyInput("CONFIG");
+        config.appendField(new BlocklyF.FieldTextInput("s1"), "NODE_ID");
+        config.appendField(new BlocklyF.FieldTextInput("return msg.temperature > 50;"), "JS_SCRIPT");
+        config.appendField(new BlocklyF.FieldCheckbox(true), "DEBUG");
+        this.appendStatementInput("branch_true").appendField("True");
+        this.appendStatementInput("branch_false").appendField("False");
+        this.appendStatementInput("branch_failure").appendField("Failure");
+        const configInput = this.getInput("CONFIG");
+        if (configInput?.setVisible) configInput.setVisible(false);
+        this.setPreviousStatement(true);
+        if (typeof this.setStyle === "function") this.setStyle("rulego_nodes");
+      },
     };
 
     ScratchBlocks.Blocks.rulego_jsTransform = {
-      init: buildMinimalNodeInit({
-        defaultId: "s2",
-        defaultName: "Transform",
-        script:
-          "metadata['test']='test02';\nmetadata['index']=50;\nmsgType='TEST_MSG_TYPE2';\nvar msg2=JSON.parse(msg);\nmsg2['aa']=66;\nreturn {'msg':msg2,'metadata':metadata,'msgType':msgType};",
-        category: "rulego_nodes",
-      }),
+      init: function (this: Block) {
+        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput("脚本转换器"), "NODE_NAME");
+        const config = this.appendDummyInput("CONFIG");
+        config.appendField(new BlocklyF.FieldTextInput("s2"), "NODE_ID");
+        config.appendField(
+          new BlocklyF.FieldTextInput(
+            "metadata['name']='test02';\nmetadata['index']=22;\nmsg['addField']='addValue2';\nreturn {'msg':msg,'metadata':metadata,'msgType':msgType};"
+          ),
+          "JS_SCRIPT"
+        );
+        config.appendField(new BlocklyF.FieldCheckbox(true), "DEBUG");
+        this.appendStatementInput("branch_success").appendField("Success");
+        this.appendStatementInput("branch_failure").appendField("Failure");
+        const configInput = this.getInput("CONFIG");
+        if (configInput?.setVisible) configInput.setVisible(false);
+        this.setPreviousStatement(true);
+        if (typeof this.setStyle === "function") this.setStyle("rulego_nodes");
+      },
     };
 
     ScratchBlocks.Blocks.rulego_jsSwitch = {
       init: function (this: Block) {
-        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput("Switch"), "NODE_NAME");
+        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput("脚本路由"), "NODE_NAME");
         const config = this.appendDummyInput("CONFIG");
         config.appendField(new BlocklyF.FieldTextInput("s3"), "NODE_ID");
-        config.appendField(new BlocklyF.FieldTextInput("return msgType;"), "JS_SCRIPT");
+        config.appendField(new BlocklyF.FieldTextInput("return ['Success'];"), "JS_SCRIPT");
         config.appendField(new BlocklyF.FieldCheckbox(true), "DEBUG");
-        this.appendStatementInput("branch_success").appendField("成功");
-        this.appendStatementInput("branch_failure").appendField("失败");
+        this.appendStatementInput("branch_success").appendField("Success");
+        this.appendStatementInput("branch_failure").appendField("Failure");
+        this.appendStatementInput("branch_default").appendField("Default");
         const configInput = this.getInput("CONFIG");
         if (configInput?.setVisible) configInput.setVisible(false);
         this.setPreviousStatement(true);
@@ -656,7 +806,20 @@ export default function RuleGoScratchEditorPage() {
     };
 
     ScratchBlocks.Blocks.rulego_join = {
-      init: buildMinimalNodeInit({ defaultId: "jn1", defaultName: "Join", category: "rulego_routes" }),
+      init: function (this: Block) {
+        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput("汇聚"), "NODE_NAME");
+        const config = this.appendDummyInput("CONFIG");
+        config.appendField(new BlocklyF.FieldTextInput("jn1"), "NODE_ID");
+        config.appendField(new BlocklyF.FieldNumber("0", 0, 3600, 1), "JOIN_TIMEOUT");
+        config.appendField(new BlocklyF.FieldCheckbox(false), "JOIN_MERGE_TO_MAP");
+        config.appendField(new BlocklyF.FieldCheckbox(true), "DEBUG");
+        this.appendStatementInput("branch_success").appendField("Success");
+        this.appendStatementInput("branch_failure").appendField("Failure");
+        const configInput = this.getInput("CONFIG");
+        if (configInput?.setVisible) configInput.setVisible(false);
+        this.setPreviousStatement(true);
+        if (typeof this.setStyle === "function") this.setStyle("rulego_routes");
+      },
     };
 
     ScratchBlocks.Blocks.rulego_for = {
@@ -680,24 +843,76 @@ export default function RuleGoScratchEditorPage() {
     };
 
     ScratchBlocks.Blocks.rulego_groupAction = {
-      init: buildMinimalNodeInit({ defaultId: "grp1", defaultName: "Group", category: "rulego_data" }),
+      init: function (this: Block & { groupCount_?: number; updateShape_?: () => void }) {
+        this.groupCount_ = 1;
+        const typeDef = ScratchBlocks.Blocks.rulego_groupAction as { updateShape_?: (this: Block) => void };
+        (this as Block & { updateShape_?: () => void }).updateShape_ = () => typeDef.updateShape_?.call(this);
+        this.updateShape_?.();
+      },
+      mutationToDom: function (this: Block & { groupCount_?: number }) {
+        const xml = document.createElement("mutation");
+        xml.setAttribute("slotcount", String(Math.max(1, Math.min(MAX_GROUP_SLOTS, this.groupCount_ ?? 1))));
+        return xml;
+      },
+      domToMutation: function (this: Block & { groupCount_?: number; updateShape_?: () => void }, xml: Element) {
+        this.groupCount_ = Math.max(1, Math.min(MAX_GROUP_SLOTS, parseInt(xml.getAttribute("slotcount") || "1", 10)));
+        this.updateShape_?.();
+      },
+      updateShape_: function (this: Block & { groupCount_?: number }) {
+        const n = Math.max(1, Math.min(MAX_GROUP_SLOTS, this.groupCount_ ?? 1));
+        const nodeId = this.getFieldValue?.("NODE_ID") ?? "grp1";
+        const nodeName = this.getFieldValue?.("NODE_NAME") ?? "节点组";
+        const matchRel = this.getFieldValue?.("MATCH_RELATION_TYPE") ?? "Success";
+        const matchNum = this.getFieldValue?.("MATCH_NUM") ?? "0";
+        const timeout = this.getFieldValue?.("GROUP_TIMEOUT") ?? "0";
+        const mergeToMap = this.getFieldValue?.("GROUP_MERGE_TO_MAP") === "TRUE";
+        const debug = this.getFieldValue?.("DEBUG") === "TRUE";
+        const inputNames = this.inputList?.map((inp: { name: string }) => inp.name) ?? [];
+        inputNames.forEach((name: string) => this.removeInput(name));
+        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput(nodeName), "NODE_NAME");
+        const configInput = this.appendDummyInput("CONFIG");
+        configInput.appendField(new BlocklyF.FieldTextInput(nodeId), "NODE_ID");
+        configInput.appendField(new BlocklyF.FieldDropdown([["Success", "Success"], ["Failure", "Failure"]]), "MATCH_RELATION_TYPE");
+        configInput.appendField(new BlocklyF.FieldNumber("0", 0, 99, 1), "MATCH_NUM");
+        configInput.appendField(new BlocklyF.FieldNumber("0", 0, 3600, 1), "GROUP_TIMEOUT");
+        configInput.appendField(new BlocklyF.FieldCheckbox(false), "GROUP_MERGE_TO_MAP");
+        configInput.appendField(new BlocklyF.FieldCheckbox(true), "DEBUG");
+        if (configInput.setVisible) configInput.setVisible(false);
+        for (let i = 0; i < n; i++) {
+          this.appendStatementInput(`branch_${i}`).appendField(`组内节点${i + 1}`);
+        }
+        this.appendStatementInput("branch_success").appendField("Success");
+        this.appendStatementInput("branch_failure").appendField("Failure");
+        this.setPreviousStatement(true);
+        this.setFieldValue(matchRel, "MATCH_RELATION_TYPE");
+        this.setFieldValue(matchNum, "MATCH_NUM");
+        this.setFieldValue(timeout, "GROUP_TIMEOUT");
+        this.setFieldValue(mergeToMap ? "TRUE" : "FALSE", "GROUP_MERGE_TO_MAP");
+        this.setFieldValue(debug ? "TRUE" : "FALSE", "DEBUG");
+        if (typeof this.setStyle === "function") this.setStyle("rulego_data");
+      },
     };
 
     ScratchBlocks.Blocks.rulego_restApiCall = {
-      init: buildMinimalNodeInit({
-        defaultId: "rest1",
-        defaultName: "Rest API",
-        category: "rulego_nodes",
-        restFields: [
-          { name: "REST_URL", value: "http://localhost:9099/api" },
-          { name: "REST_METHOD", value: "POST", dropdown: [["GET", "GET"], ["POST", "POST"], ["PUT", "PUT"], ["DELETE", "DELETE"]] },
-          { name: "REST_HEADERS", value: "{}" },
-          { name: "REST_QUERY", value: "{}" },
-          { name: "REST_BODY", value: "" },
-          { name: "REST_TIMEOUT", value: "30000" },
-          { name: "REST_MAX_PARALLEL", value: "200" },
-        ],
-      }),
+      init: function (this: Block) {
+        this.appendDummyInput("HEAD").appendField(new BlocklyF.FieldTextInput("HTTP客户端"), "NODE_NAME");
+        const config = this.appendDummyInput("CONFIG");
+        config.appendField(new BlocklyF.FieldTextInput("rest1"), "NODE_ID");
+        config.appendField(new BlocklyF.FieldTextInput("http://localhost:9099/api"), "REST_URL");
+        config.appendField(new BlocklyF.FieldDropdown([["GET", "GET"], ["POST", "POST"], ["PUT", "PUT"], ["DELETE", "DELETE"]]), "REST_METHOD");
+        config.appendField(new BlocklyF.FieldTextInput("{}"), "REST_HEADERS");
+        config.appendField(new BlocklyF.FieldTextInput("{}"), "REST_QUERY");
+        config.appendField(new BlocklyF.FieldTextInput(""), "REST_BODY");
+        config.appendField(new BlocklyF.FieldTextInput("30000"), "REST_TIMEOUT");
+        config.appendField(new BlocklyF.FieldTextInput("200"), "REST_MAX_PARALLEL");
+        config.appendField(new BlocklyF.FieldCheckbox(true), "DEBUG");
+        this.appendStatementInput("branch_success").appendField("Success");
+        this.appendStatementInput("branch_failure").appendField("Failure");
+        const configInput = this.getInput("CONFIG");
+        if (configInput?.setVisible) configInput.setVisible(false);
+        this.setPreviousStatement(true);
+        if (typeof this.setStyle === "function") this.setStyle("rulego_nodes");
+      },
     };
 
     ScratchBlocks.Blocks.rulego_endpoint = {
@@ -925,6 +1140,25 @@ export default function RuleGoScratchEditorPage() {
       configuration.mode = modeStr === "" ? 0 : Number(modeStr) || 0;
     }
 
+    if (block.type === "rulego_join") {
+      configuration.timeout = Number(getFieldValue(block, "JOIN_TIMEOUT") ?? 0) || 0;
+      configuration.mergeToMap = getBooleanField(block, "JOIN_MERGE_TO_MAP");
+    }
+
+    if (block.type === "rulego_groupAction") {
+      const slotCount = Math.max(1, Math.min(MAX_GROUP_SLOTS, (block as Block & { groupCount_?: number }).groupCount_ ?? 1));
+      const nodeIds: string[] = [];
+      for (let i = 0; i < slotCount; i++) {
+        const b = block.getInputTargetBlock(`branch_${i}`);
+        if (b) nodeIds.push(getFieldValue(b, "NODE_ID") || b.id);
+      }
+      configuration.nodeIds = nodeIds.length ? nodeIds : (getFieldValue(block, "GROUP_NODE_IDS") || "").split(",").filter(Boolean);
+      configuration.matchRelationType = getFieldValue(block, "MATCH_RELATION_TYPE") || "Success";
+      configuration.matchNum = Number(getFieldValue(block, "MATCH_NUM") ?? 0) || 0;
+      configuration.timeout = Number(getFieldValue(block, "GROUP_TIMEOUT") ?? 0) || 0;
+      configuration.mergeToMap = getBooleanField(block, "GROUP_MERGE_TO_MAP");
+    }
+
     return {
       id: nodeId,
       type: nodeType,
@@ -1005,6 +1239,26 @@ export default function RuleGoScratchEditorPage() {
       block.setFieldValue(String(node.configuration?.range ?? "1..3"), "FOR_RANGE");
       block.setFieldValue(String(node.configuration?.do ?? "s3"), "FOR_DO");
       block.setFieldValue(String(node.configuration?.mode ?? 0), "FOR_MODE");
+    }
+
+    if (node.type === "join") {
+      block.setFieldValue(String(node.configuration?.timeout ?? 0), "JOIN_TIMEOUT");
+      block.setFieldValue(node.configuration?.mergeToMap ? "TRUE" : "FALSE", "JOIN_MERGE_TO_MAP");
+    }
+
+    if (node.type === "groupAction") {
+      block.setFieldValue(String(node.configuration?.matchRelationType ?? "Success"), "MATCH_RELATION_TYPE");
+      block.setFieldValue(String(node.configuration?.matchNum ?? 0), "MATCH_NUM");
+      block.setFieldValue(String(node.configuration?.timeout ?? 0), "GROUP_TIMEOUT");
+      block.setFieldValue(node.configuration?.mergeToMap ? "TRUE" : "FALSE", "GROUP_MERGE_TO_MAP");
+      const nodeIds = (node.configuration?.nodeIds ?? []) as string[];
+      const slotCount = Math.max(1, Math.min(MAX_GROUP_SLOTS, nodeIds.length || 1));
+      const b = block as Block & { domToMutation?: (xml: Element) => void };
+      if (typeof b.domToMutation === "function") {
+        const xml = document.createElement("mutation");
+        xml.setAttribute("slotcount", String(slotCount));
+        b.domToMutation(xml);
+      }
     }
 
     const position = (node.additionalInfo as { position?: { x: number; y: number } } | undefined)?.position;
@@ -1094,14 +1348,32 @@ export default function RuleGoScratchEditorPage() {
         if (input?.connection) {
           input.connection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
         }
+      } else if (fromBlock.type === "rulego_jsFilter") {
+        const inputName = type === "True" ? "branch_true" : type === "False" ? "branch_false" : "branch_failure";
+        const input = fromBlock.getInput(inputName);
+        if (input?.connection) {
+          input.connection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
+        }
       } else if (fromBlock.type === "rulego_jsSwitch") {
-        const inputName = type === "Failure" ? "branch_failure" : "branch_success";
+        const inputName = type === "Failure" ? "branch_failure" : type === "Default" ? "branch_default" : "branch_success";
         const input = fromBlock.getInput(inputName);
         if (input?.connection) {
           input.connection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
         }
       } else if (fromBlock.type === "rulego_for") {
         const inputName = type === "Do" ? "branch_do" : type === "Failure" ? "branch_failure" : "branch_success";
+        const input = fromBlock.getInput(inputName);
+        if (input?.connection) {
+          input.connection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
+        }
+      } else if (fromBlock.type === "rulego_jsTransform" || fromBlock.type === "rulego_join" || fromBlock.type === "rulego_restApiCall") {
+        const inputName = type === "Failure" ? "branch_failure" : "branch_success";
+        const input = fromBlock.getInput(inputName);
+        if (input?.connection) {
+          input.connection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
+        }
+      } else if (fromBlock.type === "rulego_groupAction") {
+        const inputName = type === "Failure" ? "branch_failure" : "branch_success";
         const input = fromBlock.getInput(inputName);
         if (input?.connection) {
           input.connection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
@@ -1126,6 +1398,22 @@ export default function RuleGoScratchEditorPage() {
       if (input?.connection) {
         input.connection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
       }
+    });
+
+    nodes.forEach((node: { type?: string; id?: string; configuration?: { nodeIds?: string[] } }) => {
+      if (node.type !== "groupAction" || !Array.isArray(node.configuration?.nodeIds)) return;
+      const fromBlock = nodeMap.get(String(node.id));
+      if (!fromBlock || (fromBlock as Block).type !== "rulego_groupAction") return;
+      const nodeIds = node.configuration.nodeIds;
+      nodeIds.forEach((toId, i) => {
+        if (i >= 8) return;
+        const toBlock = nodeMap.get(String(toId));
+        if (!toBlock?.previousConnection) return;
+        const input = fromBlock.getInput(`branch_${i}`);
+        if (input?.connection) {
+          input.connection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
+        }
+      });
     });
 
     workspace.refreshTheme();
@@ -1240,11 +1528,28 @@ export default function RuleGoScratchEditorPage() {
         }
         addConn(fromBlock.getInputTargetBlock("branch_default") ?? null, "Default");
         addConn(fromBlock.getInputTargetBlock("branch_failure") ?? null, "Failure");
+      } else if (fromBlock.type === "rulego_jsFilter") {
+        addConn(fromBlock.getInputTargetBlock("branch_true") ?? null, "True");
+        addConn(fromBlock.getInputTargetBlock("branch_false") ?? null, "False");
+        addConn(fromBlock.getInputTargetBlock("branch_failure") ?? null, "Failure");
       } else if (fromBlock.type === "rulego_jsSwitch") {
         addConn(fromBlock.getInputTargetBlock("branch_success") ?? null, "Success");
         addConn(fromBlock.getInputTargetBlock("branch_failure") ?? null, "Failure");
+        addConn(fromBlock.getInputTargetBlock("branch_default") ?? null, "Default");
       } else if (fromBlock.type === "rulego_for") {
         addConn(fromBlock.getInputTargetBlock("branch_do") ?? null, "Do");
+        addConn(fromBlock.getInputTargetBlock("branch_success") ?? null, "Success");
+        addConn(fromBlock.getInputTargetBlock("branch_failure") ?? null, "Failure");
+      } else if (fromBlock.type === "rulego_jsTransform") {
+        addConn(fromBlock.getInputTargetBlock("branch_success") ?? null, "Success");
+        addConn(fromBlock.getInputTargetBlock("branch_failure") ?? null, "Failure");
+      } else if (fromBlock.type === "rulego_join") {
+        addConn(fromBlock.getInputTargetBlock("branch_success") ?? null, "Success");
+        addConn(fromBlock.getInputTargetBlock("branch_failure") ?? null, "Failure");
+      } else if (fromBlock.type === "rulego_groupAction") {
+        addConn(fromBlock.getInputTargetBlock("branch_success") ?? null, "Success");
+        addConn(fromBlock.getInputTargetBlock("branch_failure") ?? null, "Failure");
+      } else if (fromBlock.type === "rulego_restApiCall") {
         addConn(fromBlock.getInputTargetBlock("branch_success") ?? null, "Success");
         addConn(fromBlock.getInputTargetBlock("branch_failure") ?? null, "Failure");
       } else {
@@ -1283,8 +1588,47 @@ export default function RuleGoScratchEditorPage() {
             }
           });
           current = null;
+        } else if (current.type === "rulego_jsFilter") {
+          ["branch_true", "branch_false", "branch_failure"].forEach((inputName) => {
+            let branchBlock = current.getInputTargetBlock(inputName);
+            while (branchBlock) {
+              walkChain(branchBlock);
+              branchBlock = branchBlock.getNextBlock();
+            }
+          });
+          current = null;
         } else if (current.type === "rulego_jsSwitch") {
+          ["branch_success", "branch_failure", "branch_default"].forEach((inputName) => {
+            let branchBlock = current.getInputTargetBlock(inputName);
+            while (branchBlock) {
+              walkChain(branchBlock);
+              branchBlock = branchBlock.getNextBlock();
+            }
+          });
+          current = null;
+        } else if (current.type === "rulego_jsTransform") {
           ["branch_success", "branch_failure"].forEach((inputName) => {
+            let branchBlock = current.getInputTargetBlock(inputName);
+            while (branchBlock) {
+              walkChain(branchBlock);
+              branchBlock = branchBlock.getNextBlock();
+            }
+          });
+          current = null;
+        } else if (current.type === "rulego_join" || current.type === "rulego_restApiCall") {
+          ["branch_success", "branch_failure"].forEach((inputName) => {
+            let branchBlock = current.getInputTargetBlock(inputName);
+            while (branchBlock) {
+              walkChain(branchBlock);
+              branchBlock = branchBlock.getNextBlock();
+            }
+          });
+          current = null;
+        } else if (current.type === "rulego_groupAction") {
+          const gaInputs = (current.inputList ?? [])
+            .map((inp: { name: string }) => inp.name)
+            .filter((name: string) => name.startsWith("branch_"));
+          gaInputs.forEach((inputName: string) => {
             let branchBlock = current.getInputTargetBlock(inputName);
             while (branchBlock) {
               walkChain(branchBlock);

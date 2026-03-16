@@ -354,11 +354,25 @@ body {
   padding: 8px 6px;
   width: auto;
   min-width: 0;
-  max-width: 160px;
+  max-width: 132px !important;
 }
 
+/* 组件列表（飞出栏）：收窄总宽，使滚动条紧贴内容右侧 */
 .rulego-editor-canvas .blocklyFlyout {
-  max-width: 160px;
+  width: 120px !important;
+  max-width: 120px !important;
+  box-sizing: border-box;
+}
+
+/* 飞出栏滚动条紧贴右边缘，与内容之间不留白 */
+.rulego-editor-canvas .blocklyFlyoutScrollbar {
+  right: 0;
+}
+
+/* 飞出栏内容区不额外撑宽 */
+.rulego-editor-canvas .blocklyFlyout .blocklyScrollbarHost,
+.rulego-editor-canvas .blocklyFlyout .blocklyFlyoutContent {
+  max-width: 100%;
 }
 
 .rulego-editor-canvas .blocklyFlyoutBackground {
