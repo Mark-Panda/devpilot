@@ -13,23 +13,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/route-rewrite" replace />} />
           <Route path="/route-rewrite" element={<RouteRewritePage />} />
-          <Route
-            path="/api-tester"
-            element={<PlaceholderPage title="API 调试" />}
-          />
-          <Route
-            path="/codegen"
-            element={<PlaceholderPage title="代码生成" />}
-          />
-          <Route
-            path="/database"
-            element={<PlaceholderPage title="数据库管理" />}
-          />
           <Route path="/terminal" element={<PlaceholderPage title="终端" />} />
-          <Route
-            path="/mock-server"
-            element={<PlaceholderPage title="Mock 服务" />}
-          />
           <Route path="/settings/models" element={<ModelManagementPage />} />
           <Route path="/rulego" element={<RuleGoPage />} />
           <Route path="/rulego/editor" element={<RuleGoScratchEditorPage />} />
