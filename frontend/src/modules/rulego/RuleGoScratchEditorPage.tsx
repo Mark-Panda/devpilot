@@ -74,6 +74,9 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
   const [form, setForm] = useState<Record<string, string | boolean>>({});
   const [switchCases, setSwitchCases] = useState<CaseItem[]>([{ case: "true", then: "Case1" }]);
   const [availableSkills, setAvailableSkills] = useState<AvailableSkillItem[]>([]);
+  const [llmParamsExpanded, setLlmParamsExpanded] = useState(false);
+  const [systemPromptModalOpen, setSystemPromptModalOpen] = useState(false);
+  const [systemPromptDraft, setSystemPromptDraft] = useState("");
 
   useEffect(() => {
     if (!block) {
@@ -110,8 +113,35 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
       next.LLM_MODEL = get("LLM_MODEL");
       next.LLM_SYSTEM_PROMPT = get("LLM_SYSTEM_PROMPT");
       next.LLM_MESSAGES_JSON = get("LLM_MESSAGES_JSON") || "[]";
-      next.LLM_PARAMS_JSON = get("LLM_PARAMS_JSON") || "{}";
+      const paramsJson = get("LLM_PARAMS_JSON") || "{}";
+      next.LLM_PARAMS_JSON = paramsJson;
       next.LLM_ENABLED_SKILLS_JSON = get("LLM_ENABLED_SKILLS_JSON") || "[]";
+      const defaultParams = {
+        temperature: 0.6,
+        topP: 0.75,
+        presencePenalty: 0,
+        frequencyPenalty: 0,
+        maxTokens: 0,
+        responseFormat: "text",
+      };
+      try {
+        const p = JSON.parse(paramsJson) as Record<string, unknown>;
+        next.LLM_TEMPERATURE = String(Number(p?.temperature ?? defaultParams.temperature));
+        next.LLM_TOP_P = String(Number(p?.topP ?? defaultParams.topP));
+        next.LLM_PRESENCE_PENALTY = String(Number(p?.presencePenalty ?? defaultParams.presencePenalty));
+        next.LLM_FREQUENCY_PENALTY = String(Number(p?.frequencyPenalty ?? defaultParams.frequencyPenalty));
+        next.LLM_MAX_TOKENS = String(Number(p?.maxTokens ?? defaultParams.maxTokens));
+        next.LLM_STOP = Array.isArray(p?.stop) ? (p.stop as string[]).join(", ") : "";
+        next.LLM_RESPONSE_FORMAT = String(p?.responseFormat ?? defaultParams.responseFormat);
+      } catch {
+        next.LLM_TEMPERATURE = String(defaultParams.temperature);
+        next.LLM_TOP_P = String(defaultParams.topP);
+        next.LLM_PRESENCE_PENALTY = String(defaultParams.presencePenalty);
+        next.LLM_FREQUENCY_PENALTY = String(defaultParams.frequencyPenalty);
+        next.LLM_MAX_TOKENS = String(defaultParams.maxTokens);
+        next.LLM_STOP = "";
+        next.LLM_RESPONSE_FORMAT = defaultParams.responseFormat;
+      }
     }
     if (block.type === "rulego_delay") {
       next.DELAY_MS = get("DELAY_MS") || "60000";
@@ -172,10 +202,37 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
         block.setFieldValue(value, name);
       }
     };
+    const llmParamKeys = new Set([
+      "LLM_TEMPERATURE", "LLM_TOP_P", "LLM_PRESENCE_PENALTY", "LLM_FREQUENCY_PENALTY",
+      "LLM_MAX_TOKENS", "LLM_STOP", "LLM_RESPONSE_FORMAT",
+    ]);
     Object.entries(form).forEach(([key, value]) => {
-      if (form[key] !== undefined && key !== "CASES_JSON" && key !== "GROUP_SLOT_COUNT" && key !== "NODE_ID")
-        set(key, value as string | boolean);
+      if (form[key] === undefined || key === "CASES_JSON" || key === "GROUP_SLOT_COUNT" || key === "NODE_ID" || llmParamKeys.has(key))
+        return;
+      set(key, value as string | boolean);
     });
+    const llmParamDefaults = {
+      temperature: 0.6,
+      topP: 0.75,
+      presencePenalty: 0,
+      frequencyPenalty: 0,
+      maxTokens: 0,
+      responseFormat: "text",
+    };
+    if (block.type === "rulego_llm") {
+      const stopStr = String(form.LLM_STOP ?? "").trim();
+      const stopArr = stopStr ? stopStr.split(",").map((s) => s.trim()).filter(Boolean) : [];
+      const paramsJson = JSON.stringify({
+        temperature: Number(form.LLM_TEMPERATURE ?? llmParamDefaults.temperature),
+        topP: Number(form.LLM_TOP_P ?? llmParamDefaults.topP),
+        presencePenalty: Number(form.LLM_PRESENCE_PENALTY ?? llmParamDefaults.presencePenalty),
+        frequencyPenalty: Number(form.LLM_FREQUENCY_PENALTY ?? llmParamDefaults.frequencyPenalty),
+        maxTokens: Number(form.LLM_MAX_TOKENS ?? llmParamDefaults.maxTokens),
+        stop: stopArr.length > 0 ? stopArr : [],
+        responseFormat: String(form.LLM_RESPONSE_FORMAT ?? llmParamDefaults.responseFormat),
+      }, null, 2);
+      block.setFieldValue(paramsJson, "LLM_PARAMS_JSON");
+    }
     if (block.type === "rulego_switch") {
       const casesJson = JSON.stringify(switchCases, null, 2);
       (block as Block & { casesJson_?: string }).casesJson_ = casesJson;
@@ -199,12 +256,10 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
 
   if (!blockId) return null;
 
-  const formContent = (
-    <form className={inline ? "block-config-inline-form" : "modal-body"} onSubmit={handleSubmit}>
-          {!block ? (
-            <p className="confirm-text">块不存在或已被删除，请先在画布中选中一个块。</p>
-          ) : (
-            <div className="form-grid">
+  const formBody = !block ? (
+    <p className="confirm-text">块不存在或已被删除，请先在画布中选中一个块。</p>
+  ) : (
+    <div className="form-grid">
               <label className="form-field">
                 <span>节点 ID</span>
                 <input
@@ -555,68 +610,137 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
                 </>
               )}
               {block.type === "rulego_llm" && (
-                <>
-                  <label className="form-field">
-                    <span>请求地址 (url)</span>
-                    <input
-                      value={String(form.LLM_URL ?? "https://ai.gitee.com/v1")}
-                      onChange={(e) => setForm((f) => ({ ...f, LLM_URL: e.target.value }))}
-                      placeholder="https://ai.gitee.com/v1"
-                      autoCapitalize="off"
-                      autoCorrect="off"
-                      autoComplete="off"
-                    />
-                  </label>
-                  <label className="form-field">
-                    <span>API Key (key)</span>
-                    <input
-                      type="password"
-                      value={String(form.LLM_KEY ?? "")}
-                      onChange={(e) => setForm((f) => ({ ...f, LLM_KEY: e.target.value }))}
-                      placeholder="或使用 ${vars.token}"
-                      autoCapitalize="off"
-                      autoCorrect="off"
-                      autoComplete="off"
-                    />
-                  </label>
-                  <label className="form-field">
-                    <span>模型 (model)</span>
-                    <input
-                      value={String(form.LLM_MODEL ?? "")}
-                      onChange={(e) => setForm((f) => ({ ...f, LLM_MODEL: e.target.value }))}
-                      placeholder="如 gpt-4o、DeepSeek-R1"
-                      autoCapitalize="off"
-                      autoCorrect="off"
-                      autoComplete="off"
-                    />
-                  </label>
-                  <label className="form-field" style={{ gridColumn: "1 / -1" }}>
-                    <span>系统提示 (systemPrompt)</span>
-                    <textarea
-                      value={String(form.LLM_SYSTEM_PROMPT ?? "")}
-                      onChange={(e) => setForm((f) => ({ ...f, LLM_SYSTEM_PROMPT: e.target.value }))}
-                      placeholder="可选，支持 ${} 占位符"
-                      rows={3}
-                      style={{ width: "100%", resize: "vertical", padding: 8, borderRadius: 6, border: "1px solid #e2e8f0" }}
-                    />
-                  </label>
-                  <label className="form-field" style={{ gridColumn: "1 / -1" }}>
-                    <span>上下文消息 (messages) — JSON 数组</span>
-                    <JsonEditor
-                      value={String(form.LLM_MESSAGES_JSON ?? "[]")}
-                      onChange={(v) => setForm((f) => ({ ...f, LLM_MESSAGES_JSON: v }))}
-                      height={120}
-                      minHeight={80}
-                      showFormatButton
-                    />
-                    <small className="form-hint">每项: {`{ "role": "user" | "assistant", "content": "..." }`}，留空 [] 则使用 msg.Data 作为单条用户消息</small>
-                  </label>
-                  <div className="form-field" style={{ gridColumn: "1 / -1" }}>
-                    <span className="form-label">启用技能（~/.devpilot/skills/）</span>
+                <div className="block-config-llm">
+                  <div className="block-config-llm-section">
+                    <div className="block-config-llm-section-title">连接与模型</div>
+                    <label className="form-field" style={{ margin: 0 }}>
+                      <span>请求地址 (url)</span>
+                      <input
+                        value={String(form.LLM_URL ?? "https://ai.gitee.com/v1")}
+                        onChange={(e) => setForm((f) => ({ ...f, LLM_URL: e.target.value }))}
+                        placeholder="https://ai.gitee.com/v1"
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                        autoComplete="off"
+                      />
+                    </label>
+                    <label className="form-field" style={{ margin: 0 }}>
+                      <span>API Key (key)</span>
+                      <input
+                        type="password"
+                        value={String(form.LLM_KEY ?? "")}
+                        onChange={(e) => setForm((f) => ({ ...f, LLM_KEY: e.target.value }))}
+                        placeholder="或 ${vars.token}"
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                        autoComplete="off"
+                      />
+                    </label>
+                    <label className="form-field" style={{ margin: 0 }}>
+                      <span>模型 (model)</span>
+                      <input
+                        value={String(form.LLM_MODEL ?? "")}
+                        onChange={(e) => setForm((f) => ({ ...f, LLM_MODEL: e.target.value }))}
+                        placeholder="如 gpt-4o、DeepSeek-R1"
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                        autoComplete="off"
+                      />
+                    </label>
+                  </div>
+                  <div className="block-config-llm-section">
+                    <div className="block-config-llm-section-title">提示与消息</div>
+                    <label className="form-field" style={{ marginTop: 0 }}>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+                        <span>系统提示 (systemPrompt)</span>
+                        <button
+                          type="button"
+                          className="text-button"
+                          style={{ fontSize: 12, padding: "4px 10px" }}
+                          onClick={() => {
+                            setSystemPromptDraft(String(form.LLM_SYSTEM_PROMPT ?? ""));
+                            setSystemPromptModalOpen(true);
+                          }}
+                        >
+                          放大编辑
+                        </button>
+                      </div>
+                      <textarea
+                        value={String(form.LLM_SYSTEM_PROMPT ?? "")}
+                        onChange={(e) => setForm((f) => ({ ...f, LLM_SYSTEM_PROMPT: e.target.value }))}
+                        placeholder="可选，支持 ${} 占位符"
+                        rows={4}
+                        style={{ width: "100%", resize: "vertical", padding: 8, borderRadius: 6, border: "1px solid #e2e8f0" }}
+                      />
+                    </label>
+                    {systemPromptModalOpen && (
+                      <div
+                        className="modal-overlay"
+                        role="dialog"
+                        aria-modal="true"
+                        style={{ zIndex: 30 }}
+                        onClick={() => setSystemPromptModalOpen(false)}
+                      >
+                        <div
+                          className="modal system-prompt-editor-modal"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <div className="modal-header">
+                            <h3>编辑系统提示词</h3>
+                            <button
+                              type="button"
+                              className="text-button"
+                              onClick={() => setSystemPromptModalOpen(false)}
+                              aria-label="关闭"
+                            >
+                              ×
+                            </button>
+                          </div>
+                          <div className="modal-body" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+                            <textarea
+                              className="system-prompt-editor-textarea"
+                              value={systemPromptDraft}
+                              onChange={(e) => setSystemPromptDraft(e.target.value)}
+                              placeholder="可选，支持 ${} 占位符"
+                              spellCheck={false}
+                            />
+                          </div>
+                          <div className="modal-actions">
+                            <button type="button" className="text-button" onClick={() => setSystemPromptModalOpen(false)}>
+                              取消
+                            </button>
+                            <button
+                              type="button"
+                              className="primary-button"
+                              onClick={() => {
+                                setForm((f) => ({ ...f, LLM_SYSTEM_PROMPT: systemPromptDraft }));
+                                setSystemPromptModalOpen(false);
+                              }}
+                            >
+                              确定
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                    <label className="form-field">
+                      <span>上下文消息 (messages) — JSON 数组</span>
+                      <JsonEditor
+                        value={String(form.LLM_MESSAGES_JSON ?? "[]")}
+                        onChange={(v) => setForm((f) => ({ ...f, LLM_MESSAGES_JSON: v }))}
+                        height={100}
+                        minHeight={80}
+                        showFormatButton
+                      />
+                      <small className="form-hint">每项: {`{ "role": "user" | "assistant", "content": "..." }`}，留空 [] 则使用 msg.Data 作为单条用户消息</small>
+                    </label>
+                  </div>
+                  <div className="block-config-llm-section">
+                    <div className="block-config-llm-section-title">启用技能（~/.devpilot/skills/）</div>
                     <small className="form-hint" style={{ display: "block", marginBottom: 8 }}>
                       勾选的技能会注入系统提示，模型可按描述调用；不勾选则不注入任何技能
                     </small>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 200, overflowY: "auto", padding: "8px 0" }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 160, overflowY: "auto", padding: "4px 0" }}>
                       {availableSkills.length === 0 ? (
                         <span className="form-hint">暂无技能或未读取到 ~/.devpilot/skills/</span>
                       ) : (
@@ -647,18 +771,99 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
                       )}
                     </div>
                   </div>
-                  <label className="form-field" style={{ gridColumn: "1 / -1" }}>
-                    <span>大模型参数 (params)</span>
-                    <JsonEditor
-                      value={String(form.LLM_PARAMS_JSON ?? "{}")}
-                      onChange={(v) => setForm((f) => ({ ...f, LLM_PARAMS_JSON: v }))}
-                      height={140}
-                      minHeight={80}
-                      showFormatButton
-                    />
-                    <small className="form-hint">temperature, topP, maxTokens, responseFormat(text/json_object/json_schema) 等，参考 RuleGo LLM 文档</small>
-                  </label>
-                </>
+                  <div className="block-config-llm-section block-config-llm-section-collapsible">
+                    <button
+                      type="button"
+                      className="block-config-llm-section-toggle"
+                      onClick={() => setLlmParamsExpanded((v) => !v)}
+                      aria-expanded={llmParamsExpanded}
+                    >
+                      <span className="block-config-llm-section-title">大模型参数 (params)</span>
+                      <span className="block-config-llm-section-chevron">{llmParamsExpanded ? "▼" : "▶"}</span>
+                    </button>
+                    {llmParamsExpanded && (
+                      <div className="block-config-llm-params-grid">
+                        <label className="form-field" style={{ margin: 0 }}>
+                          <span>采样温度 (temperature)</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={2}
+                            step={0.1}
+                            value={String(form.LLM_TEMPERATURE ?? "0.6")}
+                            onChange={(e) => setForm((f) => ({ ...f, LLM_TEMPERATURE: e.target.value }))}
+                          />
+                          <small className="form-hint">0–2，越大越随机</small>
+                        </label>
+                        <label className="form-field" style={{ margin: 0 }}>
+                          <span>Top P (topP)</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={1}
+                            step={0.05}
+                            value={String(form.LLM_TOP_P ?? "0.75")}
+                            onChange={(e) => setForm((f) => ({ ...f, LLM_TOP_P: e.target.value }))}
+                          />
+                          <small className="form-hint">0–1</small>
+                        </label>
+                        <label className="form-field" style={{ margin: 0 }}>
+                          <span>已有标记惩罚 (presencePenalty)</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={1}
+                            step={0.1}
+                            value={String(form.LLM_PRESENCE_PENALTY ?? "0")}
+                            onChange={(e) => setForm((f) => ({ ...f, LLM_PRESENCE_PENALTY: e.target.value }))}
+                          />
+                          <small className="form-hint">0–1</small>
+                        </label>
+                        <label className="form-field" style={{ margin: 0 }}>
+                          <span>重复惩罚 (frequencyPenalty)</span>
+                          <input
+                            type="number"
+                            min={0}
+                            max={1}
+                            step={0.1}
+                            value={String(form.LLM_FREQUENCY_PENALTY ?? "0")}
+                            onChange={(e) => setForm((f) => ({ ...f, LLM_FREQUENCY_PENALTY: e.target.value }))}
+                          />
+                          <small className="form-hint">0–1</small>
+                        </label>
+                        <label className="form-field" style={{ margin: 0 }}>
+                          <span>最大输出长度 (maxTokens)</span>
+                          <input
+                            type="number"
+                            min={0}
+                            value={String(form.LLM_MAX_TOKENS ?? "0")}
+                            onChange={(e) => setForm((f) => ({ ...f, LLM_MAX_TOKENS: e.target.value }))}
+                          />
+                          <small className="form-hint">0 表示使用模型默认</small>
+                        </label>
+                        <label className="form-field" style={{ margin: 0 }}>
+                          <span>停止标记 (stop)</span>
+                          <input
+                            value={String(form.LLM_STOP ?? "")}
+                            onChange={(e) => setForm((f) => ({ ...f, LLM_STOP: e.target.value }))}
+                            placeholder="逗号分隔，如：\n, END"
+                            autoCapitalize="off"
+                          />
+                        </label>
+                        <label className="form-field" style={{ margin: 0 }}>
+                          <span>输出格式 (responseFormat)</span>
+                          <select
+                            value={String(form.LLM_RESPONSE_FORMAT ?? "text")}
+                            onChange={(e) => setForm((f) => ({ ...f, LLM_RESPONSE_FORMAT: e.target.value }))}
+                          >
+                            <option value="text">text（文本）</option>
+                            <option value="json_object">json_object（JSON 对象）</option>
+                          </select>
+                        </label>
+                      </div>
+                    )}
+                  </div>
+                </div>
               )}
               <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                 <input
@@ -669,18 +874,31 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
                 <span>调试</span>
               </label>
             </div>
-          )}
-          <div className={inline ? "block-config-inline-actions" : "modal-actions"}>
-            {!inline && (
-              <button type="button" className="text-button" onClick={onClose}>
-                取消
-              </button>
-            )}
-            <button type="submit" className="primary-button" disabled={!block}>
-              确定
-            </button>
-          </div>
-        </form>
+  );
+
+  const formContent = inline ? (
+    <form className="block-config-inline-form" onSubmit={handleSubmit}>
+      {formBody}
+      <div className="block-config-inline-actions">
+        <button type="submit" className="primary-button" disabled={!block}>
+          确定
+        </button>
+      </div>
+    </form>
+  ) : (
+    <form className="modal-body modal-body-form" onSubmit={handleSubmit}>
+      <div className="modal-body-scroll">
+        {formBody}
+      </div>
+      <div className="modal-actions">
+        <button type="button" className="text-button" onClick={onClose}>
+          取消
+        </button>
+        <button type="submit" className="primary-button" disabled={!block}>
+          确定
+        </button>
+      </div>
+    </form>
   );
 
   if (inline) {
@@ -701,7 +919,7 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
       aria-modal="true"
       onClick={onClose}
     >
-      <div className="modal" onClick={(ev) => ev.stopPropagation()} style={{ maxWidth: 560 }}>
+      <div className="modal" onClick={(ev) => ev.stopPropagation()}>
         <div className="modal-header">
           <h3>编辑块配置 · {block?.type ?? blockId}</h3>
           <button type="button" className="text-button" onClick={onClose} aria-label="关闭">

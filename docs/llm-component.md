@@ -125,9 +125,21 @@ func main() {
 | `frequencyPenalty` | float32  | 对重复标记的惩罚 [0.0, 1.0] |
 | `maxTokens`        | int      | 最大输出长度 |
 | `stop`             | []string | 停止输出标记 |
-| `responseFormat`   | string   | text / json_object / json_schema |
-| `jsonSchema`       | string   | JSON Schema（responseFormat=json_schema 时） |
-| `keepThink`        | bool     | 是否保留思考过程（仅 text 格式） |
+| `responseFormat`   | string   | text / json_object（仅此两种与 langchaingo 适配） |
+
+#### Params 与 langchaingo 的适配
+
+本实现通过 `CallOptionsFromParams` 将 Params 转为 langchaingo 的 `llms.CallOption`，再传给底层 OpenAI 兼容 API。当前 Params 仅保留已适配字段：
+
+| 参数 | 说明 |
+|------|------|
+| temperature | `llms.WithTemperature`，[0, 2] 与 OpenAI 一致 |
+| topP | `llms.WithTopP`，[0, 1] |
+| presencePenalty | `llms.WithPresencePenalty` |
+| frequencyPenalty | `llms.WithFrequencyPenalty` |
+| maxTokens | `llms.WithMaxTokens` |
+| stop | `llms.WithStopWords` |
+| responseFormat=json_object | `llms.WithJSONMode()` |
 
 ### 扩展字段（本实现独有）
 

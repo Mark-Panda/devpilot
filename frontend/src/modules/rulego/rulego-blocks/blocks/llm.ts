@@ -11,7 +11,7 @@ const nodeType = "ai/llm";
 const category = "rulego_action" as const;
 
 const defaultMessagesJson = "[]";
-const defaultParamsJson = "{\"temperature\":0.6,\"topP\":0.75,\"maxTokens\":0,\"responseFormat\":\"text\"}";
+const defaultParamsJson = "{\"temperature\":0.6,\"topP\":0.75,\"presencePenalty\":0,\"frequencyPenalty\":0,\"maxTokens\":0,\"stop\":[],\"responseFormat\":\"text\"}";
 
 const def: BlockTypeDef = {
   blockType,
@@ -51,15 +51,13 @@ const def: BlockTypeDef = {
     const messages = helpers.parseJsonValue(helpers.getFieldValue(block, "LLM_MESSAGES_JSON"), []) as Array<{ role?: string; content?: string }>;
     const paramsRaw = helpers.parseJsonValue(helpers.getFieldValue(block, "LLM_PARAMS_JSON"), {}) as Record<string, unknown>;
     const params = {
-      temperature: Number(paramsRaw?.temperature ?? 0),
-      topP: Number(paramsRaw?.topP ?? 0),
+      temperature: Number(paramsRaw?.temperature ?? 0.6),
+      topP: Number(paramsRaw?.topP ?? 0.75),
       presencePenalty: Number(paramsRaw?.presencePenalty ?? 0),
       frequencyPenalty: Number(paramsRaw?.frequencyPenalty ?? 0),
       maxTokens: Number(paramsRaw?.maxTokens ?? 0),
       stop: Array.isArray(paramsRaw?.stop) ? (paramsRaw.stop as string[]) : undefined,
       responseFormat: String(paramsRaw?.responseFormat ?? "text"),
-      jsonSchema: typeof paramsRaw?.jsonSchema === "string" ? paramsRaw.jsonSchema : undefined,
-      keepThink: Boolean(paramsRaw?.keepThink),
     };
     const enabledSkillNamesRaw = helpers.getFieldValue(block, "LLM_ENABLED_SKILLS_JSON") || "[]";
     const enabledSkillNames = helpers.parseJsonValue(enabledSkillNamesRaw, []) as string[];
@@ -84,15 +82,13 @@ const def: BlockTypeDef = {
     const p = (c.params as Record<string, unknown>) ?? {};
     const paramsJson = JSON.stringify(
       {
-        temperature: Number(p.temperature ?? 0),
+        temperature: Number(p.temperature ?? 0.6),
         topP: Number(p.topP ?? 0.75),
         presencePenalty: Number(p.presencePenalty ?? 0),
         frequencyPenalty: Number(p.frequencyPenalty ?? 0),
         maxTokens: Number(p.maxTokens ?? 0),
-        stop: p.stop ?? null,
+        stop: Array.isArray(p.stop) ? p.stop : [],
         responseFormat: String(p.responseFormat ?? "text"),
-        jsonSchema: p.jsonSchema ?? "",
-        keepThink: Boolean(p.keepThink),
       },
       null,
       2

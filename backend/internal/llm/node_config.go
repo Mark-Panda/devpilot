@@ -71,7 +71,7 @@ func replacePlaceholders(s string, m map[string]string) string {
 	return s
 }
 
-// CallOptionsFromParams 将 RuleGo Params 转为 langchaingo CallOption 列表。
+// CallOptionsFromParams 将 Params 转为 langchaingo CallOption 列表（仅包含已适配参数）。
 func CallOptionsFromParams(p *Params) []llms.CallOption {
 	if p == nil {
 		return nil

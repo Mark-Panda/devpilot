@@ -41,17 +41,15 @@ type ChatMessage struct {
 	Content string `json:"content"` // 消息内容，可使用 ${} 占位符
 }
 
-// Params 大模型参数，与 RuleGo 官方 LLM 节点 Params 结构一致，见 https://rulego.cc/pages/llm/#大模型参数-params-结构
+// Params 大模型参数，仅保留与 langchaingo 已适配的字段。
 type Params struct {
-	Temperature      float32   `json:"temperature"`      // 采样温度 [0.0, 2.0]，默认 0
-	TopP             float32   `json:"topP"`             // 采样方法 [0.0, 1.0]
-	PresencePenalty  float32   `json:"presencePenalty"`  // 对已有标记的惩罚 [0.0, 1.0]
-	FrequencyPenalty float32   `json:"frequencyPenalty"` // 对重复标记的惩罚 [0.0, 1.0]
-	MaxTokens        int       `json:"maxTokens"`        // 最大输出长度
-	Stop             []string  `json:"stop"`             // 停止输出标记
-	ResponseFormat   string    `json:"responseFormat"`   // text / json_object / json_schema
-	JSONSchema       string    `json:"jsonSchema"`       // JSON Schema（responseFormat=json_schema 时）
-	KeepThink        bool      `json:"keepThink"`        // 是否保留思考过程（仅 text 格式）
+	Temperature      float32  `json:"temperature"`      // 采样温度 [0.0, 2.0]
+	TopP             float32  `json:"topP"`             // 采样方法 [0.0, 1.0]
+	PresencePenalty  float32  `json:"presencePenalty"`  // 对已有标记的惩罚 [0.0, 1.0]
+	FrequencyPenalty float32  `json:"frequencyPenalty"` // 对重复标记的惩罚 [0.0, 1.0]
+	MaxTokens        int      `json:"maxTokens"`        // 最大输出长度
+	Stop           []string `json:"stop"`           // 停止输出标记
+	ResponseFormat string   `json:"responseFormat"` // text / json_object（仅此两种与 langchaingo 适配）
 }
 
 // NodeConfig RuleGo ai/llm 节点配置，与官方文档字段一致，见 https://rulego.cc/pages/llm/

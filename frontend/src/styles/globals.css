@@ -245,20 +245,23 @@ body {
 }
 
 .modal {
-  width: min(520px, 100%);
+  width: min(420px, 100%);
+  max-height: 90vh;
   background: #ffffff;
   border-radius: 16px;
   box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  padding: 20px 22px 24px;
+  gap: 0;
+  padding: 20px 20px 24px;
 }
 
 .modal-header {
+  flex-shrink: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding-bottom: 12px;
 }
 
 .modal-header h3 {
@@ -270,6 +273,29 @@ body {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/* 弹窗内仅表单区域滚动，不带动整页 */
+.modal-body-form {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  gap: 0;
+}
+
+.modal-body-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.modal-body-form .modal-actions {
+  flex-shrink: 0;
+  padding-top: 16px;
+  margin-top: 0;
+  border-top: 1px solid #e2e8f0;
 }
 
 .confirm-text {
@@ -344,6 +370,132 @@ body {
   gap: 12px;
 }
 
+/* 系统提示词放大编辑弹窗 */
+.system-prompt-editor-modal {
+  width: min(560px, 100%);
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+.system-prompt-editor-modal .modal-body {
+  flex: 1;
+  min-height: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.system-prompt-editor-textarea {
+  flex: 1;
+  width: 100%;
+  min-height: 320px;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+  resize: vertical;
+  font-family: inherit;
+}
+.system-prompt-editor-textarea:focus {
+  outline: 2px solid rgba(37, 99, 235, 0.2);
+  border-color: #2563eb;
+}
+
+/* LLM 块配置：顺序单列、统一背景、大模型参数默认折叠 */
+.block-config-llm {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  grid-column: 1 / -1;
+}
+.block-config-llm-section {
+  padding: 0 0 12px;
+  background: transparent;
+  border-bottom: 1px solid #e2e8f0;
+}
+.block-config-llm-section:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.block-config-llm-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 10px;
+  padding-top: 4px;
+}
+.block-config-llm-section-collapsible {
+  padding: 0;
+  overflow: hidden;
+  border-bottom: 1px solid #e2e8f0;
+}
+.block-config-llm-section-collapsible:last-child {
+  border-bottom: none;
+}
+.block-config-llm-section-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 8px 0;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+.block-config-llm-section-toggle:hover {
+  color: #334155;
+}
+.block-config-llm-section-chevron {
+  font-size: 11px;
+  color: #94a3b8;
+  margin-left: 8px;
+}
+.block-config-llm-section-collapsible .block-config-llm-section-title {
+  margin-bottom: 0;
+}
+.block-config-llm-params-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px 0;
+  padding: 8px 0 0;
+}
+
+/* LLM 节点配置分区布局 */
+.llm-config-section {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.llm-config-section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin: 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid #e2e8f0;
+}
+.llm-config-section-card {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.llm-config-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+@media (max-width: 520px) {
+  .llm-config-row {
+    grid-template-columns: 1fr;
+  }
+}
+
 .rulego-editor {
   display: flex;
   flex-direction: column;
@@ -362,6 +514,10 @@ body {
   grid-template-columns: minmax(0, 1fr) 320px;
   gap: 16px;
   min-height: 640px;
+  max-height: calc(100vh - 120px);
+}
+.rulego-editor-layout > * {
+  min-height: 0;
 }
 
 .rulego-editor-canvas {
@@ -379,7 +535,8 @@ body {
   flex-direction: column;
   gap: 12px;
   box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
-  overflow: auto;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .rulego-editor-side textarea {
@@ -898,6 +1055,11 @@ body {
   gap: 12px;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
+}
+
+.block-config-inline-header {
+  flex-shrink: 0;
 }
 
 .block-config-inline-header h3 {
@@ -913,7 +1075,7 @@ body {
   gap: 12px;
   flex: 1;
   min-height: 0;
-  overflow: auto;
+  overflow-y: auto;
 }
 
 .block-config-inline-form .form-grid {
