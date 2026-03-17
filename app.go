@@ -19,6 +19,7 @@ func NewApp(runtime *backend.Runtime) *App {
 
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
+	backend.InitRuleChainExecutor(a.runtime)
 }
 
 // OpenSkillZipDialog 打开系统文件选择对话框，让用户选择技能包 zip 文件。返回选中文件路径，取消时返回空字符串。

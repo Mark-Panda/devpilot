@@ -1,0 +1,244 @@
+package rulego
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"devpilot/backend/internal/llm"
+	"devpilot/backend/internal/store/models"
+	"github.com/tmc/langchaingo/llms"
+)
+
+// GenerateSkillFromRuleChain 使用大模型调用内置 create-skill 技能，生成 SKILL.md 并写入 ~/.devpilot/skills/{dirName}，
+// 同时更新规则的 SkillDirName。baseURL、apiKey、model 为调用大模型所需；若为空则返回错误。
+// 注意：供 Wails 绑定时由前端调用，不要将 context.Context 作为首参，否则 JSON 参数会绑定错误。
+func (s *Service) GenerateSkillFromRuleChain(ruleID string, baseURL, apiKey, model string) (skillDirName string, err error) {
+	log.Printf("[rulego] GenerateSkillFromRuleChain 开始 ruleID=%s baseURL=%s model=%s", ruleID, baseURL, model)
+	ctx := context.Background()
+	baseURL = strings.TrimSpace(baseURL)
+	apiKey = strings.TrimSpace(apiKey)
+	model = strings.TrimSpace(model)
+	if baseURL == "" || apiKey == "" || model == "" {
+		log.Printf("[rulego] GenerateSkillFromRuleChain 参数无效: baseURL/apiKey/model 为空")
+		return "", fmt.Errorf("base_url、api_key、model 为必填")
+	}
+
+	rule, err := s.store.GetByID(ctx, ruleID)
+	if err != nil {
+		log.Printf("[rulego] GenerateSkillFromRuleChain 获取规则失败 ruleID=%s err=%v", ruleID, err)
+		return "", err
+	}
+	if rule.Definition == "" {
+		log.Printf("[rulego] GenerateSkillFromRuleChain 规则链定义为空 ruleID=%s", ruleID)
+		return "", fmt.Errorf("规则链定义为空")
+	}
+
+	if err := llm.EnsureBuiltinCreateSkillDir(); err != nil {
+		return "", fmt.Errorf("确保内置 create-skill 目录失败: %w", err)
+	}
+	createSkill, err := llm.GetBuiltinCreateSkill()
+	if err != nil {
+		return "", fmt.Errorf("加载内置 create-skill 失败: %w", err)
+	}
+
+	cfg := llm.Config{BaseURL: baseURL, APIKey: apiKey, Model: model}
+	client, err := llm.NewClientWithSkills(ctx, cfg, []llm.Skill{*createSkill})
+	if err != nil {
+		log.Printf("[rulego] GenerateSkillFromRuleChain 创建 LLM 客户端失败 err=%v", err)
+		return "", fmt.Errorf("创建 LLM 客户端失败: %w", err)
+	}
+
+	log.Printf("[rulego] GenerateSkillFromRuleChain 调用大模型 tool loop ruleID=%s name=%s", ruleID, rule.Name)
+	userMsg := buildCreateSkillUserMessage(rule)
+	systemPrompt := llm.BuildSkillSystemPrompt([]llm.Skill{*createSkill}, false)
+	var messages []llms.MessageContent
+	if systemPrompt != "" {
+		messages = append(messages, llms.MessageContent{
+			Role:  llms.ChatMessageTypeSystem,
+			Parts: []llms.ContentPart{llms.TextContent{Text: systemPrompt}},
+		})
+	}
+	messages = append(messages, llms.MessageContent{
+		Role:  llms.ChatMessageTypeHuman,
+		Parts: []llms.ContentPart{llms.TextContent{Text: userMsg}},
+	})
+
+	tools := llm.SkillsToTools([]llm.Skill{*createSkill})
+	executor := &createSkillExecutor{s: s, ruleID: ruleID, rule: rule}
+	_, err = client.GenerateWithToolLoop(ctx, messages, tools, nil, executor, 4)
+	if err != nil {
+		log.Printf("[rulego] GenerateSkillFromRuleChain 大模型调用失败 ruleID=%s err=%v", ruleID, err)
+		return "", formatLLMError(err)
+	}
+	if executor.writtenDir == "" {
+		log.Printf("[rulego] GenerateSkillFromRuleChain 模型未调用 create-skill ruleID=%s", ruleID)
+		return "", fmt.Errorf("模型未调用 create-skill 提交内容，请重试")
+	}
+	log.Printf("[rulego] GenerateSkillFromRuleChain 完成 ruleID=%s skillDir=%s", ruleID, executor.writtenDir)
+	return executor.writtenDir, nil
+}
+
+// createSkillExecutor 在模型调用 create-skill 时解析参数并写入 SKILL.md、更新规则关联。
+type createSkillExecutor struct {
+	s          *Service
+	ruleID     string
+	rule       models.RuleGoRule
+	writtenDir string
+}
+
+func (e *createSkillExecutor) Execute(ctx context.Context, name, arguments string) (string, error) {
+	if name != llm.BuiltinCreateSkillName {
+		return "", fmt.Errorf("未知工具: %s", name)
+	}
+	log.Printf("[rulego] create-skill 被调用 ruleID=%s argumentsLen=%d", e.ruleID, len(arguments))
+	args := []byte(arguments)
+	var nameStr, descStr, bodyStr string
+	// 先尝试直接解析为 { "name", "description", "body" }
+	var direct struct {
+		Name        string `json:"name"`
+		Description string `json:"description"`
+		Body        string `json:"body"`
+	}
+	if err := json.Unmarshal(args, &direct); err == nil && (direct.Name != "" || direct.Description != "") {
+		nameStr, descStr, bodyStr = direct.Name, direct.Description, direct.Body
+	} else {
+		var input struct {
+			Input string `json:"input"`
+		}
+		if err := json.Unmarshal(args, &input); err != nil {
+			return "", fmt.Errorf("解析 create-skill 参数失败: %w", err)
+		}
+		var payload struct {
+			Name        string `json:"name"`
+			Description string `json:"description"`
+			Body        string `json:"body"`
+		}
+		if err := json.Unmarshal([]byte(input.Input), &payload); err != nil {
+			return "", fmt.Errorf("解析 input 内容失败: %w", err)
+		}
+		nameStr, descStr, bodyStr = payload.Name, payload.Description, payload.Body
+	}
+	return e.writeSkillFile(nameStr, descStr, bodyStr)
+}
+
+func (e *createSkillExecutor) writeSkillFile(name, description, body string) (string, error) {
+	name = strings.TrimSpace(name)
+	description = strings.TrimSpace(description)
+	body = strings.TrimSpace(body)
+	if name == "" || description == "" {
+		return "", fmt.Errorf("name 与 description 为必填")
+	}
+	if body == "" {
+		body = "This skill runs the linked DevPilot rule chain; user input is passed as the chain's data."
+	}
+
+	content := buildSkillMDContent(name, description, body, e.ruleID)
+	dirName := skillDirNameForRule(e.rule)
+	skillDir := filepath.Join(llm.DefaultSkillDir(), dirName)
+	if err := os.MkdirAll(skillDir, 0755); err != nil {
+		return "", fmt.Errorf("创建技能目录失败: %w", err)
+	}
+	skillPath := filepath.Join(skillDir, "SKILL.md")
+	if err := os.WriteFile(skillPath, []byte(content), 0644); err != nil {
+		log.Printf("[rulego] create-skill 写入 SKILL.md 失败 path=%s err=%v", skillPath, err)
+		return "", fmt.Errorf("写入 SKILL.md 失败: %w", err)
+	}
+	log.Printf("[rulego] create-skill 已写入 path=%s name=%s", skillPath, name)
+
+	e.rule.SkillDirName = dirName
+	if _, err := e.s.store.Update(context.Background(), e.ruleID, e.rule); err != nil {
+		_ = os.Remove(skillPath)
+		_ = os.Remove(skillDir)
+		return "", fmt.Errorf("更新规则关联失败: %w", err)
+	}
+	e.writtenDir = dirName
+	log.Printf("[rulego] create-skill 完成 ruleID=%s dirName=%s", e.ruleID, dirName)
+	return "技能已创建：" + dirName, nil
+}
+
+func buildSkillMDContent(name, description, body, ruleChainID string) string {
+	var b strings.Builder
+	b.WriteString("---\n")
+	b.WriteString("name: ")
+	b.WriteString(strings.ReplaceAll(name, "\n", " "))
+	b.WriteString("\ndescription: ")
+	b.WriteString(strings.ReplaceAll(description, "\n", " "))
+	b.WriteString("\nrule_chain_id: ")
+	b.WriteString(ruleChainID)
+	b.WriteString("\n---\n\n")
+	b.WriteString(body)
+	return b.String()
+}
+
+func buildCreateSkillUserMessage(rule models.RuleGoRule) string {
+	var b strings.Builder
+	b.WriteString("请根据以下规则链信息，调用 create-skill 工具提交生成的技能。\n\n")
+	b.WriteString("规则链 ID：")
+	b.WriteString(rule.ID)
+	b.WriteString("\n\n规则链名称：")
+	b.WriteString(rule.Name)
+	b.WriteString("\n\n规则链描述：")
+	b.WriteString(rule.Description)
+	b.WriteString("\n\n规则链 DSL（JSON）：\n")
+	b.WriteString(rule.Definition)
+	b.WriteString("\n\n请在 input 中传入 JSON：{\"name\": \"英文技能名\", \"description\": \"英文描述（何时使用）\", \"body\": \"简短 Markdown 正文\"}。")
+	return b.String()
+}
+
+// DeleteSkillForRuleChain 删除规则链关联的技能目录并清空规则的 SkillDirName。
+// 供 Wails 绑定时由前端调用，不接收 context.Context 以免 JSON 参数绑定错误。
+func (s *Service) DeleteSkillForRuleChain(ruleID string) error {
+	log.Printf("[rulego] DeleteSkillForRuleChain 开始 ruleID=%s", ruleID)
+	ctx := context.Background()
+	rule, err := s.store.GetByID(ctx, ruleID)
+	if err != nil {
+		log.Printf("[rulego] DeleteSkillForRuleChain 获取规则失败 ruleID=%s err=%v", ruleID, err)
+		return err
+	}
+	if rule.SkillDirName == "" {
+		log.Printf("[rulego] DeleteSkillForRuleChain 无关联技能 ruleID=%s", ruleID)
+		return nil
+	}
+	skillDir := filepath.Join(llm.DefaultSkillDir(), rule.SkillDirName)
+	_ = os.RemoveAll(skillDir)
+	log.Printf("[rulego] DeleteSkillForRuleChain 已删除目录 ruleID=%s skillDir=%s", ruleID, skillDir)
+	rule.SkillDirName = ""
+	_, err = s.store.Update(ctx, ruleID, rule)
+	if err != nil {
+		log.Printf("[rulego] DeleteSkillForRuleChain 更新规则失败 ruleID=%s err=%v", ruleID, err)
+		return err
+	}
+	log.Printf("[rulego] DeleteSkillForRuleChain 完成 ruleID=%s", ruleID)
+	return err
+}
+
+// skillDirNameForRule 生成规则链对应技能目录名，固定为 rule-{id} 避免重名且可追溯。
+func skillDirNameForRule(rule models.RuleGoRule) string {
+	return "rule-" + rule.ID
+}
+
+// formatLLMError 将大模型接口返回的原始错误转为对用户更友好的提示（如接口返回 HTML 错误页时的 JSON 解析错误）。
+func formatLLMError(err error) error {
+	if err == nil {
+		return nil
+	}
+	msg := err.Error()
+	if strings.Contains(msg, "invalid character") && strings.Contains(msg, "looking for beginning of value") {
+		return fmt.Errorf("大模型接口返回了非 JSON 内容（可能是错误页或网关拦截），请检查 baseURL、api_key 及模型名是否正确，或查看网关/服务端日志：%w", err)
+	}
+	if strings.Contains(msg, "400") || strings.Contains(msg, "Bad Request") {
+		return fmt.Errorf("大模型接口返回 400 错误，请检查请求参数或模型名：%w", err)
+	}
+	if strings.Contains(msg, "401") || strings.Contains(msg, "Unauthorized") {
+		return fmt.Errorf("大模型接口认证失败，请检查 api_key：%w", err)
+	}
+	if strings.Contains(msg, "502") || strings.Contains(msg, "503") || strings.Contains(msg, "gateway") {
+		return fmt.Errorf("大模型网关或服务暂时不可用，请稍后重试：%w", err)
+	}
+	return fmt.Errorf("大模型调用失败: %w", err)
+}

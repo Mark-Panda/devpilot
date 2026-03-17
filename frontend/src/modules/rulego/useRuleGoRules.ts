@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import {
   createRuleGoRule,
   deleteRuleGoRule,
+  generateSkillFromRuleChain,
   listRuleGoRules,
   loadRuleChain,
   unloadRuleChain,
@@ -36,6 +37,7 @@ export function useRuleGoRules() {
           enabled: rule.enabled,
           definition: rule.definition,
           editorJson: rule.editor_json,
+          skillDirName: rule.skill_dir_name || undefined,
         }))
       );
     } catch (err) {
@@ -60,6 +62,7 @@ export function useRuleGoRules() {
       enabled: result.enabled,
       definition: result.definition,
       editorJson: result.editor_json,
+      skillDirName: result.skill_dir_name || undefined,
     });
   };
 
@@ -78,6 +81,7 @@ export function useRuleGoRules() {
       enabled: result.enabled,
       definition: result.definition,
       editorJson: result.editor_json,
+      skillDirName: result.skill_dir_name || undefined,
     });
   };
 
@@ -94,9 +98,19 @@ export function useRuleGoRules() {
     await unloadRuleChain(id);
   };
 
+  /** 使用大模型为规则链生成技能（需已配置模型），返回生成的技能目录名 */
+  const generateSkill = async (
+    ruleId: string,
+    baseURL: string,
+    apiKey: string,
+    model: string
+  ): Promise<string> => {
+    return generateSkillFromRuleChain(ruleId, baseURL, apiKey, model);
+  };
+
   useEffect(() => {
     refresh();
   }, []);
 
-  return { rules, loading, error, refresh, create, update, remove, loadChain, unloadChain };
+  return { rules, loading, error, refresh, create, update, remove, loadChain, unloadChain, generateSkill };
 }

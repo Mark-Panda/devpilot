@@ -73,14 +73,15 @@ func (s *Service) UpdateRuleGoRule(id string, input UpdateRuleGoRuleInput) (mode
 	}
 
 	rule := models.RuleGoRule{
-		ID:          id,
-		Name:        strings.TrimSpace(input.Name),
-		Description: strings.TrimSpace(input.Description),
-		Enabled:     input.Enabled,
-		Definition:  strings.TrimSpace(input.Definition),
-		EditorJSON:  strings.TrimSpace(input.EditorJSON),
-		CreatedAt:   existing.CreatedAt,
-		UpdatedAt:   time.Now().UTC().Format(time.RFC3339),
+		ID:           id,
+		Name:         strings.TrimSpace(input.Name),
+		Description:  strings.TrimSpace(input.Description),
+		Enabled:      input.Enabled,
+		Definition:   strings.TrimSpace(input.Definition),
+		EditorJSON:   strings.TrimSpace(input.EditorJSON),
+		SkillDirName: existing.SkillDirName, // 保留关联技能目录，仅通过 GenerateSkillFromRuleChain / DeleteSkillForRuleChain 变更
+		CreatedAt:    existing.CreatedAt,
+		UpdatedAt:    time.Now().UTC().Format(time.RFC3339),
 	}
 	if err := validateRule(rule); err != nil {
 		return models.RuleGoRule{}, err
@@ -94,12 +95,17 @@ func (s *Service) UpdateRuleGoRule(id string, input UpdateRuleGoRuleInput) (mode
 		_ = s.LoadRuleChain(id)
 	} else {
 		_ = s.UnloadRuleChain(id)
+		if result.SkillDirName != "" {
+			_ = s.DeleteSkillForRuleChain(id)
+			result, _ = s.store.GetByID(context.Background(), id)
+		}
 	}
 	return result, nil
 }
 
 func (s *Service) DeleteRuleGoRule(id string) error {
 	_ = s.UnloadRuleChain(id)
+	_ = s.DeleteSkillForRuleChain(id)
 	return s.store.Delete(context.Background(), id)
 }
 

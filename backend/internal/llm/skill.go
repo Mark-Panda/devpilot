@@ -11,10 +11,12 @@ import (
 
 // Skill 表示从 SKILL.md 解析出的技能（参考 claude-code / openclaw 的 Universal Skill Loader 格式）。
 // 启动时仅加载 name/description 做匹配，激活后再加载完整内容以节省 token。
+// 若 frontmatter 含 rule_chain_id，表示该技能为“规则链技能”，执行时调用规则链而非 LLM。
 type Skill struct {
-	Name        string `yaml:"name" json:"name"`
-	Description string `yaml:"description" json:"description"` // 用于触发加载，建议 ≤1024 字符
-	Content     string `json:"content"`                        // 完整 SKILL.md 正文（含 frontmatter 后的 markdown）
+	Name         string `yaml:"name" json:"name"`
+	Description  string `yaml:"description" json:"description"`   // 用于触发加载，建议 ≤1024 字符
+	RuleChainID  string `yaml:"rule_chain_id" json:"rule_chain_id"` // 可选，关联规则链 ID，非空时执行规则链
+	Content      string `json:"content"`                          // 完整 SKILL.md 正文（含 frontmatter 后的 markdown）
 }
 
 const skillFileName = "SKILL.md"

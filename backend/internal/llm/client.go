@@ -49,6 +49,30 @@ func NewClient(ctx context.Context, config Config) (*Client, error) {
 	return c, nil
 }
 
+// NewClientWithSkills 根据 config 创建 LLM 客户端，并仅使用指定的 skills（不从 SkillDir 加载）。
+// 用于“仅暴露 create-skill 等内置技能”的流程。
+func NewClientWithSkills(ctx context.Context, config Config, skills []Skill) (*Client, error) {
+	config.BaseURL = strings.TrimSpace(config.BaseURL)
+	config.APIKey = strings.TrimSpace(config.APIKey)
+	config.Model = strings.TrimSpace(config.Model)
+	if config.BaseURL == "" || config.APIKey == "" || config.Model == "" {
+		return nil, ErrInvalidConfig
+	}
+
+	opts := []openai.Option{
+		openai.WithToken(config.APIKey),
+		openai.WithBaseURL(config.BaseURL),
+		openai.WithModel(config.Model),
+	}
+	model, err := openai.New(opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	c := &Client{model: model, config: config, skills: skills}
+	return c, nil
+}
+
 // Chat 使用当前模型进行单轮对话。若配置了 SkillDir 且加载到技能，会将技能描述注入为系统提示（仅 description，节省 token）。
 // 若希望注入完整技能内容，可使用 ChatWithSkillPrompt 或自行构建 messages。
 func (c *Client) Chat(ctx context.Context, userMessage string) (string, error) {

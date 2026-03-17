@@ -1,18 +1,22 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { ListModelConfigs } from "../../../wailsjs/go/model_management/Service";
 import RuleGoForm from "./RuleGoForm";
 import type { RuleGoRule } from "./types";
 import { useRuleGoRules } from "./useRuleGoRules";
 
 export default function RuleGoPage() {
   const navigate = useNavigate();
-  const { rules, loading, error, refresh, create, update, remove, loadChain, unloadChain } = useRuleGoRules();
+  const { rules, loading, error, refresh, create, update, remove, loadChain, unloadChain, generateSkill } =
+    useRuleGoRules();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<RuleGoRule | null>(null);
   const [confirmingRule, setConfirmingRule] = useState<RuleGoRule | null>(null);
   const [actionFeedback, setActionFeedback] = useState<{ msg: string; isError?: boolean } | null>(null);
   /** 本地记录的“已启用”规则 ID，用于切换按钮展示（与后端实际加载状态可能不同步） */
   const [loadedIds, setLoadedIds] = useState<Set<string>>(new Set());
+  /** 正在生成技能的规则 ID，用于显示“生成中...”并禁用按钮 */
+  const [generatingSkillRuleId, setGeneratingSkillRuleId] = useState<string | null>(null);
 
   const withFeedback = async (fn: () => Promise<void>, successMsg: string) => {
     try {
@@ -20,8 +24,9 @@ export default function RuleGoPage() {
       setActionFeedback({ msg: successMsg });
       setTimeout(() => setActionFeedback(null), 2500);
     } catch (e) {
-      setActionFeedback({ msg: (e as Error).message, isError: true });
-      setTimeout(() => setActionFeedback(null), 3500);
+      const msg = e instanceof Error ? e.message : String(e);
+      setActionFeedback({ msg: msg || "操作失败", isError: true });
+      setTimeout(() => setActionFeedback(null), 5000);
     }
   };
 
@@ -63,7 +68,15 @@ export default function RuleGoPage() {
               <div className="table-row" key={rule.id}>
                 <div className="table-cell">{rule.name}</div>
                 <div className="table-cell">{rule.description || "-"}</div>
-                <div className="table-cell">{rule.enabled ? "启用" : "停用"}</div>
+                <div className="table-cell">
+                  {rule.enabled && rule.definition
+                    ? loadedIds.has(rule.id)
+                      ? "已开启"
+                      : "已关闭"
+                    : rule.enabled
+                      ? "启用"
+                      : "停用"}
+                </div>
                 <div className="table-cell table-actions">
                   <button
                     className="text-button"
@@ -83,37 +96,60 @@ export default function RuleGoPage() {
                     表单编辑
                   </button>
                   {rule.enabled && rule.definition ? (
-                    loadedIds.has(rule.id) ? (
-                      <button
-                        className="text-button"
-                        type="button"
-                        onClick={() =>
-                          withFeedback(async () => {
-                            await unloadChain(rule.id);
-                            setLoadedIds((prev) => {
-                              const next = new Set(prev);
-                              next.delete(rule.id);
-                              return next;
-                            });
-                          }, "已禁用")
-                        }
-                      >
-                        禁用
-                      </button>
-                    ) : (
-                      <button
-                        className="text-button"
-                        type="button"
-                        onClick={() =>
-                          withFeedback(async () => {
-                            await loadChain(rule.id);
-                            setLoadedIds((prev) => new Set(prev).add(rule.id));
-                          }, "已启用")
-                        }
-                      >
-                        启用
-                      </button>
-                    )
+                    <button
+                      className="text-button"
+                      type="button"
+                      onClick={() =>
+                        loadedIds.has(rule.id)
+                          ? withFeedback(async () => {
+                              await unloadChain(rule.id);
+                              setLoadedIds((prev) => {
+                                const next = new Set(prev);
+                                next.delete(rule.id);
+                                return next;
+                              });
+                            }, "已关闭")
+                          : withFeedback(async () => {
+                              await loadChain(rule.id);
+                              setLoadedIds((prev) => new Set(prev).add(rule.id));
+                            }, "已开启")
+                      }
+                    >
+                      {loadedIds.has(rule.id) ? "关闭" : "开启"}
+                    </button>
+                  ) : null}
+                  {rule.enabled && rule.definition ? (
+                    <button
+                      className="text-button"
+                      type="button"
+                      disabled={generatingSkillRuleId !== null}
+                      onClick={() =>
+                        withFeedback(async () => {
+                          setGeneratingSkillRuleId(rule.id);
+                          try {
+                            const configs = await ListModelConfigs();
+                            if (!configs?.length) {
+                              throw new Error("请先在模型管理中配置至少一个模型");
+                            }
+                            const c = configs[0];
+                            const model = c.models?.[0]?.trim();
+                            if (!model) {
+                              throw new Error("该模型配置下没有可用模型");
+                            }
+                            await generateSkill(rule.id, c.base_url || "", c.api_key || "", model);
+                            await refresh();
+                          } finally {
+                            setGeneratingSkillRuleId(null);
+                          }
+                        }, rule.skillDirName ? "技能已更新" : "技能已创建")
+                      }
+                    >
+                      {generatingSkillRuleId === rule.id
+                        ? "生成中…"
+                        : rule.skillDirName
+                          ? "更新技能"
+                          : "创建技能"}
+                    </button>
                   ) : null}
                   <button
                     className="text-button danger"
@@ -129,7 +165,11 @@ export default function RuleGoPage() {
         )}
         {error ? <div className="table-error">{error}</div> : null}
         {actionFeedback ? (
-          <div className={actionFeedback.isError ? "table-error" : "form-hint"} style={{ marginTop: 8 }}>
+          <div
+            className={actionFeedback.isError ? "table-error" : "form-hint"}
+            style={{ marginTop: 8 }}
+            role={actionFeedback.isError ? "alert" : undefined}
+          >
             {actionFeedback.msg}
           </div>
         ) : null}

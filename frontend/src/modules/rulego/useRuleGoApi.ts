@@ -2,8 +2,10 @@ import {
   CreateRuleGoRule,
   DeleteExecutionLog,
   DeleteRuleGoRule,
+  DeleteSkillForRuleChain,
   ExecuteRule,
   ExecuteRuleDefinition,
+  GenerateSkillFromRuleChain,
   GetExecutionLog,
   GetRuleGoRule,
   ListAvailableSkills,
@@ -126,4 +128,19 @@ export type AvailableSkillItem = { name: string; description: string };
 /** 列出默认技能目录下所有 SKILL.md 的 name/description，供 LLM 节点勾选启用 */
 export async function listAvailableSkills(): Promise<AvailableSkillItem[]> {
   return ListAvailableSkills();
+}
+
+/** 使用大模型根据规则链 DSL 生成技能并写入 ~/.devpilot/skills/，需传入模型 baseURL、apiKey、model */
+export async function generateSkillFromRuleChain(
+  ruleId: string,
+  baseURL: string,
+  apiKey: string,
+  model: string
+): Promise<string> {
+  return GenerateSkillFromRuleChain(ruleId, baseURL, apiKey, model);
+}
+
+/** 删除规则链关联的技能目录（禁用/删除规则链时由后端自动调用，也可前端主动调用） */
+export async function deleteSkillForRuleChain(ruleId: string): Promise<void> {
+  return DeleteSkillForRuleChain(ruleId);
 }
