@@ -112,6 +112,145 @@ body {
   font-size: 14px;
 }
 
+.skill-repo-dropzone {
+  border: 2px dashed #cbd5e1;
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  background: #f8fafc;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.skill-repo-dropzone.is-dragover {
+  border-color: #2563eb;
+  background: #eff6ff;
+}
+
+.skill-repo-dropzone-text {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+}
+
+.skill-repo-dropzone.is-dragover .skill-repo-dropzone-text {
+  color: #2563eb;
+}
+
+.skill-repo-table .table-head,
+.skill-repo-table .table-row {
+  grid-template-columns: 1fr 1fr 0.9fr;
+}
+
+.skill-repo-detail-modal {
+  width: min(560px, 100%);
+}
+
+.skill-repo-detail-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+}
+
+.skill-repo-detail-path {
+  margin: 0;
+  word-break: break-all;
+  font-size: 13px;
+}
+
+.skill-repo-detail-path code {
+  background: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.skill-repo-detail-label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.skill-repo-detail-files {
+  margin: 0;
+  padding-left: 20px;
+  max-height: 240px;
+  overflow-y: auto;
+  font-size: 13px;
+}
+
+.skill-repo-detail-files li {
+  margin-bottom: 4px;
+}
+
+.skill-repo-detail-files code {
+  background: #f1f5f9;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-size: 12px;
+}
+
+.skill-repo-file-link {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+  color: #2563eb;
+}
+
+.skill-repo-file-link:hover {
+  text-decoration: underline;
+}
+
+.skill-repo-file-link:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}
+
+.skill-repo-detail-loading,
+.skill-repo-detail-error {
+  margin: 0;
+  font-size: 13px;
+}
+
+.skill-repo-detail-error {
+  color: #dc2626;
+}
+
+.skill-repo-file-modal {
+  width: min(640px, 95vw);
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.skill-repo-file-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.skill-repo-file-content {
+  margin: 0;
+  padding: 12px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow: auto;
+  max-height: 60vh;
+  flex: 1;
+  min-height: 120px;
+}
+
 .primary-button {
   background: #2563eb;
   color: #ffffff;

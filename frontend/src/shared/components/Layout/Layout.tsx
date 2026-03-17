@@ -10,6 +10,7 @@ const menuItems = [
   { path: "/mock-server", label: "Mock 服务" },
   { path: "/rulego", label: "RuleGo 规则管理" },
   { path: "/rulego/logs", label: "RuleGo 执行日志" },
+  { path: "/skill-repo", label: "技能仓库" },
   { path: "/settings/models", label: "模型管理" }
 ];
 

@@ -67,6 +67,26 @@ func LoadSkills(dir string) ([]Skill, error) {
 	return skills, nil
 }
 
+// LoadSkillFromDir 从指定目录加载单个技能（读取 dir/SKILL.md）。若目录不存在或无有效 SKILL.md 则返回 nil, nil。
+func LoadSkillFromDir(dir string) (*Skill, error) {
+	path := filepath.Join(strings.TrimSpace(dir), skillFileName)
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	s, err := parseSkillMD(data)
+	if err != nil {
+		return nil, err
+	}
+	if s.Name == "" && s.Description == "" && s.Content == "" {
+		return nil, nil
+	}
+	return s, nil
+}
+
 // parseSkillMD 解析 SKILL.md 内容：首段为 YAML frontmatter（---...---），其余为 Content。
 func parseSkillMD(data []byte) (*Skill, error) {
 	content := string(data)

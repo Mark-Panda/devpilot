@@ -6,6 +6,7 @@ import (
 	"devpilot/backend/internal/services/model_management"
 	"devpilot/backend/internal/services/route_rewrite"
 	"devpilot/backend/internal/services/rulego"
+	"devpilot/backend/internal/services/skill_repo"
 	"devpilot/backend/internal/store/pebble"
 )
 
@@ -13,6 +14,7 @@ type Runtime struct {
 	routeRewrite interface{}
 	modelManage  interface{}
 	ruleGo       interface{}
+	skillRepo    interface{}
 	close        func() error
 }
 
@@ -39,6 +41,7 @@ func InitRuntime(dataDir string) (*Runtime, error) {
 		routeRewrite: routeRewriteService,
 		modelManage:  modelService,
 		ruleGo:       ruleGoService,
+		skillRepo:    skill_repo.NewService(),
 		close:        db.Close,
 	}, nil
 }
@@ -53,6 +56,10 @@ func (r *Runtime) ModelManagementService() interface{} {
 
 func (r *Runtime) RuleGoService() interface{} {
 	return r.ruleGo
+}
+
+func (r *Runtime) SkillRepoService() interface{} {
+	return r.skillRepo
 }
 
 func (r *Runtime) Close() error {

@@ -3,6 +3,7 @@ import { Layout } from "./shared/components";
 import { RouteRewritePage } from "./modules/route-rewrite";
 import { ModelManagementPage } from "./modules/model-management";
 import { RuleGoPage, RuleGoScratchEditorPage, RuleGoLogsPage, RuleGoLogDetailPage } from "./modules/rulego";
+import { SkillRepoPage } from "./modules/skill-repo";
 import { PlaceholderPage } from "./modules/placeholder";
 
 export default function App() {
@@ -35,6 +36,7 @@ export default function App() {
           <Route path="/rulego/editor/:id" element={<RuleGoScratchEditorPage />} />
           <Route path="/rulego/logs" element={<RuleGoLogsPage />} />
           <Route path="/rulego/logs/:id" element={<RuleGoLogDetailPage />} />
+          <Route path="/skill-repo" element={<SkillRepoPage />} />
           <Route
             path="*"
             element={<PlaceholderPage title="未找到页面" />}

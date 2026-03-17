@@ -738,7 +738,7 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
                   <div className="block-config-llm-section">
                     <div className="block-config-llm-section-title">启用技能（~/.devpilot/skills/）</div>
                     <small className="form-hint" style={{ display: "block", marginBottom: 8 }}>
-                      勾选的技能会注入系统提示，模型可按描述调用；不勾选则不注入任何技能
+                      勾选的技能会注入系统提示；不勾选则不注入任何技能
                     </small>
                     <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 160, overflowY: "auto", padding: "4px 0" }}>
                       {availableSkills.length === 0 ? (
@@ -761,10 +761,7 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
                           return (
                             <label key={sk.name} style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer" }}>
                               <input type="checkbox" checked={checked} onChange={toggle} />
-                              <span>
-                                <strong>{sk.name}</strong>
-                                {sk.description ? ` — ${sk.description.slice(0, 80)}${sk.description.length > 80 ? "…" : ""}` : ""}
-                              </span>
+                              <span><strong>{sk.name}</strong></span>
                             </label>
                           );
                         })

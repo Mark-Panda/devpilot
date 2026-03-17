@@ -41,6 +41,7 @@ func main() {
 			runtime.RouteRewriteService(),
 			runtime.ModelManagementService(),
 			runtime.RuleGoService(),
+			runtime.SkillRepoService(),
 		},
 	})
 	if err != nil {
