@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as ScratchBlocks from "scratch-blocks";
 import type { WorkspaceSvg, Block, BlockSvg } from "blockly/core";
@@ -84,6 +84,12 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
   const [switchCases, setSwitchCases] = useState<CaseItem[]>([{ case: "true", then: "Case1" }]);
   const [availableSkills, setAvailableSkills] = useState<AvailableSkillItem[]>([]);
   const [modelConfigs, setModelConfigs] = useState<ModelConfig[]>([]);
+  /** 用于鼠标离开时判断是否有未保存修改 */
+  const initialFormRef = useRef<Record<string, string | boolean>>({});
+  const initialSwitchCasesRef = useRef<CaseItem[]>([]);
+  const initialDbClientParamsRef = useRef<Array<{ type: "string" | "number"; value: string }>>([]);
+  const [confirmUnsavedOpen, setConfirmUnsavedOpen] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
   const llmSelectedConfig = useMemo(() => {
     if (block?.type !== "rulego_llm") return null;
     const url = String(form.LLM_URL ?? "").trim() || "https://ai.gitee.com/v1";
@@ -102,8 +108,10 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
       setForm({});
       setSwitchCases([{ case: "true", then: "Case1" }]);
       setDbClientParams([]);
+      setConfirmUnsavedOpen(false);
       return;
     }
+    setConfirmUnsavedOpen(false);
     const get = (name: string) => String(block.getFieldValue(name) ?? "").trim();
     const getBool = (name: string) => block.getFieldValue(name) === "TRUE";
     const next: Record<string, string | boolean> = {
@@ -149,7 +157,12 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
         if (typeof x === "number") return { type: "number", value: String(x) };
         return { type: "string", value: String(x ?? "") };
       };
-      setDbClientParams(Array.from({ length: paramCount }, (_, i) => normalize(arr[i], i)));
+      const normalizedParams = Array.from({ length: paramCount }, (_, i) => normalize(arr[i], i));
+      setDbClientParams(normalizedParams);
+      initialDbClientParamsRef.current = normalizedParams.map((p) => ({ ...p }));
+    } else {
+      setDbClientParams([]);
+      initialDbClientParamsRef.current = [];
     }
     if (block.type === "rulego_llm") {
       next.LLM_URL = get("LLM_URL") || "https://ai.gitee.com/v1";
@@ -218,12 +231,20 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
             then: String((c as { then?: string })?.then ?? "Case1"),
           }))
           : [{ case: "true", then: "Case1" }];
-        setSwitchCases(list.length > 0 ? list : [{ case: "true", then: "Case1" }]);
+        const switchList = list.length > 0 ? list : [{ case: "true", then: "Case1" }];
+        setSwitchCases(switchList);
+        initialSwitchCasesRef.current = switchList.map((c) => ({ ...c }));
       } catch {
-        setSwitchCases([{ case: "true", then: "Case1" }]);
+        const fallback = [{ case: "true", then: "Case1" }];
+        setSwitchCases(fallback);
+        initialSwitchCasesRef.current = fallback.map((c) => ({ ...c }));
       }
+    } else {
+      setSwitchCases([]);
+      initialSwitchCasesRef.current = [];
     }
     setForm(next);
+    initialFormRef.current = { ...next };
   }, [block, blockId]);
 
   useEffect(() => {
@@ -245,6 +266,27 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
       .then(setModelConfigs)
       .catch(() => setModelConfigs([]));
   }, [block?.type, blockId]);
+
+  const isDirty = useCallback(() => {
+    const init = initialFormRef.current;
+    const keys = new Set([...Object.keys(init), ...Object.keys(form)]);
+    if ([...keys].some((k) => {
+      const a = form[k];
+      const b = init[k];
+      return a !== b && !(a == null && b == null);
+    })) return true;
+    if (switchCases.length !== initialSwitchCasesRef.current.length) return true;
+    if (switchCases.some((c, i) => {
+      const o = initialSwitchCasesRef.current[i];
+      return !o || o.case !== c.case || o.then !== c.then;
+    })) return true;
+    if (dbClientParams.length !== initialDbClientParamsRef.current.length) return true;
+    if (dbClientParams.some((p, i) => {
+      const o = initialDbClientParamsRef.current[i];
+      return !o || o.type !== p.type || o.value !== p.value;
+    })) return true;
+    return false;
+  }, [form, switchCases, dbClientParams]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -310,6 +352,9 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
       block.setFieldValue(JSON.stringify(dbClientParams.slice(0, paramCount)), "DB_PARAMS");
     }
     onSaved?.();
+    initialFormRef.current = { ...form };
+    initialSwitchCasesRef.current = switchCases.map((c) => ({ ...c }));
+    initialDbClientParamsRef.current = dbClientParams.map((p) => ({ ...p }));
     if (!inline) onClose();
   };
 
@@ -1080,7 +1125,7 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
   );
 
   const formContent = inline ? (
-    <form className="block-config-inline-form" onSubmit={handleSubmit}>
+    <form ref={formRef} className="block-config-inline-form" onSubmit={handleSubmit}>
       {formBody}
       <div className="block-config-inline-actions">
         <button type="submit" className="primary-button" disabled={!block}>
@@ -1089,7 +1134,7 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
       </div>
     </form>
   ) : (
-    <form className="modal-body modal-body-form" onSubmit={handleSubmit}>
+    <form ref={formRef} className="modal-body modal-body-form" onSubmit={handleSubmit}>
       <div className="modal-body-scroll">
         {formBody}
       </div>
@@ -1104,14 +1149,60 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
     </form>
   );
 
+  const handleMouseLeaveConfig = useCallback(() => {
+    if (inline && block && isDirty()) setConfirmUnsavedOpen(true);
+  }, [inline, block, isDirty]);
+
   if (inline) {
     return (
-      <div className="block-config-inline">
-        <div className="block-config-inline-header">
-          <h3>块属性 · {block?.type ?? blockId}</h3>
+      <>
+        <div
+          className="block-config-inline"
+          onMouseLeave={handleMouseLeaveConfig}
+        >
+          <div className="block-config-inline-header">
+            <h3>块属性 · {block?.type ?? blockId}</h3>
+          </div>
+          {formContent}
         </div>
-        {formContent}
-      </div>
+        {confirmUnsavedOpen && (
+          <div
+            className="modal-overlay"
+            role="dialog"
+            aria-modal="true"
+            onClick={() => setConfirmUnsavedOpen(false)}
+          >
+            <div className="modal" style={{ maxWidth: 400 }} onClick={(e) => e.stopPropagation()}>
+              <div className="modal-header">
+                <h3>未保存的修改</h3>
+                <button type="button" className="text-button" onClick={() => setConfirmUnsavedOpen(false)} aria-label="关闭">×</button>
+              </div>
+              <div className="modal-body">
+                <p className="confirm-text">有未保存的修改，是否保存？</p>
+              </div>
+              <div className="modal-actions">
+                <button type="button" className="text-button" onClick={() => setConfirmUnsavedOpen(false)}>
+                  取消
+                </button>
+                <button type="button" className="text-button" onClick={() => { setConfirmUnsavedOpen(false); onClose(); }}>
+                  不保存
+                </button>
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={() => {
+                    formRef.current?.requestSubmit();
+                    setConfirmUnsavedOpen(false);
+                    onClose();
+                  }}
+                >
+                  保存
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </>
     );
   }
 
