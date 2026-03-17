@@ -1010,6 +1010,8 @@ export default function RuleGoScratchEditorPage() {
   const [testRunning, setTestRunning] = useState(false);
   const [saveFeedback, setSaveFeedback] = useState<{ type: "success" } | { type: "error"; message: string } | null>(null);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+  /** 上次保存或加载时的 DSL，用于判断是否有未保存变更 */
+  const [savedDsl, setSavedDsl] = useState("");
 
   useEffect(() => {
     if (!saveFeedback) return;
@@ -1021,6 +1023,17 @@ export default function RuleGoScratchEditorPage() {
   const [librarySearchKeyword, setLibrarySearchKeyword] = useState("");
   const sidePanelRef = useRef<HTMLDivElement>(null);
   const lastTouchedBlockIdRef = useRef<string | null>(null);
+  /** 供 workspace 内 handleChange 读取最新值，避免闭包陈旧导致生成的 DSL 与保存时不一致 */
+  const nameRef = useRef(name);
+  const debugModeRef = useRef(debugMode);
+  const rootRef = useRef(root);
+  const enabledRef = useRef(enabled);
+  useEffect(() => {
+    nameRef.current = name;
+    debugModeRef.current = debugMode;
+    rootRef.current = root;
+    enabledRef.current = enabled;
+  }, [name, debugMode, root, enabled]);
 
   const editingRule = useMemo(() => rules.find((rule) => rule.id === id), [rules, id]);
 
@@ -1098,7 +1111,13 @@ export default function RuleGoScratchEditorPage() {
       if (ev?.blockId) lastTouchedBlockIdRef.current = ev.blockId;
       const state = ScratchBlocks.serialization.workspaces.save(workspace);
       setJson(JSON.stringify(state, null, 2));
-      const nextDsl = buildRuleGoDsl(workspace);
+      const nextDsl = buildRuleGoDsl(
+        workspace,
+        nameRef.current ?? "",
+        debugModeRef.current,
+        rootRef.current,
+        enabledRef.current
+      );
       setDsl(nextDsl);
       const topBlocks = workspace.getTopBlocks(true);
       setBlockCount(topBlocks.length);
@@ -1107,7 +1126,9 @@ export default function RuleGoScratchEditorPage() {
 
     const initialState = ScratchBlocks.serialization.workspaces.save(workspace);
     setJson(JSON.stringify(initialState, null, 2));
-    setDsl(buildRuleGoDsl(workspace));
+    const initialDsl = buildRuleGoDsl(workspace);
+    setDsl(initialDsl);
+    setSavedDsl(initialDsl);
     handleChange();
 
     const changeListener = (ev: unknown) => {
@@ -1159,6 +1180,7 @@ export default function RuleGoScratchEditorPage() {
       setName(editingRule.name);
       setDescription(editingRule.description);
       setDsl(editingRule.definition);
+      setSavedDsl(editingRule.definition ?? "");
       setJson(editingRule.editorJson);
       try {
         const parsed = JSON.parse(editingRule.definition);
@@ -1192,15 +1214,15 @@ export default function RuleGoScratchEditorPage() {
         })();
         const chain = parsed?.ruleChain;
         const dslEnabledForLoad = getEnabledFromDefinition(editingRule.definition) ?? editingRule.enabled;
-        setDsl(
-          buildRuleGoDsl(
-            workspaceRef.current,
-            editingRule.name,
-            Boolean(chain?.debugMode),
-            chain?.root !== false,
-            dslEnabledForLoad
-          )
+        const loadedDsl = buildRuleGoDsl(
+          workspaceRef.current,
+          editingRule.name,
+          Boolean(chain?.debugMode),
+          chain?.root !== false,
+          dslEnabledForLoad
         );
+        setDsl(loadedDsl);
+        setSavedDsl(loadedDsl);
         return;
       } catch {
         // ignore malformed json
@@ -1214,15 +1236,15 @@ export default function RuleGoScratchEditorPage() {
         ensureRuleGoNodeIdsAreUuid(workspaceRef.current);
         const chain = ruleDsl?.ruleChain;
         const dslEnabledForLoad = getEnabledFromDefinition(editingRule.definition) ?? editingRule.enabled;
-        setDsl(
-          buildRuleGoDsl(
-            workspaceRef.current,
-            editingRule.name,
-            Boolean(chain?.debugMode),
-            chain?.root !== false,
-            dslEnabledForLoad
-          )
+        const loadedDsl = buildRuleGoDsl(
+          workspaceRef.current,
+          editingRule.name,
+          Boolean(chain?.debugMode),
+          chain?.root !== false,
+          dslEnabledForLoad
         );
+        setDsl(loadedDsl);
+        setSavedDsl(loadedDsl);
       } catch (err) {
         setError((err as Error).message || "RuleGo DSL 解析失败");
       }
@@ -1291,6 +1313,7 @@ export default function RuleGoScratchEditorPage() {
         navigate(`/rulego/editor/${created.id}`, { replace: true });
       }
       setSaveFeedback({ type: "success" });
+      setSavedDsl(nextDsl.trim());
     } catch (err) {
       const msg = (err as Error).message || "保存失败";
       setError(msg);
@@ -1299,6 +1322,20 @@ export default function RuleGoScratchEditorPage() {
       setSaving(false);
     }
   };
+
+  const normalizeDslForCompare = (s: string) => {
+    const t = (s ?? "").trim();
+    if (!t) return "";
+    try {
+      return JSON.stringify(JSON.parse(t));
+    } catch {
+      return t;
+    }
+  };
+  const isDirty = useMemo(
+    () => normalizeDslForCompare(dsl) !== normalizeDslForCompare(savedDsl),
+    [dsl, savedDsl]
+  );
 
   const handleSave = async () => {
     if (!name.trim() || !description.trim()) {
@@ -1686,7 +1723,13 @@ export default function RuleGoScratchEditorPage() {
       <header className="rulego-editor-header-bar">
         <h1 className="rulego-editor-title">可视化规则编辑器</h1>
         <div className="rulego-editor-toolbar">
-          <button className="rulego-toolbar-btn primary" type="button" onClick={handleSave} disabled={saving}>
+          <button
+            className={`rulego-toolbar-btn ${isDirty ? "primary" : "save-unchanged"}`}
+            type="button"
+            onClick={handleSave}
+            disabled={saving || !isDirty}
+            title={isDirty ? "保存规则" : "无变更，无需保存"}
+          >
             保存
           </button>
           <button className="rulego-toolbar-btn" type="button" title="测试" onClick={handleTestClick}>

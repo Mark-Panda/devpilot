@@ -879,6 +879,20 @@ body {
   border-color: #4f46e5;
 }
 
+/* 保存按钮在无变更时：灰色且不可点击 */
+.rulego-toolbar-btn.save-unchanged {
+  background: #475569;
+  border-color: #475569;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.rulego-toolbar-btn.save-unchanged:hover {
+  background: #475569;
+  border-color: #475569;
+  color: #94a3b8;
+}
+
 .rulego-toolbar-btn.icon {
   padding: 8px 10px;
 }
