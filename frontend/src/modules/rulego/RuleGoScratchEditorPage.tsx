@@ -17,6 +17,8 @@ import {
 } from "./rulego-blocks";
 import { JsEditor, JsonEditor } from "../../shared/components";
 import { BlockLibraryPanel, DRAG_TYPE_BLOCK } from "./BlockLibraryPanel";
+import { listModelConfigs } from "../model-management/useModelConfigApi";
+import type { ModelConfig } from "../model-management/types";
 
 const scratchTheme = new ScratchBlocks.Theme(
   "scratch",
@@ -74,6 +76,14 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
   const [form, setForm] = useState<Record<string, string | boolean>>({});
   const [switchCases, setSwitchCases] = useState<CaseItem[]>([{ case: "true", then: "Case1" }]);
   const [availableSkills, setAvailableSkills] = useState<AvailableSkillItem[]>([]);
+  const [modelConfigs, setModelConfigs] = useState<ModelConfig[]>([]);
+  const llmSelectedConfig = useMemo(() => {
+    if (block?.type !== "rulego_llm") return null;
+    const url = String(form.LLM_URL ?? "").trim() || "https://ai.gitee.com/v1";
+    const key = String(form.LLM_KEY ?? "").trim();
+    return modelConfigs.find((c) => c.baseUrl === url && c.apiKey === key) ?? null;
+  }, [block?.type, form.LLM_URL, form.LLM_KEY, modelConfigs]);
+  const llmModelOptions = llmSelectedConfig?.models ?? [];
   const [llmParamsExpanded, setLlmParamsExpanded] = useState(false);
   const [systemPromptModalOpen, setSystemPromptModalOpen] = useState(false);
   const [systemPromptDraft, setSystemPromptDraft] = useState("");
@@ -190,6 +200,16 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
     listAvailableSkills()
       .then(setAvailableSkills)
       .catch(() => setAvailableSkills([]));
+  }, [block?.type, blockId]);
+
+  useEffect(() => {
+    if (block?.type !== "rulego_llm") {
+      setModelConfigs([]);
+      return;
+    }
+    listModelConfigs()
+      .then(setModelConfigs)
+      .catch(() => setModelConfigs([]));
   }, [block?.type, blockId]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -613,6 +633,36 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
                 <div className="block-config-llm">
                   <div className="block-config-llm-section">
                     <div className="block-config-llm-section-title">连接与模型</div>
+                    {modelConfigs.length > 0 && (
+                      <label className="form-field" style={{ margin: 0 }}>
+                        <span>从模型管理选择</span>
+                        <select
+                          value={llmSelectedConfig?.id ?? ""}
+                          onChange={(e) => {
+                            const id = e.target.value;
+                            const config = modelConfigs.find((c) => c.id === id);
+                            if (!config) return;
+                            const currentModel = String(form.LLM_MODEL ?? "").trim();
+                            const firstModel = config.models[0] ?? "";
+                            setForm((f) => ({
+                              ...f,
+                              LLM_URL: config.baseUrl,
+                              LLM_KEY: config.apiKey,
+                              LLM_MODEL: currentModel && config.models.includes(currentModel) ? currentModel : firstModel,
+                            }));
+                          }}
+                          style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #e2e8f0" }}
+                        >
+                          <option value="">— 手动填写下方 —</option>
+                          {modelConfigs.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.siteDescription || c.baseUrl}
+                            </option>
+                          ))}
+                        </select>
+                        <small className="form-hint">选中后自动填充 Base URL、API Key，模型从该配置中选</small>
+                      </label>
+                    )}
                     <label className="form-field" style={{ margin: 0 }}>
                       <span>请求地址 (url)</span>
                       <input
@@ -638,14 +688,28 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
                     </label>
                     <label className="form-field" style={{ margin: 0 }}>
                       <span>模型 (model)</span>
-                      <input
-                        value={String(form.LLM_MODEL ?? "")}
-                        onChange={(e) => setForm((f) => ({ ...f, LLM_MODEL: e.target.value }))}
-                        placeholder="如 gpt-4o、DeepSeek-R1"
-                        autoCapitalize="off"
-                        autoCorrect="off"
-                        autoComplete="off"
-                      />
+                      {llmModelOptions.length > 0 ? (
+                        <select
+                          value={String(form.LLM_MODEL ?? "")}
+                          onChange={(e) => setForm((f) => ({ ...f, LLM_MODEL: e.target.value }))}
+                          style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #e2e8f0" }}
+                        >
+                          {llmModelOptions.map((m) => (
+                            <option key={m} value={m}>
+                              {m}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input
+                          value={String(form.LLM_MODEL ?? "")}
+                          onChange={(e) => setForm((f) => ({ ...f, LLM_MODEL: e.target.value }))}
+                          placeholder="如 gpt-4o、DeepSeek-R1"
+                          autoCapitalize="off"
+                          autoCorrect="off"
+                          autoComplete="off"
+                        />
+                      )}
                     </label>
                   </div>
                   <div className="block-config-llm-section">
