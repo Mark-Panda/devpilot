@@ -633,84 +633,78 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
                 <div className="block-config-llm">
                   <div className="block-config-llm-section">
                     <div className="block-config-llm-section-title">连接与模型</div>
-                    {modelConfigs.length > 0 && (
-                      <label className="form-field" style={{ margin: 0 }}>
-                        <span>从模型管理选择</span>
-                        <select
-                          value={llmSelectedConfig?.id ?? ""}
-                          onChange={(e) => {
-                            const id = e.target.value;
-                            const config = modelConfigs.find((c) => c.id === id);
-                            if (!config) return;
-                            const currentModel = String(form.LLM_MODEL ?? "").trim();
-                            const firstModel = config.models[0] ?? "";
-                            setForm((f) => ({
-                              ...f,
-                              LLM_URL: config.baseUrl,
-                              LLM_KEY: config.apiKey,
-                              LLM_MODEL: currentModel && config.models.includes(currentModel) ? currentModel : firstModel,
-                            }));
-                          }}
-                          style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #e2e8f0" }}
-                        >
-                          <option value="">— 手动填写下方 —</option>
-                          {modelConfigs.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.siteDescription || c.baseUrl}
-                            </option>
-                          ))}
-                        </select>
-                        <small className="form-hint">选中后自动填充 Base URL、API Key，模型从该配置中选</small>
-                      </label>
+                    {modelConfigs.length === 0 ? (
+                      <p className="form-hint" style={{ margin: 0 }}>
+                        请先在「模型管理」中添加配置，再在此选择连接与模型。
+                      </p>
+                    ) : (
+                      <>
+                        <label className="form-field" style={{ margin: 0 }}>
+                          <span>选择配置</span>
+                          <select
+                            value={llmSelectedConfig?.id ?? ""}
+                            onChange={(e) => {
+                              const id = e.target.value;
+                              const config = modelConfigs.find((c) => c.id === id);
+                              if (!config) return;
+                              const currentModel = String(form.LLM_MODEL ?? "").trim();
+                              const firstModel = config.models[0] ?? "";
+                              setForm((f) => ({
+                                ...f,
+                                LLM_URL: config.baseUrl,
+                                LLM_KEY: config.apiKey,
+                                LLM_MODEL: currentModel && config.models.includes(currentModel) ? currentModel : firstModel,
+                              }));
+                            }}
+                            style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #e2e8f0" }}
+                          >
+                            <option value="">请选择配置</option>
+                            {modelConfigs.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.siteDescription || c.baseUrl}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                        {llmSelectedConfig && (
+                          <>
+                            <label className="form-field" style={{ margin: 0 }}>
+                              <span>请求地址 (url)</span>
+                              <input
+                                readOnly
+                                className="readonly-input"
+                                value={String(form.LLM_URL ?? "")}
+                                style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #e2e8f0", background: "#f1f5f9", color: "#64748b" }}
+                              />
+                            </label>
+                            <label className="form-field" style={{ margin: 0 }}>
+                              <span>API Key (key)</span>
+                              <input
+                                readOnly
+                                type="password"
+                                className="readonly-input"
+                                value={String(form.LLM_KEY ?? "")}
+                                style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #e2e8f0", background: "#f1f5f9", color: "#64748b" }}
+                              />
+                            </label>
+                            <label className="form-field" style={{ margin: 0 }}>
+                              <span>模型 (model)</span>
+                              <select
+                                value={String(form.LLM_MODEL ?? "")}
+                                onChange={(e) => setForm((f) => ({ ...f, LLM_MODEL: e.target.value }))}
+                                style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #e2e8f0" }}
+                              >
+                                {llmModelOptions.map((m) => (
+                                  <option key={m} value={m}>
+                                    {m}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+                          </>
+                        )}
+                      </>
                     )}
-                    <label className="form-field" style={{ margin: 0 }}>
-                      <span>请求地址 (url)</span>
-                      <input
-                        value={String(form.LLM_URL ?? "https://ai.gitee.com/v1")}
-                        onChange={(e) => setForm((f) => ({ ...f, LLM_URL: e.target.value }))}
-                        placeholder="https://ai.gitee.com/v1"
-                        autoCapitalize="off"
-                        autoCorrect="off"
-                        autoComplete="off"
-                      />
-                    </label>
-                    <label className="form-field" style={{ margin: 0 }}>
-                      <span>API Key (key)</span>
-                      <input
-                        type="password"
-                        value={String(form.LLM_KEY ?? "")}
-                        onChange={(e) => setForm((f) => ({ ...f, LLM_KEY: e.target.value }))}
-                        placeholder="或 ${vars.token}"
-                        autoCapitalize="off"
-                        autoCorrect="off"
-                        autoComplete="off"
-                      />
-                    </label>
-                    <label className="form-field" style={{ margin: 0 }}>
-                      <span>模型 (model)</span>
-                      {llmModelOptions.length > 0 ? (
-                        <select
-                          value={String(form.LLM_MODEL ?? "")}
-                          onChange={(e) => setForm((f) => ({ ...f, LLM_MODEL: e.target.value }))}
-                          style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #e2e8f0" }}
-                        >
-                          {llmModelOptions.map((m) => (
-                            <option key={m} value={m}>
-                              {m}
-                            </option>
-                          ))}
-                        </select>
-                      ) : (
-                        <input
-                          value={String(form.LLM_MODEL ?? "")}
-                          onChange={(e) => setForm((f) => ({ ...f, LLM_MODEL: e.target.value }))}
-                          placeholder="如 gpt-4o、DeepSeek-R1"
-                          autoCapitalize="off"
-                          autoCorrect="off"
-                          autoComplete="off"
-                        />
-                      )}
-                    </label>
                   </div>
                   <div className="block-config-llm-section">
                     <div className="block-config-llm-section-title">提示与消息</div>
