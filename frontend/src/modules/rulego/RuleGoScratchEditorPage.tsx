@@ -90,6 +90,7 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
   const initialDbClientParamsRef = useRef<Array<{ type: "string" | "number"; value: string }>>([]);
   const [confirmUnsavedOpen, setConfirmUnsavedOpen] = useState(false);
   const formRef = useRef<HTMLFormElement>(null);
+  const joinTargetSelectRef = useRef<HTMLSelectElement>(null);
   const llmSelectedConfig = useMemo(() => {
     if (block?.type !== "rulego_llm") return null;
     const url = String(form.LLM_URL ?? "").trim() || "https://ai.gitee.com/v1";
@@ -229,7 +230,11 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
     }
     if (block.type === "rulego_join") {
       const raw = get("JOIN_EXTRA_INCOMINGS") || "";
-      setJoinExtraIncomings(raw ? raw.split(",").map((s) => s.trim()).filter(Boolean) : []);
+      const extra = raw ? raw.split(",").map((s) => s.trim()).filter(Boolean) : [];
+      setJoinExtraIncomings(extra);
+      const mainPrev = block.previousConnection?.targetBlock?.();
+      const total = (mainPrev ? 1 : 0) + extra.length;
+      block.setFieldValue(total >= 2 ? ` (${total}路)` : "", "JOIN_ROUTES_LABEL");
     } else {
       setJoinExtraIncomings([]);
     }
@@ -507,6 +512,26 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
         const candidateBlocks = allBlocks.filter(
           (b: Block) => b.type?.startsWith?.("rulego_") && b.id !== block.id && !usedIds.has(String(b.getFieldValue?.("NODE_ID") ?? b.id ?? "").trim())
         );
+        const forkBlocks = allBlocks.filter((b: Block) => b.type === "rulego_fork");
+        const suggestedBranchEnds: Array<{ nodeId: string; name: string; block: Block }> = [];
+        forkBlocks.forEach((fork: Block & { forkCount_?: number }) => {
+          const n = Math.max(1, Math.min(8, fork.forkCount_ ?? 2));
+          for (let i = 0; i < n; i++) {
+            let b = fork.getInputTargetBlock?.(`branch_${i}`);
+            let last: Block | null = null;
+            while (b) {
+              last = b;
+              b = b.getNextBlock?.() ?? null;
+            }
+            if (last) {
+              const nodeId = String(last.getFieldValue?.("NODE_ID") ?? last.id ?? "").trim() || last.id;
+              const name = String(last.getFieldValue?.("NODE_NAME") ?? last.type ?? "").trim() || nodeId;
+              if (nodeId && !usedIds.has(nodeId) && !suggestedBranchEnds.some((s) => s.nodeId === nodeId)) {
+                suggestedBranchEnds.push({ nodeId, name, block: last });
+              }
+            }
+          }
+        });
         return (
           <>
             <label className="form-field">
@@ -531,13 +556,16 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
               <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
                 {mainNodeId && (
                   <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 8px", background: "var(--color-block-bg, #f1f5f9)", borderRadius: 6 }}>
-                    <span title={mainNodeId}>{mainNodeName || mainNodeId}</span>
-                    <span style={{ fontSize: 11, color: "#64748b" }}>（上方已接线）</span>
+                    <span title={mainNodeId} style={{ color: "#1e293b", fontWeight: 500 }}>{mainNodeName ? `${mainNodeName} (${mainNodeId})` : mainNodeId}</span>
+                    <span style={{ fontSize: 11, color: "#475569" }}>（上方已接线）</span>
                   </div>
                 )}
-                {joinExtraIncomings.map((nodeId) => (
+                {joinExtraIncomings.map((nodeId) => {
+                  const extraBlock = allBlocks.find((b: Block) => String(b.getFieldValue?.("NODE_ID") ?? b.id ?? "").trim() === nodeId);
+                  const extraName = extraBlock ? String(extraBlock.getFieldValue?.("NODE_NAME") ?? extraBlock.type ?? "").trim() : "";
+                  return (
                   <div key={nodeId} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 8px", background: "var(--color-block-bg, #f1f5f9)", borderRadius: 6 }}>
-                    <span>{nodeId}</span>
+                    <span style={{ color: "#1e293b", fontWeight: 500 }} title={nodeId}>{extraName ? `${extraName} (${nodeId})` : nodeId}</span>
                     <button
                       type="button"
                       className="text-button"
@@ -546,14 +574,45 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
                         const next = joinExtraIncomings.filter((id) => id !== nodeId);
                         setJoinExtraIncomings(next);
                         block.setFieldValue(next.join(", "), "JOIN_EXTRA_INCOMINGS");
+                        const total = (mainNodeId ? 1 : 0) + next.length;
+                        block.setFieldValue(total >= 2 ? ` (${total}路)` : "", "JOIN_ROUTES_LABEL");
                         onSaved?.();
                       }}
                     >
                       移除
                     </button>
                   </div>
-                ))}
+                  );
+                })}
               </div>
+              {suggestedBranchEnds.length > 0 && (
+                <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                  <span className="form-label" style={{ fontSize: 12, color: "#334155" }}>建议汇聚（并行分支末端）</span>
+                  <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}>
+                    {suggestedBranchEnds.map((s) => (
+                      <span key={s.nodeId} style={{ padding: "4px 8px", background: "#e0f2fe", borderRadius: 6, fontSize: 12, color: "#1e293b", fontWeight: 500 }}>
+                        {s.name || s.nodeId}
+                      </span>
+                    ))}
+                    <button
+                      type="button"
+                      className="text-button"
+                      style={{ padding: "4px 10px", fontSize: 12, border: "1px solid #0ea5e9", borderRadius: 6, color: "#0ea5e9" }}
+                      onClick={() => {
+                        const toAdd = suggestedBranchEnds.map((s) => s.nodeId);
+                        const next = [...joinExtraIncomings, ...toAdd];
+                        setJoinExtraIncomings(next);
+                        block.setFieldValue(next.join(", "), "JOIN_EXTRA_INCOMINGS");
+                        const total = (mainNodeId ? 1 : 0) + next.length;
+                        block.setFieldValue(total >= 2 ? ` (${total}路)` : "", "JOIN_ROUTES_LABEL");
+                        onSaved?.();
+                      }}
+                    >
+                      一键添加全部
+                    </button>
+                  </div>
+                </div>
+              )}
               {candidateBlocks.length > 0 && (
                 <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                   <select
@@ -564,6 +623,8 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
                       const next = [...joinExtraIncomings, nodeId];
                       setJoinExtraIncomings(next);
                       block.setFieldValue(next.join(", "), "JOIN_EXTRA_INCOMINGS");
+                      const total = (mainNodeId ? 1 : 0) + next.length;
+                      block.setFieldValue(total >= 2 ? ` (${total}路)` : "", "JOIN_ROUTES_LABEL");
                       e.target.value = "";
                       onSaved?.();
                     }}
@@ -1224,6 +1285,63 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
           </div>
         </div>
       )}
+      {block && block.type !== "rulego_join" && (() => {
+        const workspace = workspaceRef.current;
+        const allBlocks = workspace?.getAllBlocks?.(false) ?? [];
+        const joinBlocks = allBlocks.filter((b: Block) => b.type === "rulego_join");
+        const currentNodeId = String(block.getFieldValue?.("NODE_ID") ?? block.id ?? "").trim();
+        if (joinBlocks.length === 0) return null;
+        return (
+          <div className="form-field" style={{ gridColumn: "1 / -1", flexDirection: "column", gap: 6, paddingTop: 8, borderTop: "1px solid #e2e8f0" }}>
+            <span className="form-label" style={{ fontSize: 12, color: "#64748b" }}>将此块汇聚到</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+              <select
+                ref={joinTargetSelectRef}
+                style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #e2e8f0", minWidth: 160 }}
+                defaultValue=""
+              >
+                <option value="">选择汇聚块…</option>
+                {joinBlocks.map((j: Block) => {
+                  const jId = String(j.getFieldValue?.("NODE_ID") ?? j.id ?? "").trim();
+                  const jName = String(j.getFieldValue?.("NODE_NAME") ?? "汇聚").trim();
+                  const extra = (j.getFieldValue?.("JOIN_EXTRA_INCOMINGS") as string) || "";
+                  const already = extra ? extra.split(",").map((s) => s.trim()).filter(Boolean) : [];
+                  const disabled = jId === currentNodeId || already.includes(currentNodeId);
+                  return (
+                    <option key={j.id} value={jId} disabled={disabled}>
+                      {jName || jId} {disabled ? "(已汇聚)" : ""}
+                    </option>
+                  );
+                })}
+              </select>
+              <button
+                type="button"
+                className="text-button"
+                style={{ padding: "6px 12px", border: "1px solid #0ea5e9", borderRadius: 8, color: "#0ea5e9" }}
+                onClick={() => {
+                  const joinNodeId = joinTargetSelectRef.current?.value?.trim();
+                  if (!joinNodeId || !workspace) return;
+                  const joinBlock = allBlocks.find((b: Block) => String(b.getFieldValue?.("NODE_ID") ?? b.id ?? "").trim() === joinNodeId);
+                  if (!joinBlock || joinBlock.type !== "rulego_join") return;
+                  const extra = (joinBlock.getFieldValue?.("JOIN_EXTRA_INCOMINGS") as string) || "";
+                  const list = extra ? extra.split(",").map((s) => s.trim()).filter(Boolean) : [];
+                  if (list.includes(currentNodeId)) return;
+                  const next = [...list, currentNodeId];
+                  joinBlock.setFieldValue(next.join(", "), "JOIN_EXTRA_INCOMINGS");
+                  const mainPrev = joinBlock.previousConnection?.targetBlock?.();
+                  const total = (mainPrev ? 1 : 0) + next.length;
+                  joinBlock.setFieldValue(total >= 2 ? ` (${total}路)` : "", "JOIN_ROUTES_LABEL");
+                  onSaved?.();
+                  if (joinTargetSelectRef.current) joinTargetSelectRef.current.value = "";
+                }}
+              >
+                添加
+              </button>
+            </div>
+            <small className="form-hint">将当前块作为一路汇聚到所选「汇聚」块，无需拖线。</small>
+          </div>
+        );
+      })()}
     </div>
   );
 
@@ -1972,6 +2090,16 @@ export default function RuleGoScratchEditorPage() {
           input.connection.connect(toBlock.previousConnection as ScratchBlocks.Connection);
         }
       });
+    });
+
+    nodeMap.forEach((blk) => {
+      if (blk.type === "rulego_join") {
+        const mainPrev = blk.previousConnection?.targetBlock?.();
+        const extra = (blk.getFieldValue?.("JOIN_EXTRA_INCOMINGS") as string) || "";
+        const extraList = extra ? extra.split(",").map((s) => s.trim()).filter(Boolean) : [];
+        const total = (mainPrev ? 1 : 0) + extraList.length;
+        blk.setFieldValue(total >= 2 ? ` (${total}路)` : "", "JOIN_ROUTES_LABEL");
+      }
     });
 
     workspace.refreshTheme();

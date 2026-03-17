@@ -14,7 +14,9 @@ const def: BlockTypeDef = {
     const blocks = (ScratchBlocks as { Blocks: Record<string, object> }).Blocks;
     blocks[blockType] = {
       init: function (this: Block) {
-        (this as Block).appendDummyInput("HEAD").appendField(new (BlocklyF as any).FieldTextInput("汇聚"), "NODE_NAME");
+        const head = (this as Block).appendDummyInput("HEAD");
+        head.appendField(new (BlocklyF as any).FieldTextInput("汇聚"), "NODE_NAME");
+        head.appendField(new (BlocklyF as any).FieldTextInput(""), "JOIN_ROUTES_LABEL");
         const leftHint = (this as Block).appendDummyInput("LEFT_HINT");
         leftHint.appendField("← 多路汇聚");
         const config = (this as Block).appendDummyInput("CONFIG");
