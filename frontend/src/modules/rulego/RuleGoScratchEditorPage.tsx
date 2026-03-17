@@ -16,7 +16,7 @@ import {
   getBlockDef,
   getBlockTypeFromNodeType,
 } from "./rulego-blocks";
-import { JsEditor, JsonEditor } from "../../shared/components";
+import { JsEditor, JsonEditor, SqlEditor } from "../../shared/components";
 import { BlockLibraryPanel, DRAG_TYPE_BLOCK } from "./BlockLibraryPanel";
 import { listModelConfigs } from "../model-management/useModelConfigApi";
 import type { ModelConfig } from "../model-management/types";
@@ -49,6 +49,11 @@ const scratchTheme = new ScratchBlocks.Theme(
       colourSecondary: "#a78bfa",
       colourTertiary: "#c4b5fd",
     },
+    rulego_db: {
+      colourPrimary: "#0d9488",
+      colourSecondary: "#14b8a6",
+      colourTertiary: "#5eead4",
+    },
   },
   {
     rulego_trigger: { colour: "#ef4444" },
@@ -56,6 +61,7 @@ const scratchTheme = new ScratchBlocks.Theme(
     rulego_condition: { colour: "#14b8a6" },
     rulego_data: { colour: "#f59e0b" },
     rulego_flow: { colour: "#8b5cf6" },
+    rulego_db: { colour: "#0d9488" },
   }
 );
 
@@ -88,11 +94,14 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
   const [llmParamsExpanded, setLlmParamsExpanded] = useState(false);
   const [systemPromptModalOpen, setSystemPromptModalOpen] = useState(false);
   const [systemPromptDraft, setSystemPromptDraft] = useState("");
+  /** dbClient：参数列表（类型 + 值），长度与 SQL 中 ? 数量一致 */
+  const [dbClientParams, setDbClientParams] = useState<Array<{ type: "string" | "number"; value: string }>>([]);
 
   useEffect(() => {
     if (!block) {
       setForm({});
       setSwitchCases([{ case: "true", then: "Case1" }]);
+      setDbClientParams([]);
       return;
     }
     const get = (name: string) => String(block.getFieldValue(name) ?? "").trim();
@@ -116,6 +125,31 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
       next.REST_BODY = get("REST_BODY");
       next.REST_TIMEOUT = get("REST_TIMEOUT");
       next.REST_MAX_PARALLEL = get("REST_MAX_PARALLEL");
+    }
+    if (block.type === "rulego_dbClient") {
+      next.DB_DRIVER_NAME = get("DB_DRIVER_NAME") || "mysql";
+      next.DB_DSN = get("DB_DSN");
+      next.DB_POOL_SIZE = get("DB_POOL_SIZE");
+      next.DB_OP_TYPE = get("DB_OP_TYPE");
+      next.DB_SQL = get("DB_SQL");
+      next.DB_PARAMS = get("DB_PARAMS") || "[]";
+      next.DB_GET_ONE = getBool("DB_GET_ONE");
+      const sql = next.DB_SQL as string;
+      const paramCount = (sql.match(/\?/g) || []).length;
+      let arr: Array<{ type: "string" | "number"; value: string } | string | number> = [];
+      try {
+        const parsed = JSON.parse((next.DB_PARAMS as string) || "[]");
+        arr = Array.isArray(parsed) ? parsed : [];
+      } catch {
+        arr = [];
+      }
+      const normalize = (x: unknown, i: number): { type: "string" | "number"; value: string } => {
+        if (x != null && typeof x === "object" && "type" in x && "value" in x)
+          return { type: (x as { type: string }).type === "number" ? "number" : "string", value: String((x as { value: unknown }).value ?? "") };
+        if (typeof x === "number") return { type: "number", value: String(x) };
+        return { type: "string", value: String(x ?? "") };
+      };
+      setDbClientParams(Array.from({ length: paramCount }, (_, i) => normalize(arr[i], i)));
     }
     if (block.type === "rulego_llm") {
       next.LLM_URL = get("LLM_URL") || "https://ai.gitee.com/v1";
@@ -269,6 +303,11 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
       const b = block as Block & { groupCount_?: number; updateShape_?: () => void };
       b.groupCount_ = slotCount;
       b.updateShape_?.();
+    }
+    if (block.type === "rulego_dbClient") {
+      const sql = String(form.DB_SQL ?? "");
+      const paramCount = (sql.match(/\?/g) || []).length;
+      block.setFieldValue(JSON.stringify(dbClientParams.slice(0, paramCount)), "DB_PARAMS");
     }
     onSaved?.();
     if (!inline) onClose();
@@ -626,6 +665,123 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
               autoCorrect="off"
               autoComplete="off"
             />
+          </label>
+        </>
+      )}
+      {block.type === "rulego_dbClient" && (
+        <>
+          <label className="form-field">
+            <span>驱动 (driverName)</span>
+            <input
+              value={String(form.DB_DRIVER_NAME ?? "mysql")}
+              onChange={(e) => setForm((f) => ({ ...f, DB_DRIVER_NAME: e.target.value }))}
+              placeholder="mysql / postgres / sqlite 等"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>DSN 连接串</span>
+            <input
+              value={String(form.DB_DSN ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, DB_DSN: e.target.value }))}
+              placeholder="如 root:root@tcp(127.0.0.1:3306)/test"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>连接池大小 (poolSize)</span>
+            <input
+              type="number"
+              value={String(form.DB_POOL_SIZE ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, DB_POOL_SIZE: e.target.value }))}
+              placeholder="可选"
+            />
+          </label>
+          <label className="form-field">
+            <span>操作类型 (opType)</span>
+            <input
+              value={String(form.DB_OP_TYPE ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, DB_OP_TYPE: e.target.value }))}
+              placeholder="INSERT/UPDATE/DELETE/SELECT 或留空自动检测"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>SQL 语句（? 为占位符，下方将生成对应数量的参数输入）</span>
+            <SqlEditor
+              value={String(form.DB_SQL ?? "")}
+              onChange={(value) => {
+                setForm((f) => ({ ...f, DB_SQL: value }));
+                const paramCount = (value.match(/\?/g) || []).length;
+                setDbClientParams((prev) =>
+                  Array.from({ length: paramCount }, (_, i) => prev[i] ?? { type: "string", value: "" })
+                );
+              }}
+              height={140}
+              minHeight={80}
+            />
+          </label>
+          {(() => {
+            const sql = String(form.DB_SQL ?? "");
+            const paramCount = (sql.match(/\?/g) || []).length;
+            if (paramCount === 0) return null;
+            return (
+              <div className="form-field" style={{ gridColumn: "1 / -1", display: "flex", flexDirection: "column", gap: 8 }}>
+                <span className="form-label">参数（按 SQL 中 ? 顺序，共 {paramCount} 个）</span>
+                {Array.from({ length: paramCount }, (_, i) => {
+                  const item = dbClientParams[i] ?? { type: "string" as const, value: "" };
+                  return (
+                    <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                      <span style={{ minWidth: 48, fontSize: 13, color: "#64748b" }}>? {i + 1}</span>
+                      <select
+                        value={item.type}
+                        onChange={(e) =>
+                          setDbClientParams((prev) => {
+                            const next = [...prev];
+                            next[i] = { ...(next[i] ?? { type: "string", value: "" }), type: e.target.value as "string" | "number" };
+                            return next;
+                          })
+                        }
+                        style={{ width: 72, padding: "6px 8px", borderRadius: 6, border: "1px solid #e2e8f0" }}
+                      >
+                        <option value="string">字符串</option>
+                        <option value="number">数字</option>
+                      </select>
+                      <input
+                        value={item.value}
+                        onChange={(e) =>
+                          setDbClientParams((prev) => {
+                            const next = [...prev];
+                            next[i] = { ...(next[i] ?? { type: "string", value: "" }), value: e.target.value };
+                            return next;
+                          })
+                        }
+                        placeholder={item.type === "number" ? "如 18 或 ${metadata.age}" : `如 ${"${metadata.id}"} 或字面值`}
+                        style={{ flex: 1, minWidth: 120, padding: "6px 10px", borderRadius: 6, border: "1px solid #e2e8f0" }}
+                        autoCapitalize="off"
+                        autoCorrect="off"
+                        autoComplete="off"
+                      />
+                    </div>
+                  );
+                })}
+                <span className="form-hint">支持 RuleGo 组件配置变量；数字类型在 DSL 中会输出为 number</span>
+              </div>
+            );
+          })()}
+          <label className="form-field" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={Boolean(form.DB_GET_ONE)}
+              onChange={(e) => setForm((f) => ({ ...f, DB_GET_ONE: e.target.checked }))}
+            />
+            <span>仅返回一条 (getOne)</span>
           </label>
         </>
       )}

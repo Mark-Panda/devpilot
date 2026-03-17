@@ -14,6 +14,7 @@ import "./blocks/llm";
 import "./blocks/delay";
 import "./blocks/switch";
 import "./blocks/startTrigger";
+import "./blocks/dbClient";
 
 import {
   getBlockDef,
@@ -78,6 +79,12 @@ export const toolbox = {
       name: "流程控制",
       categorystyle: "rulego_flow",
       contents: [{ kind: "block" as const, type: "rulego_break" }],
+    },
+    {
+      kind: "category" as const,
+      name: "数据库",
+      categorystyle: "rulego_db",
+      contents: [{ kind: "block" as const, type: "rulego_dbClient" }],
     },
   ],
 };

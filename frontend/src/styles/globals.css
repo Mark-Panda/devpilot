@@ -1340,6 +1340,21 @@ body {
   background-color: #f8fafc !important;
 }
 
+/* SQL 编辑器：与 JSON 编辑器一致，保证语法高亮与白底 */
+.sql-editor-root .monaco-editor,
+.sql-editor-root .monaco-editor .view-lines,
+.sql-editor-root .monaco-editor .view-line,
+.sql-editor-root .monaco-editor .view-line span,
+.sql-editor-root .monaco-editor .margin-view-overlays .line-numbers {
+  color: #0f172a !important;
+}
+.sql-editor-root .monaco-editor {
+  background: #ffffff !important;
+}
+.sql-editor-root .monaco-editor .margin {
+  background-color: #f8fafc !important;
+}
+
 /* RuleGo 执行日志列表 */
 .rulego-logs-table .table-head.rulego-logs-head,
 .rulego-logs-table .table-row.rulego-logs-row {

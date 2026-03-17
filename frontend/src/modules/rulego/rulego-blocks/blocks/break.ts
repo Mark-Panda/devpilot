@@ -16,7 +16,7 @@ const def: BlockTypeDef = {
     blocks[blockType] = {
       init: buildMinimalNodeInit(BlocklyF as any, {
         defaultId: "br1",
-        defaultName: "Break",
+        defaultName: "终止循环",
         category,
       }),
     };

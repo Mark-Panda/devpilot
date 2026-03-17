@@ -13,6 +13,7 @@ const CATEGORY_STYLES: Record<string, { bg: string; border: string }> = {
   rulego_condition: { bg: "rgba(20, 184, 166, 0.2)", border: "#14b8a6" },
   rulego_data: { bg: "rgba(245, 158, 11, 0.2)", border: "#f59e0b" },
   rulego_flow: { bg: "rgba(139, 92, 246, 0.2)", border: "#8b5cf6" },
+  rulego_db: { bg: "rgba(13, 148, 136, 0.2)", border: "#0d9488" },
 };
 
 const BLOCK_LABELS: Record<string, string> = {
@@ -27,7 +28,8 @@ const BLOCK_LABELS: Record<string, string> = {
   rulego_for: "循环",
   rulego_join: "汇聚",
   rulego_groupAction: "节点组",
-  rulego_break: "停止执行",
+  rulego_break: "终止循环",
+  rulego_dbClient: "数据库客户端",
 };
 
 type CategoryItem = {
