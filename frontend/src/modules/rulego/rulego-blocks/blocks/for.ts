@@ -23,7 +23,6 @@ const def: BlockTypeDef = {
           new (BlocklyF as any).FieldDropdown([["忽略", "0"], ["追加", "1"], ["覆盖", "2"], ["异步", "3"]]),
           "FOR_MODE"
         );
-        config.appendField(new (BlocklyF as any).FieldCheckbox(true), "DEBUG");
         (this as Block).appendStatementInput("branch_do").appendField("do 遍历体");
         (this as Block).appendStatementInput("branch_failure").appendField("Failure");
         const configInput = (this as Block).getInput("CONFIG");

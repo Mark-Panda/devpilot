@@ -58,7 +58,6 @@ const def: BlockTypeDef = {
         (this as Block).appendDummyInput("HEAD").appendField(new (BlocklyF as any).FieldTextInput(nodeName), "NODE_NAME");
         const configInput = (this as Block).appendDummyInput("CONFIG");
         configInput.appendField(new (BlocklyF as any).FieldTextInput(nodeId), "NODE_ID");
-        configInput.appendField(new (BlocklyF as any).FieldCheckbox(true), "DEBUG");
         const casesInput = (this as Block)
           .appendDummyInput("CASES")
           .appendField(new (BlocklyF as any).FieldTextInput(casesJson), "CASES_JSON");

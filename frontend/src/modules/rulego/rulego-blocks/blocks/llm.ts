@@ -33,7 +33,6 @@ const def: BlockTypeDef = {
         config.appendField(new (BlocklyF as any).FieldTextInput(defaultMessagesJson), "LLM_MESSAGES_JSON");
         config.appendField(new (BlocklyF as any).FieldTextInput(defaultParamsJson), "LLM_PARAMS_JSON");
         config.appendField(new (BlocklyF as any).FieldTextInput("[]"), "LLM_ENABLED_SKILLS_JSON");
-        config.appendField(new (BlocklyF as any).FieldCheckbox(false), "DEBUG");
         (this as Block).appendStatementInput("branch_failure").appendField("Failure");
         const configInput = (this as Block).getInput("CONFIG");
         if (configInput?.setVisible) configInput.setVisible(false);

@@ -24,7 +24,6 @@ export function buildMinimalNodeInit(
         else config.appendField(new BlocklyF.FieldTextInput(f.value) as never, f.name);
       });
     }
-    config.appendField(new BlocklyF.FieldCheckbox(true) as never, "DEBUG");
     config.appendField(
       new BlocklyF.FieldDropdown([["Success", "Success"], ["Failure", "Failure"], ["True", "True"], ["False", "False"]]) as never,
       "LINK_TYPE"

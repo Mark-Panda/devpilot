@@ -28,7 +28,6 @@ const def: BlockTypeDef = {
         config.appendField(new (BlocklyF as any).FieldTextInput("delay1"), "NODE_ID");
         config.appendField(new (BlocklyF as any).FieldTextInput("60000"), "DELAY_MS");
         config.appendField(new (BlocklyF as any).FieldCheckbox(false), "DELAY_OVERWRITE");
-        config.appendField(new (BlocklyF as any).FieldCheckbox(false), "DEBUG");
         (this as Block).appendStatementInput("branch_failure").appendField("Failure");
         const configInput = (this as Block).getInput("CONFIG");
         if (configInput?.setVisible) configInput.setVisible(false);

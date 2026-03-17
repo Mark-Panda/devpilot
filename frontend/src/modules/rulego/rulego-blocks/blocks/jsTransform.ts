@@ -20,7 +20,6 @@ const def: BlockTypeDef = {
         const config = (this as Block).appendDummyInput("CONFIG");
         config.appendField(new (BlocklyF as any).FieldTextInput("s2"), "NODE_ID");
         config.appendField(new (BlocklyF as any).FieldTextInput(defaultScript), "JS_SCRIPT");
-        config.appendField(new (BlocklyF as any).FieldCheckbox(true), "DEBUG");
         (this as Block).appendStatementInput("branch_failure").appendField("Failure");
         const configInput = (this as Block).getInput("CONFIG");
         if (configInput?.setVisible) configInput.setVisible(false);

@@ -27,7 +27,6 @@ const def: BlockTypeDef = {
         config.appendField(new (BlocklyF as any).FieldTextInput(""), "REST_BODY");
         config.appendField(new (BlocklyF as any).FieldTextInput("30000"), "REST_TIMEOUT");
         config.appendField(new (BlocklyF as any).FieldTextInput("200"), "REST_MAX_PARALLEL");
-        config.appendField(new (BlocklyF as any).FieldCheckbox(true), "DEBUG");
         (this as Block).appendStatementInput("branch_failure").appendField("Failure");
         const configInput = (this as Block).getInput("CONFIG");
         if (configInput?.setVisible) configInput.setVisible(false);

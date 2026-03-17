@@ -19,7 +19,6 @@ const def: BlockTypeDef = {
         config.appendField(new (BlocklyF as any).FieldTextInput("jn1"), "NODE_ID");
         config.appendField(new (BlocklyF as any).FieldNumber("0", 0, 3600, 1), "JOIN_TIMEOUT");
         config.appendField(new (BlocklyF as any).FieldCheckbox(false), "JOIN_MERGE_TO_MAP");
-        config.appendField(new (BlocklyF as any).FieldCheckbox(true), "DEBUG");
         (this as Block).appendStatementInput("branch_failure").appendField("Failure");
         const configInput = (this as Block).getInput("CONFIG");
         if (configInput?.setVisible) configInput.setVisible(false);

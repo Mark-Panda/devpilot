@@ -99,7 +99,6 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
     const next: Record<string, string | boolean> = {
       NODE_ID: get("NODE_ID"),
       NODE_NAME: get("NODE_NAME"),
-      DEBUG: block.getField("DEBUG") ? getBool("DEBUG") : true,
     };
     if (
       block.type === "rulego_jsFilter" ||
@@ -227,7 +226,7 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
       "LLM_MAX_TOKENS", "LLM_STOP", "LLM_RESPONSE_FORMAT",
     ]);
     Object.entries(form).forEach(([key, value]) => {
-      if (form[key] === undefined || key === "CASES_JSON" || key === "GROUP_SLOT_COUNT" || key === "NODE_ID" || llmParamKeys.has(key))
+      if (form[key] === undefined || key === "CASES_JSON" || key === "GROUP_SLOT_COUNT" || key === "NODE_ID" || key === "DEBUG" || llmParamKeys.has(key))
         return;
       set(key, value as string | boolean);
     });
@@ -280,655 +279,647 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
     <p className="confirm-text">块不存在或已被删除，请先在画布中选中一个块。</p>
   ) : (
     <div className="form-grid">
-              <label className="form-field">
-                <span>节点 ID</span>
-                <input
-                  value={String(form.NODE_ID ?? "")}
-                  readOnly
-                  className="readonly-input"
-                />
-              </label>
-              <label className="form-field">
-                <span>节点名称</span>
-                <input
-                  value={String(form.NODE_NAME ?? "")}
-                  onChange={(e) => setForm((f) => ({ ...f, NODE_NAME: e.target.value }))}
-                  autoCapitalize="off"
-                  autoCorrect="off"
-                  autoComplete="off"
-                />
-              </label>
-              {block.type === "rulego_switch" && (
-                <div className="form-field" style={{ gridColumn: "1 / -1" }}>
-                  <span className="form-label">条件分支 (cases)</span>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                    {switchCases.map((item, index) => (
-                      <div
-                        key={index}
-                        style={{
-                          display: "grid",
-                          gridTemplateColumns: "1fr auto auto",
-                          gap: 8,
-                          alignItems: "start",
-                        }}
-                      >
-                        <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                          <span style={{ fontSize: 12, color: "#64748b" }}>条件表达式 (case)</span>
-                          <input
-                            value={item.case}
-                            onChange={(e) =>
-                              setSwitchCases((prev) => {
-                                const next = [...prev];
-                                next[index] = { ...next[index], case: e.target.value };
-                                return next;
-                              })
-                            }
-                            placeholder="如 msg.temperature > 50"
-                            style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #e2e8f0" }}
-                            autoCapitalize="off"
-                            autoCorrect="off"
-                            autoComplete="off"
-                          />
-                        </label>
-                        <label style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 90 }}>
-                          <span style={{ fontSize: 12, color: "#64748b" }}>路由名 (then)</span>
-                          <input
-                            value={item.then}
-                            onChange={(e) =>
-                              setSwitchCases((prev) => {
-                                const next = [...prev];
-                                next[index] = { ...next[index], then: e.target.value };
-                                return next;
-                              })
-                            }
-                            placeholder="Case1"
-                            style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #e2e8f0" }}
-                          />
-                        </label>
-                        <button
-                          type="button"
-                          className="text-button"
-                          style={{ marginTop: 20, padding: "6px 10px" }}
-                          onClick={() =>
-                            setSwitchCases((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)))
-                          }
-                          disabled={switchCases.length <= 1}
-                          title="删除该条件"
-                        >
-                          删除
-                        </button>
-                      </div>
+      <label className="form-field">
+        <span>节点 ID</span>
+        <input
+          value={String(form.NODE_ID ?? "")}
+          readOnly
+          className="readonly-input"
+        />
+      </label>
+      <label className="form-field">
+        <span>节点名称</span>
+        <input
+          value={String(form.NODE_NAME ?? "")}
+          onChange={(e) => setForm((f) => ({ ...f, NODE_NAME: e.target.value }))}
+          autoCapitalize="off"
+          autoCorrect="off"
+          autoComplete="off"
+        />
+      </label>
+      {block.type === "rulego_switch" && (
+        <div className="form-field" style={{ gridColumn: "1 / -1" }}>
+          <span className="form-label">条件分支 (cases)</span>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+            {switchCases.map((item, index) => (
+              <div
+                key={index}
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "1fr auto auto",
+                  gap: 8,
+                  alignItems: "start",
+                }}
+              >
+                <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <span style={{ fontSize: 12, color: "#64748b" }}>条件表达式 (case)</span>
+                  <input
+                    value={item.case}
+                    onChange={(e) =>
+                      setSwitchCases((prev) => {
+                        const next = [...prev];
+                        next[index] = { ...next[index], case: e.target.value };
+                        return next;
+                      })
+                    }
+                    placeholder="如 msg.temperature > 50"
+                    style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #e2e8f0" }}
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    autoComplete="off"
+                  />
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 90 }}>
+                  <span style={{ fontSize: 12, color: "#64748b" }}>路由名 (then)</span>
+                  <input
+                    value={item.then}
+                    onChange={(e) =>
+                      setSwitchCases((prev) => {
+                        const next = [...prev];
+                        next[index] = { ...next[index], then: e.target.value };
+                        return next;
+                      })
+                    }
+                    placeholder="Case1"
+                    style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid #e2e8f0" }}
+                  />
+                </label>
+                <button
+                  type="button"
+                  className="text-button"
+                  style={{ marginTop: 20, padding: "6px 10px" }}
+                  onClick={() =>
+                    setSwitchCases((prev) => (prev.length <= 1 ? prev : prev.filter((_, i) => i !== index)))
+                  }
+                  disabled={switchCases.length <= 1}
+                  title="删除该条件"
+                >
+                  删除
+                </button>
+              </div>
+            ))}
+            <button
+              type="button"
+              className="text-button"
+              style={{ alignSelf: "flex-start", padding: "8px 12px", border: "1px dashed #cbd5e1", borderRadius: 8 }}
+              onClick={() =>
+                setSwitchCases((prev) => [...prev, { case: "true", then: `Case${prev.length + 1}` }])
+              }
+              disabled={switchCases.length >= 6}
+            >
+              + 添加 Case
+            </button>
+          </div>
+          <small className="form-hint">
+            画布上会同步显示对应数量的 Case 槽位；Default / Failure 为固定槽位。最多 6 个 case。参考{" "}
+            <a href="https://rulego.cc/pages/switch/#%E9%85%8D%E7%BD%AE%E7%A4%BA%E4%BE%8B" target="_blank" rel="noopener noreferrer">
+              RuleGo 条件分支
+            </a>
+          </small>
+        </div>
+      )}
+      {block.type === "rulego_join" && (
+        <>
+          <label className="form-field">
+            <span>timeout（秒，0 表示不超时）</span>
+            <input
+              type="number"
+              min={0}
+              value={String(form.JOIN_TIMEOUT ?? "0")}
+              onChange={(e) => setForm((f) => ({ ...f, JOIN_TIMEOUT: e.target.value }))}
+            />
+          </label>
+          <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={Boolean(form.JOIN_MERGE_TO_MAP)}
+              onChange={(e) => setForm((f) => ({ ...f, JOIN_MERGE_TO_MAP: e.target.checked }))}
+            />
+            <span>mergeToMap（结果合并为 Map）</span>
+          </label>
+          <small className="form-hint" style={{ gridColumn: "1 / -1" }}>
+            参考 <a href="https://rulego.cc/pages/join/" target="_blank" rel="noopener noreferrer">RuleGo 汇聚</a>
+          </small>
+        </>
+      )}
+      {block.type === "rulego_groupAction" && (
+        <>
+          <label className="form-field">
+            <span>matchRelationType</span>
+            <select
+              value={String(form.MATCH_RELATION_TYPE ?? "Success")}
+              onChange={(e) => setForm((f) => ({ ...f, MATCH_RELATION_TYPE: e.target.value }))}
+            >
+              <option value="Success">Success</option>
+              <option value="Failure">Failure</option>
+            </select>
+          </label>
+          <label className="form-field">
+            <span>matchNum（0=全部匹配）</span>
+            <input
+              type="number"
+              min={0}
+              value={String(form.MATCH_NUM ?? "0")}
+              onChange={(e) => setForm((f) => ({ ...f, MATCH_NUM: e.target.value }))}
+            />
+          </label>
+          <label className="form-field">
+            <span>timeout（秒）</span>
+            <input
+              type="number"
+              min={0}
+              value={String(form.GROUP_TIMEOUT ?? "0")}
+              onChange={(e) => setForm((f) => ({ ...f, GROUP_TIMEOUT: e.target.value }))}
+            />
+          </label>
+          <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={Boolean(form.GROUP_MERGE_TO_MAP)}
+              onChange={(e) => setForm((f) => ({ ...f, GROUP_MERGE_TO_MAP: e.target.checked }))}
+            />
+            <span>mergeToMap</span>
+          </label>
+          <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <span>组内节点槽位数量</span>
+            <input
+              type="number"
+              min={1}
+              max={8}
+              value={String(form.GROUP_SLOT_COUNT ?? "1")}
+              onChange={(e) =>
+                setForm((f) => ({
+                  ...f,
+                  GROUP_SLOT_COUNT: String(Math.max(1, Math.min(8, parseInt(e.target.value, 10) || 1))),
+                }))
+              }
+              style={{ width: 56 }}
+            />
+            <button
+              type="button"
+              className="text-button"
+              style={{ padding: "4px 8px" }}
+              onClick={() =>
+                setForm((f) => ({
+                  ...f,
+                  GROUP_SLOT_COUNT: String(Math.min(8, (parseInt(String(f.GROUP_SLOT_COUNT ?? "1"), 10) || 1) + 1)),
+                }))
+              }
+              disabled={parseInt(String(form.GROUP_SLOT_COUNT ?? "1"), 10) >= 8}
+            >
+              +1
+            </button>
+            <button
+              type="button"
+              className="text-button"
+              style={{ padding: "4px 8px" }}
+              onClick={() =>
+                setForm((f) => ({
+                  ...f,
+                  GROUP_SLOT_COUNT: String(Math.max(1, (parseInt(String(f.GROUP_SLOT_COUNT ?? "1"), 10) || 1) - 1)),
+                }))
+              }
+              disabled={parseInt(String(form.GROUP_SLOT_COUNT ?? "1"), 10) <= 1}
+            >
+              -1
+            </button>
+          </label>
+          <small className="form-hint" style={{ gridColumn: "1 / -1" }}>
+            画布上会同步显示对应数量的「组内节点N」槽位（1～8）。参考{" "}
+            <a href="https://rulego.cc/pages/group-action/" target="_blank" rel="noopener noreferrer">RuleGo 节点组</a>
+          </small>
+        </>
+      )}
+      {block.type === "rulego_for" && (
+        <>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>range（遍历目标表达式）</span>
+            <input
+              value={String(form.FOR_RANGE ?? "1..3")}
+              onChange={(e) => setForm((f) => ({ ...f, FOR_RANGE: e.target.value }))}
+              placeholder="${msg.items} 或 1..3"
+            />
+            <small className="form-hint">如 ${"{msg.items}"}、1..3、${"{metadata.items}"}</small>
+          </label>
+          <label className="form-field">
+            <span>do（遍历体）</span>
+            <input
+              value={String(form.FOR_DO ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, FOR_DO: e.target.value }))}
+              placeholder="留空则用上方 do 槽位连接的块；或填 chain:rule01"
+            />
+            <small className="form-hint">在画布「do 遍历体」槽位中连接一个或多个块；或填写子规则链如 chain:chainId</small>
+          </label>
+          <label className="form-field">
+            <span>mode（结果合并方式）</span>
+            <select
+              value={String(form.FOR_MODE ?? "0")}
+              onChange={(e) => setForm((f) => ({ ...f, FOR_MODE: e.target.value }))}
+            >
+              <option value="0">0 - 忽略</option>
+              <option value="1">1 - 追加</option>
+              <option value="2">2 - 覆盖</option>
+              <option value="3">3 - 异步</option>
+            </select>
+          </label>
+          <small className="form-hint" style={{ gridColumn: "1 / -1" }}>
+            参考{" "}
+            <a href="https://rulego.cc/pages/for/#%E9%85%8D%E7%BD%AE%E7%A4%BA%E4%BE%8B" target="_blank" rel="noopener noreferrer">
+              RuleGo 遍历组件
+            </a>
+          </small>
+        </>
+      )}
+      {(block.type === "rulego_jsFilter" ||
+        block.type === "rulego_jsTransform" ||
+        block.type === "rulego_jsSwitch") && (
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>脚本 (JS_SCRIPT)</span>
+            <JsEditor
+              value={String(form.JS_SCRIPT ?? "")}
+              onChange={(v) => setForm((f) => ({ ...f, JS_SCRIPT: v }))}
+              height={220}
+              minHeight={120}
+              showFormatButton
+            />
+          </label>
+        )}
+      {block.type === "rulego_delay" && (
+        <>
+          <label className="form-field">
+            <span>延迟时间 (ms)</span>
+            <input
+              value={String(form.DELAY_MS ?? "60000")}
+              onChange={(e) => setForm((f) => ({ ...f, DELAY_MS: e.target.value }))}
+              placeholder="60000 或 ${metadata.delay}"
+            />
+          </label>
+          <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={Boolean(form.DELAY_OVERWRITE)}
+              onChange={(e) => setForm((f) => ({ ...f, DELAY_OVERWRITE: e.target.checked }))}
+            />
+            <span>周期内覆盖 (overwrite)</span>
+          </label>
+        </>
+      )}
+      {block.type === "rulego_restApiCall" && (
+        <>
+          <label className="form-field">
+            <span>URL</span>
+            <input
+              value={String(form.REST_URL ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, REST_URL: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>方法</span>
+            <select
+              value={String(form.REST_METHOD ?? "POST")}
+              onChange={(e) => setForm((f) => ({ ...f, REST_METHOD: e.target.value }))}
+            >
+              <option value="GET">GET</option>
+              <option value="POST">POST</option>
+              <option value="PUT">PUT</option>
+              <option value="DELETE">DELETE</option>
+            </select>
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>Headers (JSON)</span>
+            <JsonEditor
+              value={String(form.REST_HEADERS ?? "{}")}
+              onChange={(v) => setForm((f) => ({ ...f, REST_HEADERS: v }))}
+              height={80}
+              minHeight={60}
+              showFormatButton
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>Body</span>
+            <JsonEditor
+              value={String(form.REST_BODY ?? "")}
+              onChange={(v) => setForm((f) => ({ ...f, REST_BODY: v }))}
+              height={100}
+              minHeight={60}
+              showFormatButton
+            />
+          </label>
+          <label className="form-field">
+            <span>超时 (ms)</span>
+            <input
+              type="number"
+              value={String(form.REST_TIMEOUT ?? "30000")}
+              onChange={(e) => setForm((f) => ({ ...f, REST_TIMEOUT: e.target.value }))}
+            />
+          </label>
+          <label className="form-field">
+            <span>最大并发</span>
+            <input
+              value={String(form.REST_MAX_PARALLEL ?? "200")}
+              onChange={(e) => setForm((f) => ({ ...f, REST_MAX_PARALLEL: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+        </>
+      )}
+      {block.type === "rulego_llm" && (
+        <div className="block-config-llm">
+          <div className="block-config-llm-section">
+            <div className="block-config-llm-section-title">连接与模型</div>
+            {modelConfigs.length === 0 ? (
+              <p className="form-hint" style={{ margin: 0 }}>
+                请先在「模型管理」中添加配置，再在此选择连接与模型。
+              </p>
+            ) : (
+              <>
+                <label className="form-field" style={{ margin: 0 }}>
+                  <span>选择配置</span>
+                  <select
+                    value={llmSelectedConfig?.id ?? ""}
+                    onChange={(e) => {
+                      const id = e.target.value;
+                      const config = modelConfigs.find((c) => c.id === id);
+                      if (!config) return;
+                      const currentModel = String(form.LLM_MODEL ?? "").trim();
+                      const firstModel = config.models[0] ?? "";
+                      setForm((f) => ({
+                        ...f,
+                        LLM_URL: config.baseUrl,
+                        LLM_KEY: config.apiKey,
+                        LLM_MODEL: currentModel && config.models.includes(currentModel) ? currentModel : firstModel,
+                      }));
+                    }}
+                    style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #e2e8f0" }}
+                  >
+                    <option value="">请选择配置</option>
+                    {modelConfigs.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.siteDescription || c.baseUrl}
+                      </option>
                     ))}
-                    <button
-                      type="button"
-                      className="text-button"
-                      style={{ alignSelf: "flex-start", padding: "8px 12px", border: "1px dashed #cbd5e1", borderRadius: 8 }}
-                      onClick={() =>
-                        setSwitchCases((prev) => [...prev, { case: "true", then: `Case${prev.length + 1}` }])
-                      }
-                      disabled={switchCases.length >= 6}
-                    >
-                      + 添加 Case
-                    </button>
-                  </div>
-                  <small className="form-hint">
-                    画布上会同步显示对应数量的 Case 槽位；Default / Failure 为固定槽位。最多 6 个 case。参考{" "}
-                    <a href="https://rulego.cc/pages/switch/#%E9%85%8D%E7%BD%AE%E7%A4%BA%E4%BE%8B" target="_blank" rel="noopener noreferrer">
-                      RuleGo 条件分支
-                    </a>
-                  </small>
-                </div>
-              )}
-              {block.type === "rulego_join" && (
-                <>
-                  <label className="form-field">
-                    <span>timeout（秒，0 表示不超时）</span>
-                    <input
-                      type="number"
-                      min={0}
-                      value={String(form.JOIN_TIMEOUT ?? "0")}
-                      onChange={(e) => setForm((f) => ({ ...f, JOIN_TIMEOUT: e.target.value }))}
-                    />
-                  </label>
-                  <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                    <input
-                      type="checkbox"
-                      checked={Boolean(form.JOIN_MERGE_TO_MAP)}
-                      onChange={(e) => setForm((f) => ({ ...f, JOIN_MERGE_TO_MAP: e.target.checked }))}
-                    />
-                    <span>mergeToMap（结果合并为 Map）</span>
-                  </label>
-                  <small className="form-hint" style={{ gridColumn: "1 / -1" }}>
-                    参考 <a href="https://rulego.cc/pages/join/" target="_blank" rel="noopener noreferrer">RuleGo 汇聚</a>
-                  </small>
-                </>
-              )}
-              {block.type === "rulego_groupAction" && (
-                <>
-                  <label className="form-field">
-                    <span>matchRelationType</span>
-                    <select
-                      value={String(form.MATCH_RELATION_TYPE ?? "Success")}
-                      onChange={(e) => setForm((f) => ({ ...f, MATCH_RELATION_TYPE: e.target.value }))}
-                    >
-                      <option value="Success">Success</option>
-                      <option value="Failure">Failure</option>
-                    </select>
-                  </label>
-                  <label className="form-field">
-                    <span>matchNum（0=全部匹配）</span>
-                    <input
-                      type="number"
-                      min={0}
-                      value={String(form.MATCH_NUM ?? "0")}
-                      onChange={(e) => setForm((f) => ({ ...f, MATCH_NUM: e.target.value }))}
-                    />
-                  </label>
-                  <label className="form-field">
-                    <span>timeout（秒）</span>
-                    <input
-                      type="number"
-                      min={0}
-                      value={String(form.GROUP_TIMEOUT ?? "0")}
-                      onChange={(e) => setForm((f) => ({ ...f, GROUP_TIMEOUT: e.target.value }))}
-                    />
-                  </label>
-                  <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                    <input
-                      type="checkbox"
-                      checked={Boolean(form.GROUP_MERGE_TO_MAP)}
-                      onChange={(e) => setForm((f) => ({ ...f, GROUP_MERGE_TO_MAP: e.target.checked }))}
-                    />
-                    <span>mergeToMap</span>
-                  </label>
-                  <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                    <span>组内节点槽位数量</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={8}
-                      value={String(form.GROUP_SLOT_COUNT ?? "1")}
-                      onChange={(e) =>
-                        setForm((f) => ({
-                          ...f,
-                          GROUP_SLOT_COUNT: String(Math.max(1, Math.min(8, parseInt(e.target.value, 10) || 1))),
-                        }))
-                      }
-                      style={{ width: 56 }}
-                    />
-                    <button
-                      type="button"
-                      className="text-button"
-                      style={{ padding: "4px 8px" }}
-                      onClick={() =>
-                        setForm((f) => ({
-                          ...f,
-                          GROUP_SLOT_COUNT: String(Math.min(8, (parseInt(String(f.GROUP_SLOT_COUNT ?? "1"), 10) || 1) + 1)),
-                        }))
-                      }
-                      disabled={parseInt(String(form.GROUP_SLOT_COUNT ?? "1"), 10) >= 8}
-                    >
-                      +1
-                    </button>
-                    <button
-                      type="button"
-                      className="text-button"
-                      style={{ padding: "4px 8px" }}
-                      onClick={() =>
-                        setForm((f) => ({
-                          ...f,
-                          GROUP_SLOT_COUNT: String(Math.max(1, (parseInt(String(f.GROUP_SLOT_COUNT ?? "1"), 10) || 1) - 1)),
-                        }))
-                      }
-                      disabled={parseInt(String(form.GROUP_SLOT_COUNT ?? "1"), 10) <= 1}
-                    >
-                      -1
-                    </button>
-                  </label>
-                  <small className="form-hint" style={{ gridColumn: "1 / -1" }}>
-                    画布上会同步显示对应数量的「组内节点N」槽位（1～8）。参考{" "}
-                    <a href="https://rulego.cc/pages/group-action/" target="_blank" rel="noopener noreferrer">RuleGo 节点组</a>
-                  </small>
-                </>
-              )}
-              {block.type === "rulego_for" && (
-                <>
-                  <label className="form-field" style={{ gridColumn: "1 / -1" }}>
-                    <span>range（遍历目标表达式）</span>
-                    <input
-                      value={String(form.FOR_RANGE ?? "1..3")}
-                      onChange={(e) => setForm((f) => ({ ...f, FOR_RANGE: e.target.value }))}
-                      placeholder="${msg.items} 或 1..3"
-                    />
-                    <small className="form-hint">如 ${"{msg.items}"}、1..3、${"{metadata.items}"}</small>
-                  </label>
-                  <label className="form-field">
-                    <span>do（遍历体）</span>
-                    <input
-                      value={String(form.FOR_DO ?? "")}
-                      onChange={(e) => setForm((f) => ({ ...f, FOR_DO: e.target.value }))}
-                      placeholder="留空则用上方 do 槽位连接的块；或填 chain:rule01"
-                    />
-                    <small className="form-hint">在画布「do 遍历体」槽位中连接一个或多个块；或填写子规则链如 chain:chainId</small>
-                  </label>
-                  <label className="form-field">
-                    <span>mode（结果合并方式）</span>
-                    <select
-                      value={String(form.FOR_MODE ?? "0")}
-                      onChange={(e) => setForm((f) => ({ ...f, FOR_MODE: e.target.value }))}
-                    >
-                      <option value="0">0 - 忽略</option>
-                      <option value="1">1 - 追加</option>
-                      <option value="2">2 - 覆盖</option>
-                      <option value="3">3 - 异步</option>
-                    </select>
-                  </label>
-                  <small className="form-hint" style={{ gridColumn: "1 / -1" }}>
-                    参考{" "}
-                    <a href="https://rulego.cc/pages/for/#%E9%85%8D%E7%BD%AE%E7%A4%BA%E4%BE%8B" target="_blank" rel="noopener noreferrer">
-                      RuleGo 遍历组件
-                    </a>
-                  </small>
-                </>
-              )}
-              {(block.type === "rulego_jsFilter" ||
-                block.type === "rulego_jsTransform" ||
-                block.type === "rulego_jsSwitch") && (
-                  <label className="form-field" style={{ gridColumn: "1 / -1" }}>
-                    <span>脚本 (JS_SCRIPT)</span>
-                    <JsEditor
-                      value={String(form.JS_SCRIPT ?? "")}
-                      onChange={(v) => setForm((f) => ({ ...f, JS_SCRIPT: v }))}
-                      height={220}
-                      minHeight={120}
-                      showFormatButton
-                    />
-                  </label>
-                )}
-              {block.type === "rulego_delay" && (
-                <>
-                  <label className="form-field">
-                    <span>延迟时间 (ms)</span>
-                    <input
-                      value={String(form.DELAY_MS ?? "60000")}
-                      onChange={(e) => setForm((f) => ({ ...f, DELAY_MS: e.target.value }))}
-                      placeholder="60000 或 ${metadata.delay}"
-                    />
-                  </label>
-                  <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                    <input
-                      type="checkbox"
-                      checked={Boolean(form.DELAY_OVERWRITE)}
-                      onChange={(e) => setForm((f) => ({ ...f, DELAY_OVERWRITE: e.target.checked }))}
-                    />
-                    <span>周期内覆盖 (overwrite)</span>
-                  </label>
-                </>
-              )}
-              {block.type === "rulego_restApiCall" && (
-                <>
-                  <label className="form-field">
-                    <span>URL</span>
-                    <input
-                      value={String(form.REST_URL ?? "")}
-                      onChange={(e) => setForm((f) => ({ ...f, REST_URL: e.target.value }))}
-                      autoCapitalize="off"
-                      autoCorrect="off"
-                      autoComplete="off"
-                    />
-                  </label>
-                  <label className="form-field">
-                    <span>方法</span>
-                    <select
-                      value={String(form.REST_METHOD ?? "POST")}
-                      onChange={(e) => setForm((f) => ({ ...f, REST_METHOD: e.target.value }))}
-                    >
-                      <option value="GET">GET</option>
-                      <option value="POST">POST</option>
-                      <option value="PUT">PUT</option>
-                      <option value="DELETE">DELETE</option>
-                    </select>
-                  </label>
-                  <label className="form-field" style={{ gridColumn: "1 / -1" }}>
-                    <span>Headers (JSON)</span>
-                    <JsonEditor
-                      value={String(form.REST_HEADERS ?? "{}")}
-                      onChange={(v) => setForm((f) => ({ ...f, REST_HEADERS: v }))}
-                      height={80}
-                      minHeight={60}
-                      showFormatButton
-                    />
-                  </label>
-                  <label className="form-field" style={{ gridColumn: "1 / -1" }}>
-                    <span>Body</span>
-                    <JsonEditor
-                      value={String(form.REST_BODY ?? "")}
-                      onChange={(v) => setForm((f) => ({ ...f, REST_BODY: v }))}
-                      height={100}
-                      minHeight={60}
-                      showFormatButton
-                    />
-                  </label>
-                  <label className="form-field">
-                    <span>超时 (ms)</span>
-                    <input
-                      type="number"
-                      value={String(form.REST_TIMEOUT ?? "30000")}
-                      onChange={(e) => setForm((f) => ({ ...f, REST_TIMEOUT: e.target.value }))}
-                    />
-                  </label>
-                  <label className="form-field">
-                    <span>最大并发</span>
-                    <input
-                      value={String(form.REST_MAX_PARALLEL ?? "200")}
-                      onChange={(e) => setForm((f) => ({ ...f, REST_MAX_PARALLEL: e.target.value }))}
-                      autoCapitalize="off"
-                      autoCorrect="off"
-                      autoComplete="off"
-                    />
-                  </label>
-                </>
-              )}
-              {block.type === "rulego_llm" && (
-                <div className="block-config-llm">
-                  <div className="block-config-llm-section">
-                    <div className="block-config-llm-section-title">连接与模型</div>
-                    {modelConfigs.length === 0 ? (
-                      <p className="form-hint" style={{ margin: 0 }}>
-                        请先在「模型管理」中添加配置，再在此选择连接与模型。
-                      </p>
-                    ) : (
-                      <>
-                        <label className="form-field" style={{ margin: 0 }}>
-                          <span>选择配置</span>
-                          <select
-                            value={llmSelectedConfig?.id ?? ""}
-                            onChange={(e) => {
-                              const id = e.target.value;
-                              const config = modelConfigs.find((c) => c.id === id);
-                              if (!config) return;
-                              const currentModel = String(form.LLM_MODEL ?? "").trim();
-                              const firstModel = config.models[0] ?? "";
-                              setForm((f) => ({
-                                ...f,
-                                LLM_URL: config.baseUrl,
-                                LLM_KEY: config.apiKey,
-                                LLM_MODEL: currentModel && config.models.includes(currentModel) ? currentModel : firstModel,
-                              }));
-                            }}
-                            style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #e2e8f0" }}
-                          >
-                            <option value="">请选择配置</option>
-                            {modelConfigs.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.siteDescription || c.baseUrl}
-                              </option>
-                            ))}
-                          </select>
-                        </label>
-                        {llmSelectedConfig && (
-                          <>
-                            <label className="form-field" style={{ margin: 0 }}>
-                              <span>请求地址 (url)</span>
-                              <input
-                                readOnly
-                                className="readonly-input"
-                                value={String(form.LLM_URL ?? "")}
-                                style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #e2e8f0", background: "#f1f5f9", color: "#64748b" }}
-                              />
-                            </label>
-                            <label className="form-field" style={{ margin: 0 }}>
-                              <span>API Key (key)</span>
-                              <input
-                                readOnly
-                                type="password"
-                                className="readonly-input"
-                                value={String(form.LLM_KEY ?? "")}
-                                style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #e2e8f0", background: "#f1f5f9", color: "#64748b" }}
-                              />
-                            </label>
-                            <label className="form-field" style={{ margin: 0 }}>
-                              <span>模型 (model)</span>
-                              <select
-                                value={String(form.LLM_MODEL ?? "")}
-                                onChange={(e) => setForm((f) => ({ ...f, LLM_MODEL: e.target.value }))}
-                                style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #e2e8f0" }}
-                              >
-                                {llmModelOptions.map((m) => (
-                                  <option key={m} value={m}>
-                                    {m}
-                                  </option>
-                                ))}
-                              </select>
-                            </label>
-                          </>
-                        )}
-                      </>
-                    )}
-                  </div>
-                  <div className="block-config-llm-section">
-                    <div className="block-config-llm-section-title">提示与消息</div>
-                    <label className="form-field" style={{ marginTop: 0 }}>
-                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
-                        <span>系统提示 (systemPrompt)</span>
-                        <button
-                          type="button"
-                          className="text-button"
-                          style={{ fontSize: 12, padding: "4px 10px" }}
-                          onClick={() => {
-                            setSystemPromptDraft(String(form.LLM_SYSTEM_PROMPT ?? ""));
-                            setSystemPromptModalOpen(true);
-                          }}
-                        >
-                          放大编辑
-                        </button>
-                      </div>
-                      <textarea
-                        value={String(form.LLM_SYSTEM_PROMPT ?? "")}
-                        onChange={(e) => setForm((f) => ({ ...f, LLM_SYSTEM_PROMPT: e.target.value }))}
-                        placeholder="可选，支持 ${} 占位符"
-                        rows={4}
-                        style={{ width: "100%", resize: "vertical", padding: 8, borderRadius: 6, border: "1px solid #e2e8f0" }}
+                  </select>
+                </label>
+                {llmSelectedConfig && (
+                  <>
+                    <label className="form-field" style={{ margin: 0 }}>
+                      <span>请求地址 (url)</span>
+                      <input
+                        readOnly
+                        className="readonly-input"
+                        value={String(form.LLM_URL ?? "")}
+                        style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #e2e8f0", background: "#f1f5f9", color: "#64748b" }}
                       />
                     </label>
-                    {systemPromptModalOpen && (
-                      <div
-                        className="modal-overlay"
-                        role="dialog"
-                        aria-modal="true"
-                        style={{ zIndex: 30 }}
-                        onClick={() => setSystemPromptModalOpen(false)}
+                    <label className="form-field" style={{ margin: 0 }}>
+                      <span>API Key (key)</span>
+                      <input
+                        readOnly
+                        type="password"
+                        className="readonly-input"
+                        value={String(form.LLM_KEY ?? "")}
+                        style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #e2e8f0", background: "#f1f5f9", color: "#64748b" }}
+                      />
+                    </label>
+                    <label className="form-field" style={{ margin: 0 }}>
+                      <span>模型 (model)</span>
+                      <select
+                        value={String(form.LLM_MODEL ?? "")}
+                        onChange={(e) => setForm((f) => ({ ...f, LLM_MODEL: e.target.value }))}
+                        style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #e2e8f0" }}
                       >
-                        <div
-                          className="modal system-prompt-editor-modal"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          <div className="modal-header">
-                            <h3>编辑系统提示词</h3>
-                            <button
-                              type="button"
-                              className="text-button"
-                              onClick={() => setSystemPromptModalOpen(false)}
-                              aria-label="关闭"
-                            >
-                              ×
-                            </button>
-                          </div>
-                          <div className="modal-body" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
-                            <textarea
-                              className="system-prompt-editor-textarea"
-                              value={systemPromptDraft}
-                              onChange={(e) => setSystemPromptDraft(e.target.value)}
-                              placeholder="可选，支持 ${} 占位符"
-                              spellCheck={false}
-                            />
-                          </div>
-                          <div className="modal-actions">
-                            <button type="button" className="text-button" onClick={() => setSystemPromptModalOpen(false)}>
-                              取消
-                            </button>
-                            <button
-                              type="button"
-                              className="primary-button"
-                              onClick={() => {
-                                setForm((f) => ({ ...f, LLM_SYSTEM_PROMPT: systemPromptDraft }));
-                                setSystemPromptModalOpen(false);
-                              }}
-                            >
-                              确定
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                    <label className="form-field">
-                      <span>上下文消息 (messages) — JSON 数组</span>
-                      <JsonEditor
-                        value={String(form.LLM_MESSAGES_JSON ?? "[]")}
-                        onChange={(v) => setForm((f) => ({ ...f, LLM_MESSAGES_JSON: v }))}
-                        height={100}
-                        minHeight={80}
-                        showFormatButton
-                      />
-                      <small className="form-hint">每项: {`{ "role": "user" | "assistant", "content": "..." }`}，留空 [] 则使用 msg.Data 作为单条用户消息</small>
+                        {llmModelOptions.map((m) => (
+                          <option key={m} value={m}>
+                            {m}
+                          </option>
+                        ))}
+                      </select>
                     </label>
-                  </div>
-                  <div className="block-config-llm-section">
-                    <div className="block-config-llm-section-title">启用技能（~/.devpilot/skills/）</div>
-                    <small className="form-hint" style={{ display: "block", marginBottom: 8 }}>
-                      勾选的技能会注入系统提示；不勾选则不注入任何技能
-                    </small>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 160, overflowY: "auto", padding: "4px 0" }}>
-                      {availableSkills.length === 0 ? (
-                        <span className="form-hint">暂无技能或未读取到 ~/.devpilot/skills/</span>
-                      ) : (
-                        availableSkills.map((sk) => {
-                          const raw = String(form.LLM_ENABLED_SKILLS_JSON ?? "[]");
-                          let enabled: string[] = [];
-                          try {
-                            const parsed = JSON.parse(raw);
-                            enabled = Array.isArray(parsed) ? parsed : [];
-                          } catch {
-                            enabled = [];
-                          }
-                          const checked = enabled.includes(sk.name);
-                          const toggle = () => {
-                            const next = checked ? enabled.filter((n) => n !== sk.name) : [...enabled, sk.name];
-                            setForm((f) => ({ ...f, LLM_ENABLED_SKILLS_JSON: JSON.stringify(next) }));
-                          };
-                          return (
-                            <label key={sk.name} style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer" }}>
-                              <input type="checkbox" checked={checked} onChange={toggle} />
-                              <span><strong>{sk.name}</strong></span>
-                            </label>
-                          );
-                        })
-                      )}
-                    </div>
-                  </div>
-                  <div className="block-config-llm-section block-config-llm-section-collapsible">
+                  </>
+                )}
+              </>
+            )}
+          </div>
+          <div className="block-config-llm-section">
+            <div className="block-config-llm-section-title">提示与消息</div>
+            <label className="form-field" style={{ marginTop: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
+                <span>系统提示 (systemPrompt)</span>
+                <button
+                  type="button"
+                  className="text-button"
+                  style={{ fontSize: 12, padding: "4px 10px" }}
+                  onClick={() => {
+                    setSystemPromptDraft(String(form.LLM_SYSTEM_PROMPT ?? ""));
+                    setSystemPromptModalOpen(true);
+                  }}
+                >
+                  放大编辑
+                </button>
+              </div>
+              <textarea
+                value={String(form.LLM_SYSTEM_PROMPT ?? "")}
+                onChange={(e) => setForm((f) => ({ ...f, LLM_SYSTEM_PROMPT: e.target.value }))}
+                placeholder="可选，支持 ${} 占位符"
+                rows={4}
+                style={{ width: "100%", resize: "vertical", padding: 8, borderRadius: 6, border: "1px solid #e2e8f0" }}
+              />
+            </label>
+            {systemPromptModalOpen && (
+              <div
+                className="modal-overlay"
+                role="dialog"
+                aria-modal="true"
+                style={{ zIndex: 30 }}
+                onClick={() => setSystemPromptModalOpen(false)}
+              >
+                <div
+                  className="modal system-prompt-editor-modal"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="modal-header">
+                    <h3>编辑系统提示词</h3>
                     <button
                       type="button"
-                      className="block-config-llm-section-toggle"
-                      onClick={() => setLlmParamsExpanded((v) => !v)}
-                      aria-expanded={llmParamsExpanded}
+                      className="text-button"
+                      onClick={() => setSystemPromptModalOpen(false)}
+                      aria-label="关闭"
                     >
-                      <span className="block-config-llm-section-title">大模型参数 (params)</span>
-                      <span className="block-config-llm-section-chevron">{llmParamsExpanded ? "▼" : "▶"}</span>
+                      ×
                     </button>
-                    {llmParamsExpanded && (
-                      <div className="block-config-llm-params-grid">
-                        <label className="form-field" style={{ margin: 0 }}>
-                          <span>采样温度 (temperature)</span>
-                          <input
-                            type="number"
-                            min={0}
-                            max={2}
-                            step={0.1}
-                            value={String(form.LLM_TEMPERATURE ?? "0.6")}
-                            onChange={(e) => setForm((f) => ({ ...f, LLM_TEMPERATURE: e.target.value }))}
-                          />
-                          <small className="form-hint">0–2，越大越随机</small>
-                        </label>
-                        <label className="form-field" style={{ margin: 0 }}>
-                          <span>Top P (topP)</span>
-                          <input
-                            type="number"
-                            min={0}
-                            max={1}
-                            step={0.05}
-                            value={String(form.LLM_TOP_P ?? "0.75")}
-                            onChange={(e) => setForm((f) => ({ ...f, LLM_TOP_P: e.target.value }))}
-                          />
-                          <small className="form-hint">0–1</small>
-                        </label>
-                        <label className="form-field" style={{ margin: 0 }}>
-                          <span>已有标记惩罚 (presencePenalty)</span>
-                          <input
-                            type="number"
-                            min={0}
-                            max={1}
-                            step={0.1}
-                            value={String(form.LLM_PRESENCE_PENALTY ?? "0")}
-                            onChange={(e) => setForm((f) => ({ ...f, LLM_PRESENCE_PENALTY: e.target.value }))}
-                          />
-                          <small className="form-hint">0–1</small>
-                        </label>
-                        <label className="form-field" style={{ margin: 0 }}>
-                          <span>重复惩罚 (frequencyPenalty)</span>
-                          <input
-                            type="number"
-                            min={0}
-                            max={1}
-                            step={0.1}
-                            value={String(form.LLM_FREQUENCY_PENALTY ?? "0")}
-                            onChange={(e) => setForm((f) => ({ ...f, LLM_FREQUENCY_PENALTY: e.target.value }))}
-                          />
-                          <small className="form-hint">0–1</small>
-                        </label>
-                        <label className="form-field" style={{ margin: 0 }}>
-                          <span>最大输出长度 (maxTokens)</span>
-                          <input
-                            type="number"
-                            min={0}
-                            value={String(form.LLM_MAX_TOKENS ?? "0")}
-                            onChange={(e) => setForm((f) => ({ ...f, LLM_MAX_TOKENS: e.target.value }))}
-                          />
-                          <small className="form-hint">0 表示使用模型默认</small>
-                        </label>
-                        <label className="form-field" style={{ margin: 0 }}>
-                          <span>停止标记 (stop)</span>
-                          <input
-                            value={String(form.LLM_STOP ?? "")}
-                            onChange={(e) => setForm((f) => ({ ...f, LLM_STOP: e.target.value }))}
-                            placeholder="逗号分隔，如：\n, END"
-                            autoCapitalize="off"
-                          />
-                        </label>
-                        <label className="form-field" style={{ margin: 0 }}>
-                          <span>输出格式 (responseFormat)</span>
-                          <select
-                            value={String(form.LLM_RESPONSE_FORMAT ?? "text")}
-                            onChange={(e) => setForm((f) => ({ ...f, LLM_RESPONSE_FORMAT: e.target.value }))}
-                          >
-                            <option value="text">text（文本）</option>
-                            <option value="json_object">json_object（JSON 对象）</option>
-                          </select>
-                        </label>
-                      </div>
-                    )}
+                  </div>
+                  <div className="modal-body" style={{ flex: 1, minHeight: 0, display: "flex", flexDirection: "column" }}>
+                    <textarea
+                      className="system-prompt-editor-textarea"
+                      value={systemPromptDraft}
+                      onChange={(e) => setSystemPromptDraft(e.target.value)}
+                      placeholder="可选，支持 ${} 占位符"
+                      spellCheck={false}
+                    />
+                  </div>
+                  <div className="modal-actions">
+                    <button type="button" className="text-button" onClick={() => setSystemPromptModalOpen(false)}>
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      className="primary-button"
+                      onClick={() => {
+                        setForm((f) => ({ ...f, LLM_SYSTEM_PROMPT: systemPromptDraft }));
+                        setSystemPromptModalOpen(false);
+                      }}
+                    >
+                      确定
+                    </button>
                   </div>
                 </div>
+              </div>
+            )}
+            <label className="form-field">
+              <span>上下文消息 (messages) — JSON 数组</span>
+              <JsonEditor
+                value={String(form.LLM_MESSAGES_JSON ?? "[]")}
+                onChange={(v) => setForm((f) => ({ ...f, LLM_MESSAGES_JSON: v }))}
+                height={100}
+                minHeight={80}
+                showFormatButton
+              />
+              <small className="form-hint">每项: {`{ "role": "user" | "assistant", "content": "..." }`}，留空 [] 则使用 msg.Data 作为单条用户消息</small>
+            </label>
+          </div>
+          <div className="block-config-llm-section">
+            <div className="block-config-llm-section-title">启用技能（~/.devpilot/skills/）</div>
+            <small className="form-hint" style={{ display: "block", marginBottom: 8 }}>
+              勾选的技能会注入系统提示；不勾选则不注入任何技能
+            </small>
+            <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 160, overflowY: "auto", padding: "4px 0" }}>
+              {availableSkills.length === 0 ? (
+                <span className="form-hint">暂无技能或未读取到 ~/.devpilot/skills/</span>
+              ) : (
+                availableSkills.map((sk) => {
+                  const raw = String(form.LLM_ENABLED_SKILLS_JSON ?? "[]");
+                  let enabled: string[] = [];
+                  try {
+                    const parsed = JSON.parse(raw);
+                    enabled = Array.isArray(parsed) ? parsed : [];
+                  } catch {
+                    enabled = [];
+                  }
+                  const checked = enabled.includes(sk.name);
+                  const toggle = () => {
+                    const next = checked ? enabled.filter((n) => n !== sk.name) : [...enabled, sk.name];
+                    setForm((f) => ({ ...f, LLM_ENABLED_SKILLS_JSON: JSON.stringify(next) }));
+                  };
+                  return (
+                    <label key={sk.name} style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer" }}>
+                      <input type="checkbox" checked={checked} onChange={toggle} />
+                      <span><strong>{sk.name}</strong></span>
+                    </label>
+                  );
+                })
               )}
-              <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <input
-                  type="checkbox"
-                  checked={Boolean(form.DEBUG)}
-                  onChange={(e) => setForm((f) => ({ ...f, DEBUG: e.target.checked }))}
-                />
-                <span>调试</span>
-              </label>
             </div>
+          </div>
+          <div className="block-config-llm-section block-config-llm-section-collapsible">
+            <button
+              type="button"
+              className="block-config-llm-section-toggle"
+              onClick={() => setLlmParamsExpanded((v) => !v)}
+              aria-expanded={llmParamsExpanded}
+            >
+              <span className="block-config-llm-section-title">大模型参数 (params)</span>
+              <span className="block-config-llm-section-chevron">{llmParamsExpanded ? "▼" : "▶"}</span>
+            </button>
+            {llmParamsExpanded && (
+              <div className="block-config-llm-params-grid">
+                <label className="form-field" style={{ margin: 0 }}>
+                  <span>采样温度 (temperature)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={2}
+                    step={0.1}
+                    value={String(form.LLM_TEMPERATURE ?? "0.6")}
+                    onChange={(e) => setForm((f) => ({ ...f, LLM_TEMPERATURE: e.target.value }))}
+                  />
+                  <small className="form-hint">0–2，越大越随机</small>
+                </label>
+                <label className="form-field" style={{ margin: 0 }}>
+                  <span>Top P (topP)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    value={String(form.LLM_TOP_P ?? "0.75")}
+                    onChange={(e) => setForm((f) => ({ ...f, LLM_TOP_P: e.target.value }))}
+                  />
+                  <small className="form-hint">0–1</small>
+                </label>
+                <label className="form-field" style={{ margin: 0 }}>
+                  <span>已有标记惩罚 (presencePenalty)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={1}
+                    step={0.1}
+                    value={String(form.LLM_PRESENCE_PENALTY ?? "0")}
+                    onChange={(e) => setForm((f) => ({ ...f, LLM_PRESENCE_PENALTY: e.target.value }))}
+                  />
+                  <small className="form-hint">0–1</small>
+                </label>
+                <label className="form-field" style={{ margin: 0 }}>
+                  <span>重复惩罚 (frequencyPenalty)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={1}
+                    step={0.1}
+                    value={String(form.LLM_FREQUENCY_PENALTY ?? "0")}
+                    onChange={(e) => setForm((f) => ({ ...f, LLM_FREQUENCY_PENALTY: e.target.value }))}
+                  />
+                  <small className="form-hint">0–1</small>
+                </label>
+                <label className="form-field" style={{ margin: 0 }}>
+                  <span>最大输出长度 (maxTokens)</span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={String(form.LLM_MAX_TOKENS ?? "0")}
+                    onChange={(e) => setForm((f) => ({ ...f, LLM_MAX_TOKENS: e.target.value }))}
+                  />
+                  <small className="form-hint">0 表示使用模型默认</small>
+                </label>
+                <label className="form-field" style={{ margin: 0 }}>
+                  <span>停止标记 (stop)</span>
+                  <input
+                    value={String(form.LLM_STOP ?? "")}
+                    onChange={(e) => setForm((f) => ({ ...f, LLM_STOP: e.target.value }))}
+                    placeholder="逗号分隔，如：\n, END"
+                    autoCapitalize="off"
+                  />
+                </label>
+                <label className="form-field" style={{ margin: 0 }}>
+                  <span>输出格式 (responseFormat)</span>
+                  <select
+                    value={String(form.LLM_RESPONSE_FORMAT ?? "text")}
+                    onChange={(e) => setForm((f) => ({ ...f, LLM_RESPONSE_FORMAT: e.target.value }))}
+                  >
+                    <option value="text">text（文本）</option>
+                    <option value="json_object">json_object（JSON 对象）</option>
+                  </select>
+                </label>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
   );
 
   const formContent = inline ? (
@@ -1416,7 +1407,7 @@ export default function RuleGoScratchEditorPage() {
     if (!def) return null;
     const nodeId = getFieldValue(block, "NODE_ID") || block.id;
     const nodeName = getFieldValue(block, "NODE_NAME") || def.nodeType;
-    const debugMode = getBooleanField(block, "DEBUG");
+    const debugMode = block.getField("DEBUG") ? getBooleanField(block, "DEBUG") : false;
     const configuration = def.getConfiguration(block, blockHelpers);
     return {
       id: nodeId,
@@ -1446,7 +1437,6 @@ export default function RuleGoScratchEditorPage() {
     const block = workspace.newBlock(blockType) as BlockSvg;
     block.setFieldValue(node.id, "NODE_ID");
     block.setFieldValue(node.name || node.type, "NODE_NAME");
-    block.setFieldValue(node.debugMode ? "TRUE" : "FALSE", "DEBUG");
 
     const def = getBlockDef(blockType);
     if (def?.setConfiguration) {
@@ -1876,22 +1866,6 @@ export default function RuleGoScratchEditorPage() {
                   autoCorrect="off"
                   autoComplete="off"
                 />
-              </label>
-              <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <input
-                  type="checkbox"
-                  checked={enabledDraftInModal}
-                  onChange={(e) => setEnabledDraftInModal(e.target.checked)}
-                />
-                <span>启用</span>
-              </label>
-              <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                <input
-                  type="checkbox"
-                  checked={debugDraftInModal}
-                  onChange={(e) => setDebugDraftInModal(e.target.checked)}
-                />
-                <span>调试</span>
               </label>
               {nameModalError ? <div className="form-error">{nameModalError}</div> : null}
               <div className="modal-actions">

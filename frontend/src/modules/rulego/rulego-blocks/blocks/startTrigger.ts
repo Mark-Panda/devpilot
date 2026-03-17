@@ -19,7 +19,6 @@ const def: BlockTypeDef = {
           .appendField(new (BlocklyF as any).FieldTextInput("开始"), "NODE_NAME");
         const config = (this as Block).appendDummyInput("CONFIG");
         config.appendField(new (BlocklyF as any).FieldTextInput("start1"), "NODE_ID");
-        config.appendField(new (BlocklyF as any).FieldCheckbox(false), "DEBUG");
         if (config.setVisible) config.setVisible(false);
         (this as Block).setPreviousStatement(true);
         (this as Block).setNextStatement(true);

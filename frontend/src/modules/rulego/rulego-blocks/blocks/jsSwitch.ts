@@ -18,7 +18,6 @@ const def: BlockTypeDef = {
         const config = (this as Block).appendDummyInput("CONFIG");
         config.appendField(new (BlocklyF as any).FieldTextInput("s3"), "NODE_ID");
         config.appendField(new (BlocklyF as any).FieldTextInput("return ['Success'];"), "JS_SCRIPT");
-        config.appendField(new (BlocklyF as any).FieldCheckbox(true), "DEBUG");
         (this as Block).appendStatementInput("branch_failure").appendField("Failure");
         (this as Block).appendStatementInput("branch_default").appendField("Default");
         const configInput = (this as Block).getInput("CONFIG");

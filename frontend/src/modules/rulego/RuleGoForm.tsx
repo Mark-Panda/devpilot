@@ -221,15 +221,6 @@ export default function RuleGoForm({
             <label className="form-field form-field-checkbox">
               <input
                 type="checkbox"
-                checked={values.debugMode}
-                onChange={(e) => setValues({ ...values, debugMode: e.target.checked })}
-              />
-              <span>调试</span>
-              <small className="form-hint">与 DSL ruleChain.debugMode 一致，保存时同步到规则定义</small>
-            </label>
-            <label className="form-field form-field-checkbox">
-              <input
-                type="checkbox"
                 checked={values.root}
                 onChange={(e) => setValues({ ...values, root: e.target.checked })}
               />

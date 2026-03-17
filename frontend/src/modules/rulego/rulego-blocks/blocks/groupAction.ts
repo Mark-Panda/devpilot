@@ -40,7 +40,6 @@ const def: BlockTypeDef = {
         const matchNum = this.getFieldValue?.("MATCH_NUM") ?? "0";
         const timeout = this.getFieldValue?.("GROUP_TIMEOUT") ?? "0";
         const mergeToMap = this.getFieldValue?.("GROUP_MERGE_TO_MAP") === "TRUE";
-        const debug = this.getFieldValue?.("DEBUG") === "TRUE";
         const inputNames = this.inputList?.map((inp: { name: string }) => inp.name) ?? [];
         inputNames.forEach((name: string) => this.removeInput(name));
         (this as Block).appendDummyInput("HEAD").appendField(new (BlocklyF as any).FieldTextInput(nodeName), "NODE_NAME");
@@ -53,7 +52,6 @@ const def: BlockTypeDef = {
         configInput.appendField(new (BlocklyF as any).FieldNumber("0", 0, 99, 1), "MATCH_NUM");
         configInput.appendField(new (BlocklyF as any).FieldNumber("0", 0, 3600, 1), "GROUP_TIMEOUT");
         configInput.appendField(new (BlocklyF as any).FieldCheckbox(false), "GROUP_MERGE_TO_MAP");
-        configInput.appendField(new (BlocklyF as any).FieldCheckbox(true), "DEBUG");
         if (configInput.setVisible) configInput.setVisible(false);
         for (let i = 0; i < n; i++) {
           (this as Block).appendStatementInput(`branch_${i}`).appendField(`组内节点${i + 1}`);
@@ -65,7 +63,6 @@ const def: BlockTypeDef = {
         this.setFieldValue(matchNum, "MATCH_NUM");
         this.setFieldValue(timeout, "GROUP_TIMEOUT");
         this.setFieldValue(mergeToMap ? "TRUE" : "FALSE", "GROUP_MERGE_TO_MAP");
-        this.setFieldValue(debug ? "TRUE" : "FALSE", "DEBUG");
         if (typeof (this as Block).setStyle === "function") (this as Block).setStyle(category);
       },
     };
