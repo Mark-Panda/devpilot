@@ -1,21 +1,23 @@
 .PHONY: dev build clean lint test build-all generate docs deps rulego-rules
 
-dev:
+# 开发前先生成图标并清理旧 .app，确保 Dock 显示正确图标
+dev: build-appicon
+	@rm -rf build/bin
 	wails dev
 
 build: build-appicon
 	wails build
 
-# 将 Logo 复制为 Wails 应用图标（build/appicon.png），供 wails build 生成各平台图标
+# 从 Logo 生成各尺寸图标：build/appicon.png（1024）、build/icons/*.png、build/AppIcon.icns（若 iconutil 可用）
 build-appicon:
-	@mkdir -p build
-	@cp frontend/public/devpilot-logo.png build/appicon.png
+	@./build/generate-icons.sh
 
 build-all:
 	wails build -platform darwin/amd64,darwin/arm64,windows/amd64,linux/amd64
 
 clean:
 	rm -rf build/bin frontend/dist
+	@echo "Tip: 若 Dock 仍显示旧图标，可退出应用后执行: killall Dock"
 
 generate:
 	wails generate module
