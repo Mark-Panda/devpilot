@@ -15,10 +15,13 @@ const def: BlockTypeDef = {
     blocks[blockType] = {
       init: function (this: Block) {
         (this as Block).appendDummyInput("HEAD").appendField(new (BlocklyF as any).FieldTextInput("汇聚"), "NODE_NAME");
+        const leftHint = (this as Block).appendDummyInput("LEFT_HINT");
+        leftHint.appendField("← 多路汇聚");
         const config = (this as Block).appendDummyInput("CONFIG");
         config.appendField(new (BlocklyF as any).FieldTextInput("jn1"), "NODE_ID");
         config.appendField(new (BlocklyF as any).FieldNumber("0", 0, 3600, 1), "JOIN_TIMEOUT");
         config.appendField(new (BlocklyF as any).FieldCheckbox(false), "JOIN_MERGE_TO_MAP");
+        config.appendField(new (BlocklyF as any).FieldTextInput(""), "JOIN_EXTRA_INCOMINGS");
         (this as Block).appendStatementInput("branch_failure").appendField("Failure");
         const configInput = (this as Block).getInput("CONFIG");
         if (configInput?.setVisible) configInput.setVisible(false);

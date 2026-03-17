@@ -102,12 +102,15 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
   const [systemPromptDraft, setSystemPromptDraft] = useState("");
   /** dbClient：参数列表（类型 + 值），长度与 SQL 中 ? 数量一致 */
   const [dbClientParams, setDbClientParams] = useState<Array<{ type: "string" | "number"; value: string }>>([]);
+  /** 汇聚：额外汇聚的节点 ID 列表（除上方已接线外的分支） */
+  const [joinExtraIncomings, setJoinExtraIncomings] = useState<string[]>([]);
 
   useEffect(() => {
     if (!block) {
       setForm({});
       setSwitchCases([{ case: "true", then: "Case1" }]);
       setDbClientParams([]);
+      setJoinExtraIncomings([]);
       setConfirmUnsavedOpen(false);
       return;
     }
@@ -221,6 +224,15 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
       next.GROUP_MERGE_TO_MAP = getBool("GROUP_MERGE_TO_MAP");
       next.GROUP_SLOT_COUNT = String((block as Block & { groupCount_?: number }).groupCount_ ?? 1);
     }
+    if (block.type === "rulego_fork") {
+      next.FORK_BRANCH_COUNT = String((block as Block & { forkCount_?: number }).forkCount_ ?? 2);
+    }
+    if (block.type === "rulego_join") {
+      const raw = get("JOIN_EXTRA_INCOMINGS") || "";
+      setJoinExtraIncomings(raw ? raw.split(",").map((s) => s.trim()).filter(Boolean) : []);
+    } else {
+      setJoinExtraIncomings([]);
+    }
     if (block.type === "rulego_switch") {
       try {
         const raw = get("CASES_JSON") || (block as Block & { casesJson_?: string }).casesJson_ || "";
@@ -303,7 +315,7 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
       "LLM_MAX_TOKENS", "LLM_STOP", "LLM_RESPONSE_FORMAT",
     ]);
     Object.entries(form).forEach(([key, value]) => {
-      if (form[key] === undefined || key === "CASES_JSON" || key === "GROUP_SLOT_COUNT" || key === "NODE_ID" || key === "DEBUG" || llmParamKeys.has(key))
+      if (form[key] === undefined || key === "CASES_JSON" || key === "GROUP_SLOT_COUNT" || key === "FORK_BRANCH_COUNT" || key === "NODE_ID" || key === "DEBUG" || llmParamKeys.has(key))
         return;
       set(key, value as string | boolean);
     });
@@ -344,6 +356,12 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
       const slotCount = Math.max(1, Math.min(8, parseInt(String(form.GROUP_SLOT_COUNT), 10) || 1));
       const b = block as Block & { groupCount_?: number; updateShape_?: () => void };
       b.groupCount_ = slotCount;
+      b.updateShape_?.();
+    }
+    if (block.type === "rulego_fork" && form.FORK_BRANCH_COUNT !== undefined) {
+      const branchCount = Math.max(1, Math.min(8, parseInt(String(form.FORK_BRANCH_COUNT), 10) || 2));
+      const b = block as Block & { forkCount_?: number; updateShape_?: () => void };
+      b.forkCount_ = branchCount;
       b.updateShape_?.();
     }
     if (block.type === "rulego_dbClient") {
@@ -463,30 +481,115 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
           </small>
         </div>
       )}
-      {block.type === "rulego_join" && (
-        <>
-          <label className="form-field">
-            <span>timeout（秒，0 表示不超时）</span>
-            <input
-              type="number"
-              min={0}
-              value={String(form.JOIN_TIMEOUT ?? "0")}
-              onChange={(e) => setForm((f) => ({ ...f, JOIN_TIMEOUT: e.target.value }))}
-            />
-          </label>
-          <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <input
-              type="checkbox"
-              checked={Boolean(form.JOIN_MERGE_TO_MAP)}
-              onChange={(e) => setForm((f) => ({ ...f, JOIN_MERGE_TO_MAP: e.target.checked }))}
-            />
-            <span>mergeToMap（结果合并为 Map）</span>
-          </label>
-          <small className="form-hint" style={{ gridColumn: "1 / -1" }}>
-            参考 <a href="https://rulego.cc/pages/join/" target="_blank" rel="noopener noreferrer">RuleGo 汇聚</a>
+      {block.type === "rulego_fork" && (
+        <label className="form-field">
+          <span>并行分支数（2～8）</span>
+          <input
+            type="number"
+            min={2}
+            max={8}
+            value={String(form.FORK_BRANCH_COUNT ?? "2")}
+            onChange={(e) => setForm((f) => ({ ...f, FORK_BRANCH_COUNT: e.target.value }))}
+          />
+          <small className="form-hint">
+            参考 <a href="https://rulego.cc/pages/fork/#%E9%85%8D%E7%BD%AE" target="_blank" rel="noopener noreferrer">RuleGo 并行网关</a>
           </small>
-        </>
+        </label>
       )}
+      {block.type === "rulego_join" && (() => {
+        const workspace = workspaceRef.current;
+        const mainPrev = block.previousConnection?.targetBlock?.();
+        const mainNodeId = mainPrev ? (String(mainPrev.getFieldValue?.("NODE_ID") ?? mainPrev.id ?? "").trim() || mainPrev.id) : null;
+        const mainNodeName = mainPrev ? String(mainPrev.getFieldValue?.("NODE_NAME") ?? mainPrev.type ?? "").trim() || mainPrev.id : null;
+        const allBlocks = workspace?.getAllBlocks?.(false) ?? [];
+        const joinId = String(block.getFieldValue?.("NODE_ID") ?? block.id ?? "").trim();
+        const usedIds = new Set([mainNodeId, joinId, ...joinExtraIncomings].filter(Boolean));
+        const candidateBlocks = allBlocks.filter(
+          (b: Block) => b.type?.startsWith?.("rulego_") && b.id !== block.id && !usedIds.has(String(b.getFieldValue?.("NODE_ID") ?? b.id ?? "").trim())
+        );
+        return (
+          <>
+            <label className="form-field">
+              <span>timeout（秒，0 表示不超时）</span>
+              <input
+                type="number"
+                min={0}
+                value={String(form.JOIN_TIMEOUT ?? "0")}
+                onChange={(e) => setForm((f) => ({ ...f, JOIN_TIMEOUT: e.target.value }))}
+              />
+            </label>
+            <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <input
+                type="checkbox"
+                checked={Boolean(form.JOIN_MERGE_TO_MAP)}
+                onChange={(e) => setForm((f) => ({ ...f, JOIN_MERGE_TO_MAP: e.target.checked }))}
+              />
+              <span>mergeToMap（结果合并为 Map）</span>
+            </label>
+            <div className="form-field" style={{ gridColumn: "1 / -1", flexDirection: "column", alignItems: "stretch", gap: 8 }}>
+              <span className="form-label">已汇聚的节点</span>
+              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                {mainNodeId && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "4px 8px", background: "var(--color-block-bg, #f1f5f9)", borderRadius: 6 }}>
+                    <span title={mainNodeId}>{mainNodeName || mainNodeId}</span>
+                    <span style={{ fontSize: 11, color: "#64748b" }}>（上方已接线）</span>
+                  </div>
+                )}
+                {joinExtraIncomings.map((nodeId) => (
+                  <div key={nodeId} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "4px 8px", background: "var(--color-block-bg, #f1f5f9)", borderRadius: 6 }}>
+                    <span>{nodeId}</span>
+                    <button
+                      type="button"
+                      className="text-button"
+                      style={{ padding: "2px 8px", fontSize: 12 }}
+                      onClick={() => {
+                        const next = joinExtraIncomings.filter((id) => id !== nodeId);
+                        setJoinExtraIncomings(next);
+                        block.setFieldValue(next.join(", "), "JOIN_EXTRA_INCOMINGS");
+                        onSaved?.();
+                      }}
+                    >
+                      移除
+                    </button>
+                  </div>
+                ))}
+              </div>
+              {candidateBlocks.length > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      const nodeId = e.target.value;
+                      if (!nodeId) return;
+                      const next = [...joinExtraIncomings, nodeId];
+                      setJoinExtraIncomings(next);
+                      block.setFieldValue(next.join(", "), "JOIN_EXTRA_INCOMINGS");
+                      e.target.value = "";
+                      onSaved?.();
+                    }}
+                    style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #e2e8f0", minWidth: 160 }}
+                  >
+                    <option value="">添加汇聚节点…</option>
+                    {candidateBlocks.map((b: Block) => {
+                      const id = String(b.getFieldValue?.("NODE_ID") ?? b.id ?? "").trim();
+                      const name = String(b.getFieldValue?.("NODE_NAME") ?? b.type ?? "").trim();
+                      return (
+                        <option key={b.id} value={id}>
+                          {name || id} ({id})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              )}
+            </div>
+            <small className="form-hint" style={{ gridColumn: "1 / -1" }}>
+              将并行分支末端积木接到本块上方凹槽，或在此处「添加汇聚节点」指定其余分支；保存后 DSL 会包含所有汇聚关系。参考{" "}
+              <a href="https://rulego.cc/pages/join/" target="_blank" rel="noopener noreferrer">RuleGo 汇聚</a>
+            </small>
+          </>
+        );
+      })()}
       {block.type === "rulego_groupAction" && (
         <>
           <label className="form-field">
@@ -1773,12 +1876,55 @@ export default function RuleGoScratchEditorPage() {
       nodeMap.set(String(node.id), block);
     });
 
+    const forkSuccessMap = new Map<string, string[]>();
+    connections.forEach((c) => {
+      if (String(c.type ?? "Success") !== "Success") return;
+      const fromId = String(c.fromId);
+      const toId = String(c.toId);
+      const node = nodes.find((n) => String(n.id) === fromId);
+      if (node?.type === "fork") {
+        const arr = forkSuccessMap.get(fromId) ?? [];
+        arr.push(toId);
+        forkSuccessMap.set(fromId, arr);
+      }
+    });
+    forkSuccessMap.forEach((toIds, forkId) => {
+      const block = nodeMap.get(forkId) as (Block & { forkCount_?: number; updateShape_?: () => void }) | undefined;
+      if (block?.type !== "rulego_fork") return;
+      const n = Math.max(1, Math.min(8, toIds.length));
+      block.forkCount_ = n;
+      block.updateShape_?.();
+    });
+    const forkSuccessOrder = new Map<string, string[]>();
+    forkSuccessMap.forEach((toIds, forkId) => {
+      forkSuccessOrder.set(forkId, [...toIds].sort());
+    });
+
     connections.forEach((connection) => {
       const fromBlock = nodeMap.get(String(connection.fromId));
       const toBlock = nodeMap.get(String(connection.toId));
       const toPrev = toBlock ? (toBlock as BlockSvg).previousConnection : null;
       if (!fromBlock || !toBlock || !toPrev) return;
       const type = String(connection.type ?? "Success");
+      const fromId = String(connection.fromId);
+      const toId = String(connection.toId);
+
+      if (toBlock.type === "rulego_join" && toPrev?.isConnected?.()) {
+        const extra = (toBlock.getFieldValue?.("JOIN_EXTRA_INCOMINGS") as string) || "";
+        const list = extra ? extra.split(",").map((s) => s.trim()).filter(Boolean) : [];
+        if (!list.includes(fromId)) list.push(fromId);
+        toBlock.setFieldValue(list.join(", "), "JOIN_EXTRA_INCOMINGS");
+        return;
+      }
+
+      if (fromBlock.type === "rulego_fork" && type === "Success") {
+        const order = forkSuccessOrder.get(fromId);
+        const idx = order ? order.indexOf(toId) : -1;
+        if (idx >= 0) {
+          (fromBlock as Block & { _forkConnIndex?: number })._forkConnIndex = idx;
+        }
+      }
+
       const def = getBlockDef(fromBlock.type);
       const inputName = def?.getInputNameForConnectionType?.(type, fromBlock);
       if (inputName) {
@@ -1790,6 +1936,10 @@ export default function RuleGoScratchEditorPage() {
         fromBlock.setFieldValue(type, "LINK_TYPE");
         if (connection.label) fromBlock.setFieldValue(String(connection.label), "LINK_LABEL");
         fromBlock.nextConnection.connect(toPrev as ScratchBlocks.Connection);
+      }
+
+      if (fromBlock.type === "rulego_fork") {
+        (fromBlock as Block & { _forkConnIndex?: number })._forkConnIndex = undefined;
       }
     });
 
@@ -1921,6 +2071,34 @@ export default function RuleGoScratchEditorPage() {
     };
 
     topBlocks.forEach((block) => walkChain(block));
+
+    const collectBlocks = (block: Block | null, set: Set<Block>) => {
+      if (!block || set.has(block)) return;
+      set.add(block);
+      collectBlocks(block.getNextBlock(), set);
+      const def = getBlockDef(block.type);
+      const walkInputs = def?.getWalkInputs(block);
+      if (walkInputs) {
+        walkInputs.forEach((inputName: string) => {
+          if (inputName === "__next__") return;
+          let b = block.getInputTargetBlock(inputName);
+          while (b) {
+            collectBlocks(b, set);
+            b = b.getNextBlock();
+          }
+        });
+      }
+    };
+    const allBlocksSet = new Set<Block>();
+    topBlocks.forEach((b) => collectBlocks(b, allBlocksSet));
+    allBlocksSet.forEach((block) => {
+      if (block.type === "rulego_join") {
+        const extra = getFieldValue(block, "JOIN_EXTRA_INCOMINGS") || "";
+        const ids = extra.split(",").map((s) => s.trim()).filter(Boolean);
+        const joinId = getFieldValue(block, "NODE_ID") || block.id;
+        ids.forEach((fromId) => connections.push({ fromId, toId: joinId, type: "Success" }));
+      }
+    });
 
     const ruleChainId = editingRule?.id ?? id ?? "rule01";
     const ruleChainName = ruleName?.trim() || name.trim() || "Rule Chain";
