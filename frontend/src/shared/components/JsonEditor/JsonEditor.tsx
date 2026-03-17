@@ -57,7 +57,7 @@ export function JsonEditor({
   }, [onChange, onFormatError]);
 
   return (
-    <div className={className}>
+    <div className={[`json-editor-root`, className].filter(Boolean).join(" ")}>
       {showFormatButton && (
         <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
           <button type="button" className="text-button" style={{ padding: "4px 10px", fontSize: 12 }} onClick={handleFormat}>

@@ -1,7 +1,7 @@
 .PHONY: dev build clean lint test build-all generate docs deps rulego-rules
 
 # 开发前先生成图标并清理旧 .app，确保 Dock 显示正确图标
-dev: build-appicon
+dev:
 	wails dev
 # dev: build-appicon
 # 	@rm -rf build/bin

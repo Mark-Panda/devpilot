@@ -1149,6 +1149,21 @@ body {
   background: #ffffff !important;
 }
 
+/* JSON 编辑器：强制文字黑色、白底，避免被 rulego-editor-side 等父级浅色覆盖 */
+.json-editor-root .monaco-editor,
+.json-editor-root .monaco-editor .view-lines,
+.json-editor-root .monaco-editor .view-line,
+.json-editor-root .monaco-editor .view-line span,
+.json-editor-root .monaco-editor .margin-view-overlays .line-numbers {
+  color: #0f172a !important;
+}
+.json-editor-root .monaco-editor {
+  background: #ffffff !important;
+}
+.json-editor-root .monaco-editor .margin {
+  background-color: #f8fafc !important;
+}
+
 /* RuleGo 执行日志列表 */
 .rulego-logs-table .table-head.rulego-logs-head,
 .rulego-logs-table .table-row.rulego-logs-row {
