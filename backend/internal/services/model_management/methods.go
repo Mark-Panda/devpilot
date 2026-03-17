@@ -19,15 +19,17 @@ func NewService(store *Store) *Service {
 }
 
 type CreateModelConfigInput struct {
-	BaseURL string `json:"base_url"`
-	Model   string `json:"model"`
-	APIKey  string `json:"api_key"`
+	BaseURL         string   `json:"base_url"`
+	APIKey          string   `json:"api_key"`
+	SiteDescription string   `json:"site_description"`
+	Models          []string `json:"models"`
 }
 
 type UpdateModelConfigInput struct {
-	BaseURL string `json:"base_url"`
-	Model   string `json:"model"`
-	APIKey  string `json:"api_key"`
+	BaseURL         string   `json:"base_url"`
+	APIKey          string   `json:"api_key"`
+	SiteDescription string   `json:"site_description"`
+	Models          []string `json:"models"`
 }
 
 func (s *Service) ListModelConfigs() ([]models.ModelConfig, error) {
@@ -35,10 +37,17 @@ func (s *Service) ListModelConfigs() ([]models.ModelConfig, error) {
 }
 
 func (s *Service) CreateModelConfig(input CreateModelConfigInput) (models.ModelConfig, error) {
+	modelsTrimmed := make([]string, 0, len(input.Models))
+	for _, m := range input.Models {
+		if s := strings.TrimSpace(m); s != "" {
+			modelsTrimmed = append(modelsTrimmed, s)
+		}
+	}
 	config := models.ModelConfig{
-		BaseURL: strings.TrimSpace(input.BaseURL),
-		Model:   strings.TrimSpace(input.Model),
-		APIKey:  strings.TrimSpace(input.APIKey),
+		BaseURL:         strings.TrimSpace(input.BaseURL),
+		APIKey:          strings.TrimSpace(input.APIKey),
+		SiteDescription: strings.TrimSpace(input.SiteDescription),
+		Models:          modelsTrimmed,
 	}
 	if err := validateConfig(config); err != nil {
 		return models.ModelConfig{}, err
@@ -57,13 +66,20 @@ func (s *Service) UpdateModelConfig(id string, input UpdateModelConfigInput) (mo
 		return models.ModelConfig{}, err
 	}
 
+	modelsTrimmed := make([]string, 0, len(input.Models))
+	for _, m := range input.Models {
+		if s := strings.TrimSpace(m); s != "" {
+			modelsTrimmed = append(modelsTrimmed, s)
+		}
+	}
 	config := models.ModelConfig{
-		ID:        id,
-		BaseURL:   strings.TrimSpace(input.BaseURL),
-		Model:     strings.TrimSpace(input.Model),
-		APIKey:    strings.TrimSpace(input.APIKey),
-		CreatedAt: existing.CreatedAt,
-		UpdatedAt: time.Now().UTC().Format(time.RFC3339),
+		ID:              id,
+		BaseURL:         strings.TrimSpace(input.BaseURL),
+		APIKey:          strings.TrimSpace(input.APIKey),
+		SiteDescription: strings.TrimSpace(input.SiteDescription),
+		Models:          modelsTrimmed,
+		CreatedAt:       existing.CreatedAt,
+		UpdatedAt:       time.Now().UTC().Format(time.RFC3339),
 	}
 	if err := validateConfig(config); err != nil {
 		return models.ModelConfig{}, err
@@ -80,11 +96,14 @@ func validateConfig(config models.ModelConfig) error {
 	if config.BaseURL == "" {
 		return errors.New("base_url is required")
 	}
-	if config.Model == "" {
-		return errors.New("model is required")
-	}
 	if config.APIKey == "" {
 		return errors.New("api_key is required")
+	}
+	if config.SiteDescription == "" {
+		return errors.New("site_description is required")
+	}
+	if len(config.Models) == 0 {
+		return errors.New("at least one model is required")
 	}
 	return nil
 }

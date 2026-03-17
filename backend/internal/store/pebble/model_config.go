@@ -22,12 +22,13 @@ func CreateModelConfig(ctx context.Context, db *DB, input models.ModelConfig) (m
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	config := models.ModelConfig{
-		ID:        id,
-		BaseURL:   input.BaseURL,
-		Model:     input.Model,
-		APIKey:    input.APIKey,
-		CreatedAt: now,
-		UpdatedAt: now,
+		ID:              id,
+		BaseURL:         input.BaseURL,
+		APIKey:          input.APIKey,
+		SiteDescription: input.SiteDescription,
+		Models:          input.Models,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 
 	if err := putModelConfig(db, config); err != nil {
@@ -70,8 +71,9 @@ func UpdateModelConfig(ctx context.Context, db *DB, id string, patch models.Mode
 	}
 
 	existing.BaseURL = patch.BaseURL
-	existing.Model = patch.Model
 	existing.APIKey = patch.APIKey
+	existing.SiteDescription = patch.SiteDescription
+	existing.Models = patch.Models
 	existing.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 
 	if err := putModelConfig(db, existing); err != nil {

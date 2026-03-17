@@ -17,16 +17,8 @@ export function useModelConfigs() {
     setLoading(true);
     setError(null);
     try {
-      const data = await listModelConfigs();
-      const list = Array.isArray(data) ? data : [];
-      setConfigs(
-        list.map((config) => ({
-          id: config.id,
-          baseUrl: config.base_url,
-          model: config.model,
-          apiKey: config.api_key,
-        }))
-      );
+      const list = await listModelConfigs();
+      setConfigs(list);
     } catch (err) {
       setError((err as Error).message || "加载失败");
     } finally {
@@ -34,34 +26,32 @@ export function useModelConfigs() {
     }
   };
 
-  const create = async (input: { baseUrl: string; model: string; apiKey: string }) => {
+  const create = async (input: {
+    baseUrl: string;
+    apiKey: string;
+    siteDescription: string;
+    models: string[];
+  }) => {
     const result = await createModelConfig({
       base_url: input.baseUrl,
-      model: input.model,
       api_key: input.apiKey,
+      site_description: input.siteDescription,
+      models: input.models,
     });
-    addConfig({
-      id: result.id,
-      baseUrl: result.base_url,
-      model: result.model,
-      apiKey: result.api_key,
-    });
+    addConfig(result);
   };
 
   const update = async (
     id: string,
-    input: { baseUrl: string; model: string; apiKey: string }
+    input: { baseUrl: string; apiKey: string; siteDescription: string; models: string[] }
   ) => {
     const result = await updateModelConfig(id, {
       base_url: input.baseUrl,
-      model: input.model,
       api_key: input.apiKey,
+      site_description: input.siteDescription,
+      models: input.models,
     });
-    updateConfig(id, {
-      baseUrl: result.base_url,
-      model: result.model,
-      apiKey: result.api_key,
-    });
+    updateConfig(id, result);
   };
 
   const remove = async (id: string) => {

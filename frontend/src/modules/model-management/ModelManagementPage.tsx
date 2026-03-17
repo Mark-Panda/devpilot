@@ -1,5 +1,5 @@
 import { useState } from "react";
-import ModelConfigForm from "./ModelConfigForm";
+import ModelConfigForm, { type FormValues } from "./ModelConfigForm";
 import type { ModelConfig } from "./types";
 import { useModelConfigs } from "./useModelConfigs";
 
@@ -36,7 +36,8 @@ export default function ModelManagementPage() {
       <div className="table-card">
         <div className="table-head">
           <div className="table-cell">Base URL</div>
-          <div className="table-cell">Model</div>
+          <div className="table-cell">站点描述</div>
+          <div className="table-cell">Models</div>
           <div className="table-cell">API Key</div>
           <div className="table-cell">操作</div>
         </div>
@@ -49,7 +50,12 @@ export default function ModelManagementPage() {
             {configs.map((config) => (
               <div className="table-row" key={config.id}>
                 <div className="table-cell">{config.baseUrl}</div>
-                <div className="table-cell">{config.model}</div>
+                <div className="table-cell">{config.siteDescription || "—"}</div>
+                <div className="table-cell">
+                  {config.models.length
+                    ? config.models.join(", ")
+                    : "—"}
+                </div>
                 <div className="table-cell">{config.apiKey}</div>
                 <div className="table-cell table-actions">
                   <button
@@ -99,7 +105,7 @@ export default function ModelManagementPage() {
               mode={editingConfig ? "edit" : "create"}
               initial={editingConfig}
               onCancel={() => setModalOpen(false)}
-              onSubmit={async (values) => {
+              onSubmit={async (values: FormValues) => {
                 if (editingConfig) {
                   await update(editingConfig.id, values);
                 } else {
@@ -134,7 +140,10 @@ export default function ModelManagementPage() {
             </div>
             <div className="modal-body">
               <p className="confirm-text">
-                确定要删除配置 <strong>{confirmingConfig.model}</strong> 吗？
+                确定要删除该配置吗？
+                {confirmingConfig.siteDescription && (
+                  <>（{confirmingConfig.siteDescription}）</>
+                )}
               </p>
             </div>
             <div className="modal-actions">

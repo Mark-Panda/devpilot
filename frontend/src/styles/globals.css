@@ -456,6 +456,29 @@ body {
   color: #475569;
 }
 
+.form-field-full {
+  grid-column: 1 / -1;
+}
+
+.form-row-with-action {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.form-row-with-action input {
+  flex: 1;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.form-row-with-action input:focus {
+  outline: 2px solid rgba(37, 99, 235, 0.2);
+  border-color: #2563eb;
+}
+
 .form-field input,
 .form-field select,
 .form-field textarea {
