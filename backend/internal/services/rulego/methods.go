@@ -60,6 +60,7 @@ func (s *Service) CreateRuleGoRule(input CreateRuleGoRuleInput) (models.RuleGoRu
 	if err != nil {
 		return models.RuleGoRule{}, err
 	}
+	// 仅当规则链为启用状态时才加载到引擎；未启用时不重载
 	if result.Enabled && result.Definition != "" {
 		_ = s.LoadRuleChain(result.ID)
 	}
@@ -91,6 +92,7 @@ func (s *Service) UpdateRuleGoRule(id string, input UpdateRuleGoRuleInput) (mode
 	if err != nil {
 		return models.RuleGoRule{}, err
 	}
+	// 仅当规则链为启用状态时才重载；未启用时不重载，并卸载引擎中的实例
 	if result.Enabled && result.Definition != "" {
 		_ = s.LoadRuleChain(id)
 	} else {

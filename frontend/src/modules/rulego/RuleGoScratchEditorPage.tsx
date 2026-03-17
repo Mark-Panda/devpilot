@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as ScratchBlocks from "scratch-blocks";
 import type { WorkspaceSvg, Block, BlockSvg } from "blockly/core";
+import { getEnabledFromDefinition } from "./dslUtils";
 import { useRuleGoRules } from "./useRuleGoRules";
 import {
   executeRuleGoRuleByDefinition,
@@ -1007,7 +1008,15 @@ export default function RuleGoScratchEditorPage() {
   const [testDataJson, setTestDataJson] = useState("{}");
   const [testResult, setTestResult] = useState<ExecuteRuleOutput | null>(null);
   const [testRunning, setTestRunning] = useState(false);
+  const [saveFeedback, setSaveFeedback] = useState<{ type: "success" } | { type: "error"; message: string } | null>(null);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!saveFeedback) return;
+    const delay = saveFeedback.type === "error" ? 2000 : 1000;
+    const t = setTimeout(() => setSaveFeedback(null), delay);
+    return () => clearTimeout(t);
+  }, [saveFeedback]);
   const [blockCount, setBlockCount] = useState(0);
   const [librarySearchKeyword, setLibrarySearchKeyword] = useState("");
   const sidePanelRef = useRef<HTMLDivElement>(null);
@@ -1149,7 +1158,6 @@ export default function RuleGoScratchEditorPage() {
     if (editingRule) {
       setName(editingRule.name);
       setDescription(editingRule.description);
-      setEnabled(editingRule.enabled);
       setDsl(editingRule.definition);
       setJson(editingRule.editorJson);
       try {
@@ -1157,9 +1165,12 @@ export default function RuleGoScratchEditorPage() {
         const chain = parsed?.ruleChain;
         setDebugMode(Boolean(chain?.debugMode));
         setRoot(chain?.root !== false);
+        const dslEnabled = getEnabledFromDefinition(editingRule.definition);
+        setEnabled(dslEnabled ?? editingRule.enabled);
       } catch {
         setDebugMode(false);
         setRoot(true);
+        setEnabled(editingRule.enabled);
       }
     } else {
       setName("");
@@ -1180,12 +1191,14 @@ export default function RuleGoScratchEditorPage() {
           }
         })();
         const chain = parsed?.ruleChain;
+        const dslEnabledForLoad = getEnabledFromDefinition(editingRule.definition) ?? editingRule.enabled;
         setDsl(
           buildRuleGoDsl(
             workspaceRef.current,
             editingRule.name,
             Boolean(chain?.debugMode),
-            chain?.root !== false
+            chain?.root !== false,
+            dslEnabledForLoad
           )
         );
         return;
@@ -1200,12 +1213,14 @@ export default function RuleGoScratchEditorPage() {
         loadWorkspaceFromRuleGoDsl(ruleDsl, workspaceRef.current);
         ensureRuleGoNodeIdsAreUuid(workspaceRef.current);
         const chain = ruleDsl?.ruleChain;
+        const dslEnabledForLoad = getEnabledFromDefinition(editingRule.definition) ?? editingRule.enabled;
         setDsl(
           buildRuleGoDsl(
             workspaceRef.current,
             editingRule.name,
             Boolean(chain?.debugMode),
-            chain?.root !== false
+            chain?.root !== false,
+            dslEnabledForLoad
           )
         );
       } catch (err) {
@@ -1223,10 +1238,13 @@ export default function RuleGoScratchEditorPage() {
   const saveRule = async (ruleName: string, overrides?: SaveRuleOverrides) => {
     const trimmedName = ruleName.trim();
     if (!trimmedName) {
-      setError("规则名称不能为空");
+      const msg = "规则名称不能为空";
+      setError(msg);
+      setSaveFeedback({ type: "error", message: msg });
       return;
     }
     const useDescription = overrides?.description ?? description;
+    // 状态以 DSL 为准：有 overrides 时用弹框选择，否则用当前编辑器状态（加载时已从 DSL 解析）
     const useEnabled = overrides?.enabled ?? enabled;
     const useDebugMode = overrides?.debugMode ?? debugMode;
     const useRoot = overrides?.root ?? root;
@@ -1235,11 +1253,15 @@ export default function RuleGoScratchEditorPage() {
         ? buildRuleGoDsl(workspaceRef.current, trimmedName, useDebugMode, useRoot)
         : dsl;
     if (!nextDsl.trim()) {
-      setError("RuleGo DSL 不能为空");
+      const msg = "RuleGo DSL 不能为空";
+      setError(msg);
+      setSaveFeedback({ type: "error", message: msg });
       return;
     }
     if (!json.trim()) {
-      setError("Scratch JSON 不能为空");
+      const msg = "Scratch JSON 不能为空";
+      setError(msg);
+      setSaveFeedback({ type: "error", message: msg });
       return;
     }
     if (workspaceRef.current) {
@@ -1268,9 +1290,11 @@ export default function RuleGoScratchEditorPage() {
         // 新建保存后跳转到该规则的编辑 URL，后续点击保存会走 update 而非再次 create
         navigate(`/rulego/editor/${created.id}`, { replace: true });
       }
-      // 保存后继续留在可视化编辑器；失败时仅通过 setError 展示提示
+      setSaveFeedback({ type: "success" });
     } catch (err) {
-      setError((err as Error).message || "保存失败");
+      const msg = (err as Error).message || "保存失败";
+      setError(msg);
+      setSaveFeedback({ type: "error", message: msg });
     } finally {
       setSaving(false);
     }
@@ -1526,7 +1550,8 @@ export default function RuleGoScratchEditorPage() {
     workspace: WorkspaceSvg,
     ruleName?: string,
     debugModeParam?: boolean,
-    rootParam?: boolean
+    rootParam?: boolean,
+    enabledParam?: boolean
   ) => {
     const topBlocks = workspace.getTopBlocks(true);
     if (topBlocks.length === 0) return "";
@@ -1620,6 +1645,7 @@ export default function RuleGoScratchEditorPage() {
     const ruleChainName = ruleName?.trim() || name.trim() || "Rule Chain";
     const ruleChainDebugMode = typeof debugModeParam === "boolean" ? debugModeParam : debugMode;
     const ruleChainRoot = typeof rootParam === "boolean" ? rootParam : root;
+    const ruleChainEnabled = enabledParam !== undefined ? enabledParam : enabled;
 
     return JSON.stringify(
       {
@@ -1628,7 +1654,7 @@ export default function RuleGoScratchEditorPage() {
           name: ruleChainName,
           debugMode: ruleChainDebugMode,
           root: ruleChainRoot,
-          disabled: !enabled,
+          disabled: !ruleChainEnabled,
           configuration: {},
           additionalInfo: {},
         },
@@ -1819,6 +1845,49 @@ export default function RuleGoScratchEditorPage() {
             <div className="modal-body">
               <textarea readOnly value={json} rows={20} style={{ width: "100%", fontFamily: "monospace", fontSize: 13 }} />
             </div>
+          </div>
+        </div>
+      )}
+
+      {saveFeedback && (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          style={{ alignItems: "flex-start", paddingTop: "10vh" }}
+          onClick={() => setSaveFeedback(null)}
+        >
+          <div
+            className="modal"
+            style={{ maxWidth: 280, padding: "12px 16px 14px" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              className="modal-header"
+              style={{
+                paddingBottom: 8,
+                position: "relative",
+                justifyContent: saveFeedback.type === "success" ? "center" : undefined,
+              }}
+            >
+              <h3 style={{ fontSize: 15, textAlign: saveFeedback.type === "success" ? "center" : undefined }}>
+                {saveFeedback.type === "success" ? "保存成功" : "保存失败"}
+              </h3>
+              <button
+                type="button"
+                className="text-button"
+                style={saveFeedback.type === "success" ? { position: "absolute", right: 0 } : undefined}
+                onClick={() => setSaveFeedback(null)}
+                aria-label="关闭"
+              >
+                ×
+              </button>
+            </div>
+            {saveFeedback.type === "error" ? (
+              <div className="modal-body" style={{ padding: 0, fontSize: 13 }}>
+                <p style={{ margin: 0, color: "var(--color-error, #b91c1c)" }}>{saveFeedback.message}</p>
+              </div>
+            ) : null}
           </div>
         </div>
       )}

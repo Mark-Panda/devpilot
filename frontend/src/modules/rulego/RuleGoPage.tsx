@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ListModelConfigs } from "../../../wailsjs/go/model_management/Service";
+import { getEnabledFromDefinition } from "./dslUtils";
 import RuleGoForm from "./RuleGoForm";
+import { useRuleGoStore } from "./store";
 import type { RuleGoRule } from "./types";
 import { useRuleGoRules } from "./useRuleGoRules";
 
@@ -9,12 +11,11 @@ export default function RuleGoPage() {
   const navigate = useNavigate();
   const { rules, loading, error, refresh, create, update, remove, loadChain, unloadChain, generateSkill } =
     useRuleGoRules();
+  const { loadedRuleIds, setLoadedRuleIds } = useRuleGoStore();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<RuleGoRule | null>(null);
   const [confirmingRule, setConfirmingRule] = useState<RuleGoRule | null>(null);
   const [actionFeedback, setActionFeedback] = useState<{ msg: string; isError?: boolean } | null>(null);
-  /** 本地记录的“已启用”规则 ID，用于切换按钮展示（与后端实际加载状态可能不同步） */
-  const [loadedIds, setLoadedIds] = useState<Set<string>>(new Set());
   /** 正在生成技能的规则 ID，用于显示“生成中...”并禁用按钮 */
   const [generatingSkillRuleId, setGeneratingSkillRuleId] = useState<string | null>(null);
 
@@ -64,16 +65,18 @@ export default function RuleGoPage() {
           <div className="table-empty">暂无数据</div>
         ) : (
           <div className="table-body">
-            {rules.map((rule) => (
+            {rules.map((rule) => {
+              const enabledFromDsl = getEnabledFromDefinition(rule.definition) ?? rule.enabled;
+              return (
               <div className="table-row" key={rule.id}>
                 <div className="table-cell">{rule.name}</div>
                 <div className="table-cell">{rule.description || "-"}</div>
                 <div className="table-cell">
-                  {rule.enabled && rule.definition
-                    ? loadedIds.has(rule.id)
+                  {enabledFromDsl && rule.definition
+                    ? loadedRuleIds.has(rule.id)
                       ? "已开启"
                       : "已关闭"
-                    : rule.enabled
+                    : enabledFromDsl
                       ? "启用"
                       : "停用"}
                 </div>
@@ -95,15 +98,15 @@ export default function RuleGoPage() {
                   >
                     表单编辑
                   </button>
-                  {rule.enabled && rule.definition ? (
+                  {enabledFromDsl && rule.definition ? (
                     <button
                       className="text-button"
                       type="button"
                       onClick={() =>
-                        loadedIds.has(rule.id)
+                        loadedRuleIds.has(rule.id)
                           ? withFeedback(async () => {
                               await unloadChain(rule.id);
-                              setLoadedIds((prev) => {
+                              setLoadedRuleIds((prev) => {
                                 const next = new Set(prev);
                                 next.delete(rule.id);
                                 return next;
@@ -111,14 +114,14 @@ export default function RuleGoPage() {
                             }, "已关闭")
                           : withFeedback(async () => {
                               await loadChain(rule.id);
-                              setLoadedIds((prev) => new Set(prev).add(rule.id));
+                              setLoadedRuleIds((prev) => new Set(prev).add(rule.id));
                             }, "已开启")
                       }
                     >
-                      {loadedIds.has(rule.id) ? "关闭" : "开启"}
+                      {loadedRuleIds.has(rule.id) ? "关闭" : "开启"}
                     </button>
                   ) : null}
-                  {rule.enabled && rule.definition ? (
+                  {enabledFromDsl && rule.definition ? (
                     <button
                       className="text-button"
                       type="button"
@@ -160,7 +163,8 @@ export default function RuleGoPage() {
                   </button>
                 </div>
               </div>
-            ))}
+            );
+            })}
           </div>
         )}
         {error ? <div className="table-error">{error}</div> : null}
