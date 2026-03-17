@@ -1267,13 +1267,15 @@ export default function RuleGoScratchEditorPage() {
           editorJson: json.trim(),
         });
       } else {
-        await create({
+        const created = await create({
           name: trimmedName,
           description: String(useDescription).trim(),
           enabled: useEnabled,
           definition: nextDsl.trim(),
           editorJson: json.trim(),
         });
+        // 新建保存后跳转到该规则的编辑 URL，后续点击保存会走 update 而非再次 create
+        navigate(`/rulego/editor/${created.id}`, { replace: true });
       }
       // 保存后继续留在可视化编辑器；失败时仅通过 setError 展示提示
     } catch (err) {

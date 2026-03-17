@@ -5,6 +5,8 @@ import {
   uploadSkillZipFromFile,
   getSkillPackageDetail,
   getSkillPackageFileContent,
+  deleteSkillPackage,
+  isSkillPackageDeletable,
   type SkillPackageItem,
   type SkillPackageDetail,
 } from "./useSkillRepoApi";
@@ -21,6 +23,8 @@ export default function SkillRepoPage() {
   const [fileContent, setFileContent] = useState<{ filePath: string; content: string } | null>(null);
   const [fileContentLoading, setFileContentLoading] = useState(false);
   const [fileContentError, setFileContentError] = useState<string | null>(null);
+  const [deletingDirName, setDeletingDirName] = useState<string | null>(null);
+  const [confirmDeleteDirName, setConfirmDeleteDirName] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -106,6 +110,24 @@ export default function SkillRepoPage() {
     }
   }, []);
 
+  const handleDelete = useCallback(
+    async (dirName: string) => {
+      if (!isSkillPackageDeletable(dirName)) return;
+      setDeletingDirName(dirName);
+      setError(null);
+      try {
+        await deleteSkillPackage(dirName);
+        setConfirmDeleteDirName(null);
+        await load();
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e));
+      } finally {
+        setDeletingDirName(null);
+      }
+    },
+    [load]
+  );
+
   const handleViewFile = useCallback(
     async (filePath: string) => {
       if (!detailDirName) return;
@@ -184,6 +206,16 @@ export default function SkillRepoPage() {
                   >
                     查看
                   </button>
+                  {isSkillPackageDeletable(pkg.dir_name) ? (
+                    <button
+                      className="text-button danger"
+                      type="button"
+                      onClick={() => setConfirmDeleteDirName(pkg.dir_name)}
+                      disabled={deletingDirName !== null}
+                    >
+                      删除
+                    </button>
+                  ) : null}
                 </div>
               </div>
             ))}
@@ -243,6 +275,50 @@ export default function SkillRepoPage() {
               {fileContentError ? (
                 <p className="skill-repo-detail-error">{fileContentError}</p>
               ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {confirmDeleteDirName ? (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setConfirmDeleteDirName(null)}
+        >
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>确认删除</h3>
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => setConfirmDeleteDirName(null)}
+              >
+                关闭
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="confirm-text">
+                确定要删除技能包 <strong>{confirmDeleteDirName}</strong> 吗？删除后无法恢复。
+              </p>
+            </div>
+            <div className="modal-actions">
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => setConfirmDeleteDirName(null)}
+              >
+                取消
+              </button>
+              <button
+                className="primary-button danger"
+                type="button"
+                disabled={deletingDirName !== null}
+                onClick={() => handleDelete(confirmDeleteDirName)}
+              >
+                {deletingDirName === confirmDeleteDirName ? "删除中…" : "删除"}
+              </button>
             </div>
           </div>
         </div>

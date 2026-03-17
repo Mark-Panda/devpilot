@@ -9,6 +9,7 @@ import {
   updateRuleGoRule,
 } from "./useRuleGoApi";
 import { useRuleGoStore } from "./store";
+import type { RuleGoRule } from "./types";
 
 type RuleGoInput = {
   name: string;
@@ -47,7 +48,7 @@ export function useRuleGoRules() {
     }
   };
 
-  const create = async (input: RuleGoInput) => {
+  const create = async (input: RuleGoInput): Promise<RuleGoRule> => {
     const result = await createRuleGoRule({
       name: input.name,
       description: input.description,
@@ -55,7 +56,7 @@ export function useRuleGoRules() {
       definition: input.definition,
       editor_json: input.editorJson,
     });
-    addRule({
+    const rule: RuleGoRule = {
       id: result.id,
       name: result.name,
       description: result.description,
@@ -63,7 +64,9 @@ export function useRuleGoRules() {
       definition: result.definition,
       editorJson: result.editor_json,
       skillDirName: result.skill_dir_name || undefined,
-    });
+    };
+    addRule(rule);
+    return rule;
   };
 
   const update = async (id: string, input: RuleGoInput) => {

@@ -1,4 +1,5 @@
 import {
+  DeleteSkillPackage as DeleteSkillPackageApi,
   ExtractSkillZip,
   ExtractSkillZipFromData,
   GetSkillPackageDetail,
@@ -62,4 +63,17 @@ function fileToBase64(file: File): Promise<string> {
 export async function uploadSkillZipFromFile(file: File): Promise<void> {
   const base64 = await fileToBase64(file);
   await ExtractSkillZipFromData(base64);
+}
+
+/** 是否允许在技能仓库中删除该技能包（内置 create-skill 与规则链生成的 rule-* 不可删除） */
+export function isSkillPackageDeletable(dirName: string): boolean {
+  const d = (dirName || "").trim();
+  if (d === "" || d === "create-skill") return false;
+  if (d.startsWith("rule-")) return false;
+  return true;
+}
+
+/** 删除指定技能包目录。内置与规则链生成的技能会报错。 */
+export async function deleteSkillPackage(dirName: string): Promise<void> {
+  return DeleteSkillPackageApi(dirName);
 }

@@ -14,6 +14,12 @@ import (
 	"devpilot/backend/internal/llm"
 )
 
+// 内置技能目录名（不可在技能仓库中删除）
+const builtinSkillDirName = "create-skill"
+
+// ruleChainSkillPrefix 规则链生成技能的目录名前缀（rule-{id}），此类技能不可在技能仓库中删除。
+const ruleChainSkillPrefix = "rule-"
+
 // Service 提供技能仓库能力：列举 ~/.devpilot/skills/ 下技能包、解压上传的 zip。
 type Service struct {
 	skillDir string
@@ -223,4 +229,43 @@ func (s *Service) ExtractSkillZipFromData(dataBase64 string) error {
 		return err
 	}
 	return s.ExtractSkillZip(tmpPath)
+}
+
+// IsSkillPackageDeletable 判断该技能包是否允许在技能仓库中删除。
+// 内置技能（create-skill）和规则链生成的技能（rule-*）不可删除。
+func IsSkillPackageDeletable(dirName string) bool {
+	dirName = strings.TrimSpace(filepath.Clean(dirName))
+	if dirName == "" || dirName == "." || strings.Contains(dirName, "..") {
+		return false
+	}
+	if dirName == builtinSkillDirName {
+		return false
+	}
+	if strings.HasPrefix(dirName, ruleChainSkillPrefix) {
+		return false
+	}
+	return true
+}
+
+// DeleteSkillPackage 删除指定技能包子目录。内置技能（create-skill）和规则链生成的技能（rule-*）禁止删除，返回错误。
+func (s *Service) DeleteSkillPackage(dirName string) error {
+	dirName = strings.TrimSpace(filepath.Clean(dirName))
+	if dirName == "" || dirName == "." || strings.Contains(dirName, "..") {
+		return errors.New("invalid dir name")
+	}
+	if !IsSkillPackageDeletable(dirName) {
+		return errors.New("该技能为内置或由规则链生成，不可在技能仓库中删除")
+	}
+	absDir := filepath.Join(s.skillDir, dirName)
+	info, err := os.Stat(absDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return errors.New("skill package not found")
+		}
+		return err
+	}
+	if !info.IsDir() {
+		return errors.New("not a directory")
+	}
+	return os.RemoveAll(absDir)
 }

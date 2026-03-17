@@ -202,12 +202,24 @@ export default function RuleGoPage() {
               onSubmit={async (values) => {
                 if (editingRule) {
                   await update(editingRule.id, values);
+                  setModalOpen(false);
+                  setEditingRule(null);
+                  await refresh();
                 } else {
-                  await create(values);
+                  // 新增时先关闭弹窗再请求，避免用户再次点击保存产生重复创建
+                  setModalOpen(false);
+                  setEditingRule(null);
+                  try {
+                    await create(values);
+                    await refresh();
+                  } catch (e) {
+                    setActionFeedback({
+                      msg: e instanceof Error ? e.message : String(e),
+                      isError: true,
+                    });
+                    setTimeout(() => setActionFeedback(null), 5000);
+                  }
                 }
-                setModalOpen(false);
-                setEditingRule(null);
-                await refresh();
               }}
             />
           </div>

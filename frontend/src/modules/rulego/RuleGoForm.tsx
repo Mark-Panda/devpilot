@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { RuleGoRule } from "./types";
 
 /** 从 DSL definition JSON 中解析 ruleChain.debugMode / ruleChain.root */
@@ -93,6 +93,7 @@ export default function RuleGoForm({
   }, [initial]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   const canSubmit = useMemo(() => {
     if (!values.name.trim()) return false;
@@ -110,30 +111,35 @@ export default function RuleGoForm({
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (submittingRef.current) return;
     const message = validate();
     if (message) {
       setError(message);
       return;
     }
 
+    submittingRef.current = true;
     setSubmitting(true);
     setError(null);
     let definitionOut = showDefinition ? values.definition.trim() : (initial?.definition ?? "");
     if (!showDefinition && initial?.definition && definitionOut) {
       definitionOut = mergeRuleChainFlags(definitionOut, values.debugMode, values.root);
     }
-    const payload = {
+    const payload: FormValues = {
       name: values.name.trim(),
       description: values.description.trim(),
       enabled: values.enabled,
       definition: definitionOut,
       editorJson: showEditorJson ? values.editorJson.trim() : (initial?.editorJson ?? ""),
+      debugMode: values.debugMode,
+      root: values.root,
     };
     try {
       await onSubmit(payload);
     } catch (err) {
       setError((err as Error).message || "提交失败");
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -241,7 +247,7 @@ export default function RuleGoForm({
           取消
         </button>
         <button className="primary-button" type="submit" disabled={!canSubmit || submitting}>
-          {mode === "create" ? "创建" : "保存"}
+          {submitting ? (mode === "create" ? "创建中…" : "保存中…") : mode === "create" ? "创建" : "保存"}
         </button>
       </div>
     </form>
