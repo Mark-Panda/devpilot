@@ -25,7 +25,6 @@ func CreateRuleGoRule(ctx context.Context, db *DB, input models.RuleGoRule) (mod
 		ID:           id,
 		Name:         input.Name,
 		Description:  input.Description,
-		Enabled:      input.Enabled,
 		Definition:   input.Definition,
 		EditorJSON:   input.EditorJSON,
 		SkillDirName: input.SkillDirName,
@@ -74,7 +73,6 @@ func UpdateRuleGoRule(ctx context.Context, db *DB, id string, patch models.RuleG
 
 	existing.Name = patch.Name
 	existing.Description = patch.Description
-	existing.Enabled = patch.Enabled
 	existing.Definition = patch.Definition
 	existing.EditorJSON = patch.EditorJSON
 	existing.SkillDirName = patch.SkillDirName

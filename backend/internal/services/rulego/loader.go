@@ -48,8 +48,8 @@ func (s *Service) LoadRuleChain(ruleID string) error {
 		}
 		return err
 	}
-	if !rule.Enabled {
-		return errors.New("规则已停用，请先启用后再加载")
+	if !EnabledFromDefinition(rule.Definition) {
+		return errors.New("规则已停用，请先在 DSL 中启用后再加载")
 	}
 	if rule.Definition == "" {
 		return errors.New("规则定义为空")
@@ -91,7 +91,7 @@ func (s *Service) LoadAllEnabledRuleChains() (loaded int, err error) {
 		return 0, err
 	}
 	for _, rule := range rules {
-		if !rule.Enabled || rule.Definition == "" {
+		if !EnabledFromDefinition(rule.Definition) || rule.Definition == "" {
 			continue
 		}
 		if _, ok := rulego.Get(rule.ID); ok {

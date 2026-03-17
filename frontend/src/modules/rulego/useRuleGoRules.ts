@@ -14,7 +14,6 @@ import type { RuleGoRule } from "./types";
 type RuleGoInput = {
   name: string;
   description: string;
-  enabled: boolean;
   definition: string;
   editorJson: string;
 };
@@ -35,7 +34,6 @@ export function useRuleGoRules() {
           id: rule.id,
           name: rule.name,
           description: rule.description,
-          enabled: rule.enabled,
           definition: rule.definition,
           editorJson: rule.editor_json,
           skillDirName: rule.skill_dir_name || undefined,
@@ -52,7 +50,6 @@ export function useRuleGoRules() {
     const result = await createRuleGoRule({
       name: input.name,
       description: input.description,
-      enabled: input.enabled,
       definition: input.definition,
       editor_json: input.editorJson,
     });
@@ -60,7 +57,6 @@ export function useRuleGoRules() {
       id: result.id,
       name: result.name,
       description: result.description,
-      enabled: result.enabled,
       definition: result.definition,
       editorJson: result.editor_json,
       skillDirName: result.skill_dir_name || undefined,
@@ -73,15 +69,12 @@ export function useRuleGoRules() {
     const result = await updateRuleGoRule(id, {
       name: input.name,
       description: input.description,
-      enabled: input.enabled,
       definition: input.definition,
       editor_json: input.editorJson,
     });
-    // 使用请求体中的 name 更新本地，确保弹框填写的规则链名称能正确展示（不依赖接口返回）
     updateRule(id, {
       name: input.name,
       description: result.description,
-      enabled: result.enabled,
       definition: result.definition,
       editorJson: result.editor_json,
       skillDirName: result.skill_dir_name || undefined,

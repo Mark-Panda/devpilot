@@ -27,7 +27,6 @@ func NewService(store *Store, execLogStore *ExecutionLogStore) *Service {
 type CreateRuleGoRuleInput struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
-	Enabled     bool   `json:"enabled"`
 	Definition  string `json:"definition"`
 	EditorJSON  string `json:"editor_json"`
 }
@@ -35,7 +34,6 @@ type CreateRuleGoRuleInput struct {
 type UpdateRuleGoRuleInput struct {
 	Name        string `json:"name"`
 	Description string `json:"description"`
-	Enabled     bool   `json:"enabled"`
 	Definition  string `json:"definition"`
 	EditorJSON  string `json:"editor_json"`
 }
@@ -48,7 +46,6 @@ func (s *Service) CreateRuleGoRule(input CreateRuleGoRuleInput) (models.RuleGoRu
 	rule := models.RuleGoRule{
 		Name:        strings.TrimSpace(input.Name),
 		Description: strings.TrimSpace(input.Description),
-		Enabled:     input.Enabled,
 		Definition:  strings.TrimSpace(input.Definition),
 		EditorJSON:  strings.TrimSpace(input.EditorJSON),
 	}
@@ -60,8 +57,7 @@ func (s *Service) CreateRuleGoRule(input CreateRuleGoRuleInput) (models.RuleGoRu
 	if err != nil {
 		return models.RuleGoRule{}, err
 	}
-	// 仅当规则链为启用状态时才加载到引擎；未启用时不重载
-	if result.Enabled && result.Definition != "" {
+	if EnabledFromDefinition(result.Definition) && result.Definition != "" {
 		_ = s.LoadRuleChain(result.ID)
 	}
 	return result, nil
@@ -77,7 +73,6 @@ func (s *Service) UpdateRuleGoRule(id string, input UpdateRuleGoRuleInput) (mode
 		ID:           id,
 		Name:         strings.TrimSpace(input.Name),
 		Description:  strings.TrimSpace(input.Description),
-		Enabled:      input.Enabled,
 		Definition:   strings.TrimSpace(input.Definition),
 		EditorJSON:   strings.TrimSpace(input.EditorJSON),
 		SkillDirName: existing.SkillDirName, // 保留关联技能目录，仅通过 GenerateSkillFromRuleChain / DeleteSkillForRuleChain 变更
@@ -92,8 +87,8 @@ func (s *Service) UpdateRuleGoRule(id string, input UpdateRuleGoRuleInput) (mode
 	if err != nil {
 		return models.RuleGoRule{}, err
 	}
-	// 仅当规则链为启用状态时才重载；未启用时不重载，并卸载引擎中的实例
-	if result.Enabled && result.Definition != "" {
+	enabled := EnabledFromDefinition(result.Definition)
+	if enabled && result.Definition != "" {
 		_ = s.LoadRuleChain(id)
 	} else {
 		_ = s.UnloadRuleChain(id)

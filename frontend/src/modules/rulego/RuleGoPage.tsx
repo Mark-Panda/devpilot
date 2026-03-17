@@ -1,9 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ListModelConfigs } from "../../../wailsjs/go/model_management/Service";
-import { getEnabledFromDefinition } from "./dslUtils";
+import { getEnabledFromDefinition, setDisabledInDefinition } from "./dslUtils";
 import RuleGoForm from "./RuleGoForm";
-import { useRuleGoStore } from "./store";
 import type { RuleGoRule } from "./types";
 import { useRuleGoRules } from "./useRuleGoRules";
 
@@ -11,7 +10,6 @@ export default function RuleGoPage() {
   const navigate = useNavigate();
   const { rules, loading, error, refresh, create, update, remove, loadChain, unloadChain, generateSkill } =
     useRuleGoRules();
-  const { loadedRuleIds, setLoadedRuleIds } = useRuleGoStore();
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<RuleGoRule | null>(null);
   const [confirmingRule, setConfirmingRule] = useState<RuleGoRule | null>(null);
@@ -66,17 +64,25 @@ export default function RuleGoPage() {
         ) : (
           <div className="table-body">
             {rules.map((rule) => {
-              const enabledFromDsl = getEnabledFromDefinition(rule.definition) ?? rule.enabled;
+              // 状态以 definition 中 DSL 的 ruleChain.disabled 为准（表中已无 enabled 字段）
+              const effectiveEnabled = getEnabledFromDefinition(rule.definition);
+              const hasDefinition = Boolean(rule.definition);
+              const basePayload = {
+                name: rule.name,
+                description: rule.description,
+                definition: rule.definition,
+                editorJson: rule.editorJson,
+              };
               return (
               <div className="table-row" key={rule.id}>
                 <div className="table-cell">{rule.name}</div>
                 <div className="table-cell">{rule.description || "-"}</div>
                 <div className="table-cell">
-                  {enabledFromDsl && rule.definition
-                    ? loadedRuleIds.has(rule.id)
+                  {hasDefinition
+                    ? effectiveEnabled
                       ? "已开启"
                       : "已关闭"
-                    : enabledFromDsl
+                    : effectiveEnabled
                       ? "启用"
                       : "停用"}
                 </div>
@@ -98,30 +104,32 @@ export default function RuleGoPage() {
                   >
                     表单编辑
                   </button>
-                  {enabledFromDsl && rule.definition ? (
+                  {hasDefinition ? (
                     <button
                       className="text-button"
                       type="button"
                       onClick={() =>
-                        loadedRuleIds.has(rule.id)
+                        effectiveEnabled
                           ? withFeedback(async () => {
-                              await unloadChain(rule.id);
-                              setLoadedRuleIds((prev) => {
-                                const next = new Set(prev);
-                                next.delete(rule.id);
-                                return next;
+                              await update(rule.id, {
+                                ...basePayload,
+                                definition: setDisabledInDefinition(rule.definition, true),
                               });
+                              await unloadChain(rule.id);
                             }, "已关闭")
                           : withFeedback(async () => {
+                              await update(rule.id, {
+                                ...basePayload,
+                                definition: setDisabledInDefinition(rule.definition, false),
+                              });
                               await loadChain(rule.id);
-                              setLoadedRuleIds((prev) => new Set(prev).add(rule.id));
                             }, "已开启")
                       }
                     >
-                      {loadedRuleIds.has(rule.id) ? "关闭" : "开启"}
+                      {effectiveEnabled ? "关闭" : "开启"}
                     </button>
                   ) : null}
-                  {enabledFromDsl && rule.definition ? (
+                  {effectiveEnabled && hasDefinition ? (
                     <button
                       className="text-button"
                       type="button"

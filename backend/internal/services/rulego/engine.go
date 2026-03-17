@@ -39,7 +39,7 @@ func (s *Service) ExecuteRule(ruleID string, input ExecuteRuleInput) (ExecuteRul
 		}
 		return ExecuteRuleOutput{Success: false, Error: err.Error()}, err
 	}
-	if !rule.Enabled {
+	if !EnabledFromDefinition(rule.Definition) {
 		return ExecuteRuleOutput{Success: false, Error: "规则已停用"}, errors.New("rule disabled")
 	}
 	if rule.Definition == "" {

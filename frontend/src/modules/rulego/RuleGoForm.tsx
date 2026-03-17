@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { getEnabledFromDefinition } from "./dslUtils";
 import type { RuleGoRule } from "./types";
 
 /** 从 DSL definition JSON 中解析 ruleChain.debugMode / ruleChain.root */
@@ -15,11 +16,12 @@ function parseRuleChainFlags(definition: string): { debugMode: boolean; root: bo
   }
 }
 
-/** 将 debugMode/root 写回 definition JSON（用于表单编辑同步到 DSL） */
+/** 将 debugMode/root/enabled 写回 definition JSON（用于表单编辑同步到 DSL 的 ruleChain 状态） */
 function mergeRuleChainFlags(
   definition: string,
   debugMode: boolean,
-  root: boolean
+  root: boolean,
+  enabled?: boolean
 ): string {
   try {
     const parsed = JSON.parse(definition);
@@ -27,6 +29,7 @@ function mergeRuleChainFlags(
       if (!parsed.ruleChain) parsed.ruleChain = {};
       parsed.ruleChain.debugMode = debugMode;
       parsed.ruleChain.root = root;
+      if (enabled !== undefined) parsed.ruleChain.disabled = !enabled;
       return JSON.stringify(parsed, null, 2);
     }
   } catch {
@@ -70,7 +73,7 @@ export default function RuleGoForm({
     return {
       name: initial?.name ?? "",
       description: initial?.description ?? "",
-      enabled: initial?.enabled ?? true,
+      enabled: def ? getEnabledFromDefinition(def) : true,
       definition: initial?.definition ?? "",
       editorJson: initial?.editorJson ?? "",
       debugMode: flags.debugMode,
@@ -84,7 +87,7 @@ export default function RuleGoForm({
     setValues({
       name: initial?.name ?? "",
       description: initial?.description ?? "",
-      enabled: initial?.enabled ?? true,
+      enabled: def ? getEnabledFromDefinition(def) : true,
       definition: initial?.definition ?? "",
       editorJson: initial?.editorJson ?? "",
       debugMode: flags.debugMode,
@@ -122,8 +125,13 @@ export default function RuleGoForm({
     setSubmitting(true);
     setError(null);
     let definitionOut = showDefinition ? values.definition.trim() : (initial?.definition ?? "");
-    if (!showDefinition && initial?.definition && definitionOut) {
-      definitionOut = mergeRuleChainFlags(definitionOut, values.debugMode, values.root);
+    if (definitionOut) {
+      definitionOut = mergeRuleChainFlags(
+        definitionOut,
+        values.debugMode,
+        values.root,
+        values.enabled
+      );
     }
     const payload: FormValues = {
       name: values.name.trim(),

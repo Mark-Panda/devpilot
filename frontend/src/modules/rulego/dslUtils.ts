@@ -1,17 +1,34 @@
 /**
- * 从 DSL definition JSON 中解析 ruleChain 的启用状态。
- * DSL 中为 ruleChain.disabled（true=停用，false=启用），与接口 enabled 含义相反。
- * @returns 若 DSL 中存在 ruleChain.disabled 则返回对应的 enabled；否则返回 undefined，由调用方用 rule.enabled 兜底。
+ * 从 DSL definition JSON 中解析 ruleChain 的启用状态（以 definition 为准，表中已无 enabled 字段）。
+ * DSL 中 ruleChain.disabled === true 为停用，false 或未设置为启用。
  */
-export function getEnabledFromDefinition(definition: string): boolean | undefined {
-  if (!definition?.trim()) return undefined;
+export function getEnabledFromDefinition(definition: string): boolean {
+  if (!definition?.trim()) return false;
   try {
     const parsed = JSON.parse(definition);
     const chain = parsed?.ruleChain;
-    if (chain == null || typeof chain !== "object") return undefined;
-    if (typeof chain.disabled !== "boolean") return undefined;
+    if (chain == null || typeof chain !== "object") return true;
+    if (typeof chain.disabled !== "boolean") return true;
     return !chain.disabled;
   } catch {
-    return undefined;
+    return true;
   }
+}
+
+/**
+ * 将 definition 中的 ruleChain.disabled 设为指定值，用于列表「开启/关闭」持久化。
+ */
+export function setDisabledInDefinition(definition: string, disabled: boolean): string {
+  if (!definition?.trim()) return definition;
+  try {
+    const parsed = JSON.parse(definition);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      if (!parsed.ruleChain) parsed.ruleChain = {};
+      parsed.ruleChain.disabled = disabled;
+      return JSON.stringify(parsed, null, 2);
+    }
+  } catch {
+    // ignore
+  }
+  return definition;
 }

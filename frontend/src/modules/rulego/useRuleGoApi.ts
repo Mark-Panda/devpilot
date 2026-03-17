@@ -24,7 +24,6 @@ export type RuleGoExecutionNodeLog = models.RuleGoExecutionNodeLog;
 type CreateRuleGoRuleInput = {
   name: string;
   description: string;
-  enabled: boolean;
   definition: string;
   editor_json: string;
 };

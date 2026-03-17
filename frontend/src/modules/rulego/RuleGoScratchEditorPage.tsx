@@ -1187,12 +1187,11 @@ export default function RuleGoScratchEditorPage() {
         const chain = parsed?.ruleChain;
         setDebugMode(Boolean(chain?.debugMode));
         setRoot(chain?.root !== false);
-        const dslEnabled = getEnabledFromDefinition(editingRule.definition);
-        setEnabled(dslEnabled ?? editingRule.enabled);
+        setEnabled(getEnabledFromDefinition(editingRule.definition));
       } catch {
         setDebugMode(false);
         setRoot(true);
-        setEnabled(editingRule.enabled);
+        setEnabled(true);
       }
     } else {
       setName("");
@@ -1213,7 +1212,7 @@ export default function RuleGoScratchEditorPage() {
           }
         })();
         const chain = parsed?.ruleChain;
-        const dslEnabledForLoad = getEnabledFromDefinition(editingRule.definition) ?? editingRule.enabled;
+        const dslEnabledForLoad = getEnabledFromDefinition(editingRule.definition);
         const loadedDsl = buildRuleGoDsl(
           workspaceRef.current,
           editingRule.name,
@@ -1235,7 +1234,7 @@ export default function RuleGoScratchEditorPage() {
         loadWorkspaceFromRuleGoDsl(ruleDsl, workspaceRef.current);
         ensureRuleGoNodeIdsAreUuid(workspaceRef.current);
         const chain = ruleDsl?.ruleChain;
-        const dslEnabledForLoad = getEnabledFromDefinition(editingRule.definition) ?? editingRule.enabled;
+        const dslEnabledForLoad = getEnabledFromDefinition(editingRule.definition);
         const loadedDsl = buildRuleGoDsl(
           workspaceRef.current,
           editingRule.name,
@@ -1272,7 +1271,7 @@ export default function RuleGoScratchEditorPage() {
     const useRoot = overrides?.root ?? root;
     const nextDsl =
       workspaceRef.current
-        ? buildRuleGoDsl(workspaceRef.current, trimmedName, useDebugMode, useRoot)
+        ? buildRuleGoDsl(workspaceRef.current, trimmedName, useDebugMode, useRoot, useEnabled)
         : dsl;
     if (!nextDsl.trim()) {
       const msg = "RuleGo DSL 不能为空";
@@ -1297,7 +1296,6 @@ export default function RuleGoScratchEditorPage() {
         await update(editingRule.id, {
           name: trimmedName,
           description: String(useDescription).trim(),
-          enabled: useEnabled,
           definition: nextDsl.trim(),
           editorJson: json.trim(),
         });
@@ -1305,7 +1303,6 @@ export default function RuleGoScratchEditorPage() {
         const created = await create({
           name: trimmedName,
           description: String(useDescription).trim(),
-          enabled: useEnabled,
           definition: nextDsl.trim(),
           editorJson: json.trim(),
         });
