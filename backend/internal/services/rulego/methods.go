@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"devpilot/backend/internal/store/sqlite"
-	"devpilot/backend/internal/store/sqlite/models"
+	"devpilot/backend/internal/store/models"
+	"devpilot/backend/internal/store/pebble"
 )
 
 type Service struct {
@@ -117,7 +117,7 @@ func validateRule(rule models.RuleGoRule) error {
 }
 
 func IsNotFound(err error) bool {
-	return errors.Is(err, sqlite.ErrNotFound)
+	return errors.Is(err, pebble.ErrNotFound)
 }
 
 // ListExecutionLogsResult 执行日志分页结果
@@ -157,7 +157,7 @@ type GetExecutionLogResponse struct {
 // GetExecutionLog 获取单条执行日志及所有节点步骤（入参/出参）
 func (s *Service) GetExecutionLog(executionID string) (GetExecutionLogResponse, error) {
 	if s.execLogStore == nil {
-		return GetExecutionLogResponse{}, sqlite.ErrNotFound
+		return GetExecutionLogResponse{}, pebble.ErrNotFound
 	}
 	logRow, err := s.execLogStore.GetExecutionLogByID(context.Background(), executionID)
 	if err != nil {
@@ -173,7 +173,7 @@ func (s *Service) GetExecutionLog(executionID string) (GetExecutionLogResponse, 
 // DeleteExecutionLog 删除一条执行日志及其所有节点步骤
 func (s *Service) DeleteExecutionLog(executionID string) error {
 	if s.execLogStore == nil {
-		return sqlite.ErrNotFound
+		return pebble.ErrNotFound
 	}
 	return s.execLogStore.DeleteExecutionLog(context.Background(), executionID)
 }

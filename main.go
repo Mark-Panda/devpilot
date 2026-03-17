@@ -3,6 +3,7 @@ package main
 import (
 	"embed"
 	"log"
+	"os"
 	"path/filepath"
 
 	"devpilot/backend"
@@ -15,7 +16,12 @@ import (
 var assets embed.FS
 
 func main() {
-	runtime, err := backend.InitRuntime(filepath.Join("build", "devpilot.db"))
+	home, err := os.UserHomeDir()
+	if err != nil {
+		log.Fatal(err)
+	}
+	dataDir := filepath.Join(home, ".devpilot")
+	runtime, err := backend.InitRuntime(dataDir)
 	if err != nil {
 		log.Fatal(err)
 	}

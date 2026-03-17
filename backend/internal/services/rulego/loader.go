@@ -10,7 +10,7 @@ import (
 	"github.com/rulego/rulego/api/types"
 	"github.com/rulego/rulego/engine"
 
-	"devpilot/backend/internal/store/sqlite"
+	"devpilot/backend/internal/store/pebble"
 )
 
 // GetRegisteredNodeTypes 返回当前 RuleGo 引擎中已注册的节点类型列表（排序后）。
@@ -43,7 +43,7 @@ func logRegisteredComponents() {
 func (s *Service) LoadRuleChain(ruleID string) error {
 	rule, err := s.store.GetByID(context.Background(), ruleID)
 	if err != nil {
-		if errors.Is(err, sqlite.ErrNotFound) {
+		if errors.Is(err, pebble.ErrNotFound) {
 			return errors.New("规则不存在")
 		}
 		return err

@@ -9,7 +9,7 @@ import (
 
 	"github.com/rulego/rulego/api/types"
 
-	"devpilot/backend/internal/store/sqlite/models"
+	"devpilot/backend/internal/store/models"
 )
 
 // 编译期检查：确保 LogAspect 实现 BeforeAspect、AfterAspect

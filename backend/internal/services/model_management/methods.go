@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"devpilot/backend/internal/store/sqlite"
-	"devpilot/backend/internal/store/sqlite/models"
+	"devpilot/backend/internal/store/models"
+	"devpilot/backend/internal/store/pebble"
 )
 
 type Service struct {
@@ -90,5 +90,5 @@ func validateConfig(config models.ModelConfig) error {
 }
 
 func IsNotFound(err error) bool {
-	return errors.Is(err, sqlite.ErrNotFound)
+	return errors.Is(err, pebble.ErrNotFound)
 }

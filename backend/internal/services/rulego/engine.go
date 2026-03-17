@@ -10,8 +10,8 @@ import (
 	"github.com/rulego/rulego"
 	"github.com/rulego/rulego/api/types"
 
-	"devpilot/backend/internal/store/sqlite"
-	"devpilot/backend/internal/store/sqlite/models"
+	"devpilot/backend/internal/store/models"
+	"devpilot/backend/internal/store/pebble"
 )
 
 // ExecuteRuleOutput 执行规则链的出参
@@ -34,7 +34,7 @@ type ExecuteRuleInput struct {
 func (s *Service) ExecuteRule(ruleID string, input ExecuteRuleInput) (ExecuteRuleOutput, error) {
 	rule, err := s.store.GetByID(context.Background(), ruleID)
 	if err != nil {
-		if errors.Is(err, sqlite.ErrNotFound) {
+		if errors.Is(err, pebble.ErrNotFound) {
 			return ExecuteRuleOutput{Success: false, Error: "规则不存在"}, err
 		}
 		return ExecuteRuleOutput{Success: false, Error: err.Error()}, err

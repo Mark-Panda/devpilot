@@ -1,13 +1,12 @@
 package backend
 
 import (
-	"fmt"
 	"log"
 
 	"devpilot/backend/internal/services/model_management"
 	"devpilot/backend/internal/services/route_rewrite"
 	"devpilot/backend/internal/services/rulego"
-	"devpilot/backend/internal/store/sqlite"
+	"devpilot/backend/internal/store/pebble"
 )
 
 type Runtime struct {
@@ -17,23 +16,18 @@ type Runtime struct {
 	close        func() error
 }
 
-func InitRuntime(dbPath string) (*Runtime, error) {
-	db, err := sqlite.Open(dbPath)
+func InitRuntime(dataDir string) (*Runtime, error) {
+	db, err := pebble.Open(dataDir)
 	if err != nil {
 		return nil, err
 	}
 
-	if err := sqlite.Migrate(db.DB); err != nil {
-		_ = db.Close()
-		return nil, fmt.Errorf("migrate db: %w", err)
-	}
-
-	routeRewriteStore := route_rewrite.NewStore(db.DB)
+	routeRewriteStore := route_rewrite.NewStore(db)
 	routeRewriteService := route_rewrite.NewService(routeRewriteStore)
-	modelStore := model_management.NewStore(db.DB)
+	modelStore := model_management.NewStore(db)
 	modelService := model_management.NewService(modelStore)
-	ruleGoStore := rulego.NewStore(db.DB)
-	ruleGoExecLogStore := rulego.NewExecutionLogStore(db.DB)
+	ruleGoStore := rulego.NewStore(db)
+	ruleGoExecLogStore := rulego.NewExecutionLogStore(db)
 	ruleGoService := rulego.NewService(ruleGoStore, ruleGoExecLogStore)
 	if n, err := ruleGoService.LoadAllEnabledRuleChains(); err != nil {
 		log.Printf("[rulego] 启动加载启用规则链: 已加载 %d 条，错误: %v", n, err)
