@@ -3,8 +3,13 @@
 dev:
 	wails dev
 
-build:
+build: build-appicon
 	wails build
+
+# 将 Logo 复制为 Wails 应用图标（build/appicon.png），供 wails build 生成各平台图标
+build-appicon:
+	@mkdir -p build
+	@cp frontend/public/devpilot-logo.png build/appicon.png
 
 build-all:
 	wails build -platform darwin/amd64,darwin/arm64,windows/amd64,linux/amd64

@@ -678,6 +678,7 @@ export default function RuleGoScratchEditorPage() {
   const [nameDraft, setNameDraft] = useState("");
   const [descriptionDraft, setDescriptionDraft] = useState("");
   const [debugMode, setDebugMode] = useState(false);
+  const [root, setRoot] = useState(true);
   const [enabledDraftInModal, setEnabledDraftInModal] = useState(true);
   const [debugDraftInModal, setDebugDraftInModal] = useState(false);
   const [nameModalError, setNameModalError] = useState<string | null>(null);
@@ -838,20 +839,38 @@ export default function RuleGoScratchEditorPage() {
         const parsed = JSON.parse(editingRule.definition);
         const chain = parsed?.ruleChain;
         setDebugMode(Boolean(chain?.debugMode));
+        setRoot(chain?.root !== false);
       } catch {
         setDebugMode(false);
+        setRoot(true);
       }
     } else {
       setName("");
       setDescription("");
       setDebugMode(false);
+      setRoot(true);
     }
 
     if (editingRule?.editorJson) {
       try {
         const state = JSON.parse(editingRule.editorJson);
         ScratchBlocks.serialization.workspaces.load(state, workspaceRef.current, { recordUndo: false });
-        setDsl(buildRuleGoDsl(workspaceRef.current, editingRule.name));
+        const parsed = (() => {
+          try {
+            return JSON.parse(editingRule.definition);
+          } catch {
+            return {};
+          }
+        })();
+        const chain = parsed?.ruleChain;
+        setDsl(
+          buildRuleGoDsl(
+            workspaceRef.current,
+            editingRule.name,
+            Boolean(chain?.debugMode),
+            chain?.root !== false
+          )
+        );
         return;
       } catch {
         // ignore malformed json
@@ -863,14 +882,27 @@ export default function RuleGoScratchEditorPage() {
         const ruleDsl = JSON.parse(editingRule.definition);
         loadWorkspaceFromRuleGoDsl(ruleDsl, workspaceRef.current);
         ensureRuleGoNodeIdsAreUuid(workspaceRef.current);
-        setDsl(buildRuleGoDsl(workspaceRef.current, editingRule.name));
+        const chain = ruleDsl?.ruleChain;
+        setDsl(
+          buildRuleGoDsl(
+            workspaceRef.current,
+            editingRule.name,
+            Boolean(chain?.debugMode),
+            chain?.root !== false
+          )
+        );
       } catch (err) {
         setError((err as Error).message || "RuleGo DSL 解析失败");
       }
     }
   }, [editingRule]);
 
-  type SaveRuleOverrides = { description?: string; enabled?: boolean; debugMode?: boolean } | undefined;
+  type SaveRuleOverrides = {
+    description?: string;
+    enabled?: boolean;
+    debugMode?: boolean;
+    root?: boolean;
+  } | undefined;
   const saveRule = async (ruleName: string, overrides?: SaveRuleOverrides) => {
     const trimmedName = ruleName.trim();
     if (!trimmedName) {
@@ -880,7 +912,11 @@ export default function RuleGoScratchEditorPage() {
     const useDescription = overrides?.description ?? description;
     const useEnabled = overrides?.enabled ?? enabled;
     const useDebugMode = overrides?.debugMode ?? debugMode;
-    const nextDsl = workspaceRef.current ? buildRuleGoDsl(workspaceRef.current, trimmedName, useDebugMode) : dsl;
+    const useRoot = overrides?.root ?? root;
+    const nextDsl =
+      workspaceRef.current
+        ? buildRuleGoDsl(workspaceRef.current, trimmedName, useDebugMode, useRoot)
+        : dsl;
     if (!nextDsl.trim()) {
       setError("RuleGo DSL 不能为空");
       return;
@@ -892,6 +928,7 @@ export default function RuleGoScratchEditorPage() {
     if (workspaceRef.current) {
       setDsl(nextDsl);
     }
+    if (overrides?.root !== undefined) setRoot(overrides.root);
     setSaving(true);
     setError(null);
     try {
@@ -958,7 +995,8 @@ export default function RuleGoScratchEditorPage() {
   };
 
   const handleTestClick = () => {
-    const currentDsl = workspaceRef.current ? buildRuleGoDsl(workspaceRef.current, name, debugMode) : dsl;
+    const currentDsl =
+      workspaceRef.current ? buildRuleGoDsl(workspaceRef.current, name, debugMode, root) : dsl;
     if (!currentDsl.trim()) {
       setError("画布为空，无法测试");
       return;
@@ -969,7 +1007,8 @@ export default function RuleGoScratchEditorPage() {
   };
 
   const handleTestRun = async () => {
-    const currentDsl = workspaceRef.current ? buildRuleGoDsl(workspaceRef.current, name, debugMode) : dsl;
+    const currentDsl =
+      workspaceRef.current ? buildRuleGoDsl(workspaceRef.current, name, debugMode, root) : dsl;
     if (!currentDsl.trim()) {
       setTestResult({ success: false, data: "", error: "画布为空", elapsed: 0 });
       return;
@@ -1165,7 +1204,12 @@ export default function RuleGoScratchEditorPage() {
     workspace.refreshTheme();
   };
 
-  const buildRuleGoDsl = (workspace: WorkspaceSvg, ruleName?: string, debugModeParam?: boolean) => {
+  const buildRuleGoDsl = (
+    workspace: WorkspaceSvg,
+    ruleName?: string,
+    debugModeParam?: boolean,
+    rootParam?: boolean
+  ) => {
     const topBlocks = workspace.getTopBlocks(true);
     if (topBlocks.length === 0) return "";
 
@@ -1257,6 +1301,7 @@ export default function RuleGoScratchEditorPage() {
     const ruleChainId = editingRule?.id ?? id ?? "rule01";
     const ruleChainName = ruleName?.trim() || name.trim() || "Rule Chain";
     const ruleChainDebugMode = typeof debugModeParam === "boolean" ? debugModeParam : debugMode;
+    const ruleChainRoot = typeof rootParam === "boolean" ? rootParam : root;
 
     return JSON.stringify(
       {
@@ -1264,7 +1309,7 @@ export default function RuleGoScratchEditorPage() {
           id: ruleChainId,
           name: ruleChainName,
           debugMode: ruleChainDebugMode,
-          root: true,
+          root: ruleChainRoot,
           disabled: !enabled,
           configuration: {},
           additionalInfo: {},
@@ -1349,7 +1394,7 @@ export default function RuleGoScratchEditorPage() {
             onClick={() => {
               if (workspaceRef.current) {
                 ensureRuleGoNodeIdsAreUuid(workspaceRef.current);
-                setDsl(buildRuleGoDsl(workspaceRef.current, name, debugMode));
+                setDsl(buildRuleGoDsl(workspaceRef.current, name, debugMode, root));
               }
               setViewDslOpen(true);
             }}

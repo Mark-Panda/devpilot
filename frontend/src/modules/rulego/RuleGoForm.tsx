@@ -1,12 +1,48 @@
 import { useEffect, useMemo, useState } from "react";
 import type { RuleGoRule } from "./types";
 
+/** 从 DSL definition JSON 中解析 ruleChain.debugMode / ruleChain.root */
+function parseRuleChainFlags(definition: string): { debugMode: boolean; root: boolean } {
+  try {
+    const parsed = JSON.parse(definition);
+    const chain = parsed?.ruleChain;
+    return {
+      debugMode: Boolean(chain?.debugMode),
+      root: chain?.root !== false,
+    };
+  } catch {
+    return { debugMode: false, root: true };
+  }
+}
+
+/** 将 debugMode/root 写回 definition JSON（用于表单编辑同步到 DSL） */
+function mergeRuleChainFlags(
+  definition: string,
+  debugMode: boolean,
+  root: boolean
+): string {
+  try {
+    const parsed = JSON.parse(definition);
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      if (!parsed.ruleChain) parsed.ruleChain = {};
+      parsed.ruleChain.debugMode = debugMode;
+      parsed.ruleChain.root = root;
+      return JSON.stringify(parsed, null, 2);
+    }
+  } catch {
+    // ignore
+  }
+  return definition;
+}
+
 type FormValues = {
   name: string;
   description: string;
   enabled: boolean;
   definition: string;
   editorJson: string;
+  debugMode: boolean;
+  root: boolean;
 };
 
 type RuleGoFormProps = {
@@ -28,21 +64,31 @@ export default function RuleGoForm({
   showEditorJson = true,
   showDefinition = true,
 }: RuleGoFormProps) {
-  const [values, setValues] = useState<FormValues>({
-    name: initial?.name ?? "",
-    description: initial?.description ?? "",
-    enabled: initial?.enabled ?? true,
-    definition: initial?.definition ?? "",
-    editorJson: initial?.editorJson ?? "",
+  const [values, setValues] = useState<FormValues>(() => {
+    const def = initial?.definition ?? "";
+    const flags = def ? parseRuleChainFlags(def) : { debugMode: false, root: true };
+    return {
+      name: initial?.name ?? "",
+      description: initial?.description ?? "",
+      enabled: initial?.enabled ?? true,
+      definition: initial?.definition ?? "",
+      editorJson: initial?.editorJson ?? "",
+      debugMode: flags.debugMode,
+      root: flags.root,
+    };
   });
 
   useEffect(() => {
+    const def = initial?.definition ?? "";
+    const flags = def ? parseRuleChainFlags(def) : { debugMode: false, root: true };
     setValues({
       name: initial?.name ?? "",
       description: initial?.description ?? "",
       enabled: initial?.enabled ?? true,
       definition: initial?.definition ?? "",
       editorJson: initial?.editorJson ?? "",
+      debugMode: flags.debugMode,
+      root: flags.root,
     });
   }, [initial]);
   const [error, setError] = useState<string | null>(null);
@@ -72,11 +118,15 @@ export default function RuleGoForm({
 
     setSubmitting(true);
     setError(null);
+    let definitionOut = showDefinition ? values.definition.trim() : (initial?.definition ?? "");
+    if (!showDefinition && initial?.definition && definitionOut) {
+      definitionOut = mergeRuleChainFlags(definitionOut, values.debugMode, values.root);
+    }
     const payload = {
       name: values.name.trim(),
       description: values.description.trim(),
       enabled: values.enabled,
-      definition: showDefinition ? values.definition.trim() : (initial?.definition ?? ""),
+      definition: definitionOut,
       editorJson: showEditorJson ? values.editorJson.trim() : (initial?.editorJson ?? ""),
     };
     try {
@@ -160,6 +210,28 @@ export default function RuleGoForm({
           </select>
           <small className="form-hint">控制规则是否生效</small>
         </label>
+        {initial?.definition ? (
+          <>
+            <label className="form-field form-field-checkbox">
+              <input
+                type="checkbox"
+                checked={values.debugMode}
+                onChange={(e) => setValues({ ...values, debugMode: e.target.checked })}
+              />
+              <span>调试</span>
+              <small className="form-hint">与 DSL ruleChain.debugMode 一致，保存时同步到规则定义</small>
+            </label>
+            <label className="form-field form-field-checkbox">
+              <input
+                type="checkbox"
+                checked={values.root}
+                onChange={(e) => setValues({ ...values, root: e.target.checked })}
+              />
+              <span>是否根规则链</span>
+              <small className="form-hint">与 DSL ruleChain.root 一致，保存时同步到规则定义</small>
+            </label>
+          </>
+        ) : null}
       </div>
 
       {error ? <div className="form-error">{error}</div> : null}

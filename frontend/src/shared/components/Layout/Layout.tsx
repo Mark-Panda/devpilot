@@ -25,7 +25,9 @@ export default function Layout({ children }: LayoutProps) {
     <div className={`app-shell${isRuleGoEditor ? " app-shell-full" : ""}`}>
       {!isRuleGoEditor && (
         <aside className="app-sidebar">
-          <div className="app-brand">DevPilot</div>
+          <div className="app-brand">
+            <img src="/devpilot-logo.png" alt="DevPilot" className="app-brand-logo" />
+          </div>
           <nav className="app-nav">
             {menuItems.map((item) => (
               <NavLink
