@@ -10,16 +10,19 @@ import (
 const DefaultLLMURL = "https://ai.gitee.com/v1"
 
 // NodeConfigToConfig 将 NodeConfig 转为 Config（url/key -> BaseURL/APIKey），便于创建 Client。
+// 若 NodeConfig.SkillDir 为空，不在此处填充，由 NewClient 使用 DefaultSkillDir（~/.devpilot/skills/）。
 func NodeConfigToConfig(nc *NodeConfig) Config {
 	url := strings.TrimSpace(nc.URL)
 	if url == "" {
 		url = DefaultLLMURL
 	}
+	skillDir := strings.TrimSpace(nc.SkillDir)
+	// 空则交给 NewClient 使用默认 ~/.devpilot/skills/
 	cfg := Config{
 		BaseURL:  url,
 		APIKey:   strings.TrimSpace(nc.Key),
 		Model:    strings.TrimSpace(nc.Model),
-		SkillDir: strings.TrimSpace(nc.SkillDir),
+		SkillDir: skillDir,
 		MCP:      nc.MCP,
 	}
 	if nc.Params != nil {

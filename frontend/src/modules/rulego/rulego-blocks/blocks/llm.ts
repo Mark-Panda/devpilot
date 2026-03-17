@@ -32,6 +32,7 @@ const def: BlockTypeDef = {
         config.appendField(new (BlocklyF as any).FieldTextInput(""), "LLM_SYSTEM_PROMPT");
         config.appendField(new (BlocklyF as any).FieldTextInput(defaultMessagesJson), "LLM_MESSAGES_JSON");
         config.appendField(new (BlocklyF as any).FieldTextInput(defaultParamsJson), "LLM_PARAMS_JSON");
+        config.appendField(new (BlocklyF as any).FieldTextInput("[]"), "LLM_ENABLED_SKILLS_JSON");
         config.appendField(new (BlocklyF as any).FieldCheckbox(false), "DEBUG");
         (this as Block).appendStatementInput("branch_failure").appendField("Failure");
         const configInput = (this as Block).getInput("CONFIG");
@@ -60,6 +61,8 @@ const def: BlockTypeDef = {
       jsonSchema: typeof paramsRaw?.jsonSchema === "string" ? paramsRaw.jsonSchema : undefined,
       keepThink: Boolean(paramsRaw?.keepThink),
     };
+    const enabledSkillNamesRaw = helpers.getFieldValue(block, "LLM_ENABLED_SKILLS_JSON") || "[]";
+    const enabledSkillNames = helpers.parseJsonValue(enabledSkillNamesRaw, []) as string[];
     return {
       url: url.trim(),
       key: key.trim(),
@@ -67,6 +70,7 @@ const def: BlockTypeDef = {
       systemPrompt: systemPrompt.trim(),
       messages: Array.isArray(messages) ? messages.map((m) => ({ role: String(m?.role ?? "user"), content: String(m?.content ?? "") })) : [],
       params,
+      enabled_skill_names: Array.isArray(enabledSkillNames) ? enabledSkillNames : [],
     };
   },
   setConfiguration(block, node, helpers) {
@@ -94,6 +98,8 @@ const def: BlockTypeDef = {
       2
     );
     block.setFieldValue(paramsJson, "LLM_PARAMS_JSON");
+    const enabled = (c.enabled_skill_names as string[] | undefined) ?? [];
+    block.setFieldValue(JSON.stringify(Array.isArray(enabled) ? enabled : []), "LLM_ENABLED_SKILLS_JSON");
   },
   getConnectionBranches() {
     return [

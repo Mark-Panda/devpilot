@@ -75,8 +75,27 @@ func (n *LLMNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) {
 			Parts: []llms.ContentPart{llms.TextContent{Text: userContent}},
 		})
 	}
+	// 注入 Skill 系统提示，并支持“识别到即执行”：勾选启用的技能同时作为 tools，模型返回 tool_calls 时执行子轮 LLM
+	skills := n.client.Skills()
+	if len(n.config.EnabledSkillNames) > 0 && len(skills) > 0 {
+		skills = llm.FilterSkillsByNames(skills, n.config.EnabledSkillNames)
+	} else if len(n.config.EnabledSkillNames) == 0 {
+		skills = nil
+	}
+	if len(skills) > 0 {
+		skillPrompt := llm.BuildSkillSystemPrompt(skills, true)
+		messages = prependOrMergeSkillSystemPrompt(messages, skillPrompt)
+	}
 	opts := llm.CallOptionsFromParams(n.config.Params)
-	result, err := n.client.GenerateFromMessagesWithOptions(context.Background(), messages, opts)
+	var result string
+	var err error
+	if len(skills) > 0 {
+		tools := llm.SkillsToTools(skills)
+		executor := llm.NewSkillExecutor(n.client, skills)
+		result, err = n.client.GenerateWithToolLoop(context.Background(), messages, tools, opts, executor, llm.DefaultToolLoopMaxRounds)
+	} else {
+		result, err = n.client.GenerateFromMessagesWithOptions(context.Background(), messages, opts)
+	}
 	if err != nil {
 		log.Printf("[rulego] ai/llm node error: %v", err)
 		ctx.TellFailure(msg, err)
@@ -112,6 +131,34 @@ func replacePlaceholders(s string, m map[string]string) string {
 		s = strings.ReplaceAll(s, "${vars."+k+"}", v)
 	}
 	return s
+}
+
+// prependOrMergeSkillSystemPrompt 将 skill 系统提示并入 messages。
+// 若首条为 system，则把 skillPrompt 与现有内容合并；否则在开头插入一条 system 消息。
+func prependOrMergeSkillSystemPrompt(messages []llms.MessageContent, skillPrompt string) []llms.MessageContent {
+	if skillPrompt == "" || len(messages) == 0 {
+		return messages
+	}
+	if messages[0].Role == llms.ChatMessageTypeSystem && len(messages[0].Parts) > 0 {
+		if t, ok := messages[0].Parts[0].(llms.TextContent); ok {
+			merged := skillPrompt + "\n\n" + t.Text
+			out := make([]llms.MessageContent, len(messages))
+			copy(out, messages)
+			out[0] = llms.MessageContent{
+				Role:  llms.ChatMessageTypeSystem,
+				Parts: []llms.ContentPart{llms.TextContent{Text: merged}},
+			}
+			return out
+		}
+	}
+	// 开头不是 system 或无法合并，则在最前插入一条 system
+	out := make([]llms.MessageContent, 0, len(messages)+1)
+	out = append(out, llms.MessageContent{
+		Role:  llms.ChatMessageTypeSystem,
+		Parts: []llms.ContentPart{llms.TextContent{Text: skillPrompt}},
+	})
+	out = append(out, messages...)
+	return out
 }
 
 func init() {

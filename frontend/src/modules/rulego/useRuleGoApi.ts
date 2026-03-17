@@ -6,6 +6,7 @@ import {
   ExecuteRuleDefinition,
   GetExecutionLog,
   GetRuleGoRule,
+  ListAvailableSkills,
   ListExecutionLogs,
   ListRuleGoRules,
   LoadRuleChain,
@@ -117,4 +118,12 @@ export async function getExecutionLog(
 /** 删除一条执行日志及其节点步骤 */
 export async function deleteExecutionLog(executionId: string): Promise<void> {
   return DeleteExecutionLog(executionId);
+}
+
+/** ~/.devpilot/skills/ 下可勾选启用的技能项（供 LLM 节点配置使用） */
+export type AvailableSkillItem = { name: string; description: string };
+
+/** 列出默认技能目录下所有 SKILL.md 的 name/description，供 LLM 节点勾选启用 */
+export async function listAvailableSkills(): Promise<AvailableSkillItem[]> {
+  return ListAvailableSkills();
 }

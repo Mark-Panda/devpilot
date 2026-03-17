@@ -1,5 +1,17 @@
 package llm
 
+import (
+	"os"
+	"path/filepath"
+)
+
+// DefaultSkillDir 返回默认技能目录：~/.devpilot/skills/（与 Claude Code / OpenClaw 的“用户技能目录”一致）。
+// 当 Config.SkillDir 为空时，NewClient 会使用此目录。
+func DefaultSkillDir() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, ".devpilot", "skills")
+}
+
 // Config 自定义 LLM 组件配置（兼容 OpenAI API 的第三方服务）。
 // 除基础 baseUrl/apiKey/model 外，支持加载 skill 与 MCP 能力。
 type Config struct {
@@ -51,9 +63,10 @@ type NodeConfig struct {
 	SystemPrompt string        `json:"systemPrompt"`          // 系统提示，支持 ${} 占位符
 	Messages     []ChatMessage `json:"messages"`               // 上下文/用户消息列表
 	Images       []string     `json:"images"`                  // 图片 URL 列表（可选，多模态）
-	Params       *Params       `json:"params"`                 // 大模型参数
-	SkillDir     string        `json:"skill_dir,omitempty"`    // 扩展：技能目录
-	MCP          *MCPConfig    `json:"mcp,omitempty"`         // 扩展：MCP 配置
+	Params             *Params       `json:"params"`                   // 大模型参数
+	SkillDir           string        `json:"skill_dir,omitempty"`      // 扩展：技能目录，空则用 ~/.devpilot/skills/
+	EnabledSkillNames  []string      `json:"enabled_skill_names,omitempty"` // 扩展：勾选启用的技能名，仅这些会注入；空表示全部启用
+	MCP                *MCPConfig    `json:"mcp,omitempty"`            // 扩展：MCP 配置
 }
 
 // MCPConfig 描述 MCP 服务器配置，便于 LLM 调用 MCP 暴露的 tools/resources。

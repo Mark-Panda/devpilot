@@ -34,6 +34,10 @@ func NewClient(ctx context.Context, config Config) (*Client, error) {
 		return nil, err
 	}
 
+	// 默认使用 ~/.devpilot/skills/ 作为技能目录（与 Claude Code / OpenClaw 一致）
+	if config.SkillDir == "" {
+		config.SkillDir = DefaultSkillDir()
+	}
 	c := &Client{model: model, config: config}
 	if config.SkillDir != "" {
 		skills, err := LoadSkills(config.SkillDir)
@@ -102,6 +106,73 @@ func (c *Client) GenerateFromMessagesWithOptions(ctx context.Context, messages [
 		return "", ErrEmptyResponse
 	}
 	return resp.Choices[0].Content, nil
+}
+
+// DefaultToolLoopMaxRounds 工具调用循环最大轮数，避免无限递归。
+const DefaultToolLoopMaxRounds = 16
+
+// GenerateWithToolLoop 带工具调用的生成：传入 tools 与 ToolExecutor，当模型返回 tool_calls 时执行并继续，
+// 直到模型返回纯文本或达到 maxRounds。与 Claude Code / OpenClaw 的 MCP 调用流程一致。
+// 若 tools 为空或 executor 为 nil，行为等价于 GenerateFromMessagesWithOptions（不传 WithTools）。
+func (c *Client) GenerateWithToolLoop(ctx context.Context, messages []llms.MessageContent, tools []llms.Tool, opts []llms.CallOption, executor ToolExecutor, maxRounds int) (string, error) {
+	if len(opts) == 0 {
+		opts = c.callOptions()
+	}
+	if maxRounds <= 0 {
+		maxRounds = DefaultToolLoopMaxRounds
+	}
+	callOpts := make([]llms.CallOption, len(opts), len(opts)+1)
+	copy(callOpts, opts)
+	if len(tools) > 0 {
+		callOpts = append(callOpts, llms.WithTools(tools))
+	}
+
+	for round := 0; round < maxRounds; round++ {
+		resp, err := c.model.GenerateContent(ctx, messages, callOpts...)
+		if err != nil {
+			return "", err
+		}
+		if len(resp.Choices) == 0 {
+			return "", ErrEmptyResponse
+		}
+		choice := resp.Choices[0]
+		if len(choice.ToolCalls) == 0 || executor == nil {
+			return choice.Content, nil
+		}
+		// 追加 assistant 消息（含 tool_calls）
+		parts := make([]llms.ContentPart, 0, len(choice.ToolCalls)+1)
+		if choice.Content != "" {
+			parts = append(parts, llms.TextContent{Text: choice.Content})
+		}
+		for _, tc := range choice.ToolCalls {
+			parts = append(parts, tc)
+		}
+		messages = append(messages, llms.MessageContent{
+			Role:  llms.ChatMessageTypeAI,
+			Parts: parts,
+		})
+		// 执行每个 tool call 并追加 tool 结果消息
+		for _, tc := range choice.ToolCalls {
+			if tc.FunctionCall == nil {
+				continue
+			}
+			content, err := executor.Execute(ctx, tc.FunctionCall.Name, tc.FunctionCall.Arguments)
+			if err != nil {
+				content = "error: " + err.Error()
+			}
+			messages = append(messages, llms.MessageContent{
+				Role: llms.ChatMessageTypeTool,
+				Parts: []llms.ContentPart{
+					llms.ToolCallResponse{
+						ToolCallID: tc.ID,
+						Name:       tc.FunctionCall.Name,
+						Content:    content,
+					},
+				},
+			})
+		}
+	}
+	return "", ErrToolLoopMaxRounds
 }
 
 func (c *Client) callOptions() []llms.CallOption {

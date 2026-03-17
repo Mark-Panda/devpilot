@@ -3,7 +3,12 @@ import { useNavigate, useParams } from "react-router-dom";
 import * as ScratchBlocks from "scratch-blocks";
 import type { WorkspaceSvg, Block, BlockSvg } from "blockly/core";
 import { useRuleGoRules } from "./useRuleGoRules";
-import { executeRuleGoRuleByDefinition, type ExecuteRuleOutput } from "./useRuleGoApi";
+import {
+  executeRuleGoRuleByDefinition,
+  listAvailableSkills,
+  type AvailableSkillItem,
+  type ExecuteRuleOutput,
+} from "./useRuleGoApi";
 import {
   registerAllBlocks,
   toolbox as rulegoToolbox,
@@ -68,6 +73,7 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
   const block = blockId && workspaceRef.current ? workspaceRef.current.getBlockById(blockId) : null;
   const [form, setForm] = useState<Record<string, string | boolean>>({});
   const [switchCases, setSwitchCases] = useState<CaseItem[]>([{ case: "true", then: "Case1" }]);
+  const [availableSkills, setAvailableSkills] = useState<AvailableSkillItem[]>([]);
 
   useEffect(() => {
     if (!block) {
@@ -105,6 +111,7 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
       next.LLM_SYSTEM_PROMPT = get("LLM_SYSTEM_PROMPT");
       next.LLM_MESSAGES_JSON = get("LLM_MESSAGES_JSON") || "[]";
       next.LLM_PARAMS_JSON = get("LLM_PARAMS_JSON") || "{}";
+      next.LLM_ENABLED_SKILLS_JSON = get("LLM_ENABLED_SKILLS_JSON") || "[]";
     }
     if (block.type === "rulego_delay") {
       next.DELAY_MS = get("DELAY_MS") || "60000";
@@ -144,6 +151,16 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
     }
     setForm(next);
   }, [block, blockId]);
+
+  useEffect(() => {
+    if (block?.type !== "rulego_llm") {
+      setAvailableSkills([]);
+      return;
+    }
+    listAvailableSkills()
+      .then(setAvailableSkills)
+      .catch(() => setAvailableSkills([]));
+  }, [block?.type, blockId]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -594,6 +611,42 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
                     />
                     <small className="form-hint">每项: {`{ "role": "user" | "assistant", "content": "..." }`}，留空 [] 则使用 msg.Data 作为单条用户消息</small>
                   </label>
+                  <div className="form-field" style={{ gridColumn: "1 / -1" }}>
+                    <span className="form-label">启用技能（~/.devpilot/skills/）</span>
+                    <small className="form-hint" style={{ display: "block", marginBottom: 8 }}>
+                      勾选的技能会注入系统提示，模型可按描述调用；不勾选则不注入任何技能
+                    </small>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6, maxHeight: 200, overflowY: "auto", padding: "8px 0" }}>
+                      {availableSkills.length === 0 ? (
+                        <span className="form-hint">暂无技能或未读取到 ~/.devpilot/skills/</span>
+                      ) : (
+                        availableSkills.map((sk) => {
+                          const raw = String(form.LLM_ENABLED_SKILLS_JSON ?? "[]");
+                          let enabled: string[] = [];
+                          try {
+                            const parsed = JSON.parse(raw);
+                            enabled = Array.isArray(parsed) ? parsed : [];
+                          } catch {
+                            enabled = [];
+                          }
+                          const checked = enabled.includes(sk.name);
+                          const toggle = () => {
+                            const next = checked ? enabled.filter((n) => n !== sk.name) : [...enabled, sk.name];
+                            setForm((f) => ({ ...f, LLM_ENABLED_SKILLS_JSON: JSON.stringify(next) }));
+                          };
+                          return (
+                            <label key={sk.name} style={{ display: "flex", alignItems: "flex-start", gap: 8, cursor: "pointer" }}>
+                              <input type="checkbox" checked={checked} onChange={toggle} />
+                              <span>
+                                <strong>{sk.name}</strong>
+                                {sk.description ? ` — ${sk.description.slice(0, 80)}${sk.description.length > 80 ? "…" : ""}` : ""}
+                              </span>
+                            </label>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
                   <label className="form-field" style={{ gridColumn: "1 / -1" }}>
                     <span>大模型参数 (params)</span>
                     <JsonEditor

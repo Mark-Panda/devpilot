@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"devpilot/backend/internal/llm"
 	"devpilot/backend/internal/store/models"
 	"devpilot/backend/internal/store/pebble"
 )
@@ -176,4 +177,23 @@ func (s *Service) DeleteExecutionLog(executionID string) error {
 		return pebble.ErrNotFound
 	}
 	return s.execLogStore.DeleteExecutionLog(context.Background(), executionID)
+}
+
+// AvailableSkillItem 表示 ~/.devpilot/skills/ 下可勾选的一项技能（供 LLM 节点配置使用）
+type AvailableSkillItem struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// ListAvailableSkills 返回默认技能目录 ~/.devpilot/skills/ 下所有 SKILL.md 的 name 与 description，供前端勾选启用
+func (s *Service) ListAvailableSkills() ([]AvailableSkillItem, error) {
+	skills, err := llm.LoadSkills(llm.DefaultSkillDir())
+	if err != nil {
+		return nil, err
+	}
+	out := make([]AvailableSkillItem, 0, len(skills))
+	for _, sk := range skills {
+		out = append(out, AvailableSkillItem{Name: sk.Name, Description: sk.Description})
+	}
+	return out, nil
 }

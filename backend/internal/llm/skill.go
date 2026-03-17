@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/tmc/langchaingo/llms"
 	"gopkg.in/yaml.v3"
 )
 
@@ -89,6 +90,56 @@ func parseSkillMD(data []byte) (*Skill, error) {
 		}
 	}
 	return s, nil
+}
+
+// FilterSkillsByNames 只保留 name 在 names 中的技能（names 为空则返回原列表，表示全部启用）。
+func FilterSkillsByNames(skills []Skill, names []string) []Skill {
+	if len(names) == 0 {
+		return skills
+	}
+	set := make(map[string]bool, len(names))
+	for _, n := range names {
+		set[strings.TrimSpace(n)] = true
+	}
+	var out []Skill
+	for _, s := range skills {
+		if set[s.Name] {
+			out = append(out, s)
+		}
+	}
+	return out
+}
+
+// skillToolParams 技能作为 tool 时的参数 schema，供模型传入输入/上下文
+var skillToolParams = map[string]any{
+	"type": "object",
+	"properties": map[string]any{
+		"input": map[string]any{
+			"type":        "string",
+			"description": "Input or context for this skill (e.g. user request, task description)",
+		},
+	},
+}
+
+// SkillsToTools 将技能列表转为 langchaingo 的 llms.Tool，供 WithTools 与 GenerateWithToolLoop 使用。
+// 模型返回 tool_calls 时，可通过 ToolExecutor（如 NewSkillExecutor）真正执行对应技能。
+func SkillsToTools(skills []Skill) []llms.Tool {
+	if len(skills) == 0 {
+		return nil
+	}
+	tools := make([]llms.Tool, 0, len(skills))
+	for i := range skills {
+		s := &skills[i]
+		tools = append(tools, llms.Tool{
+			Type: "function",
+			Function: &llms.FunctionDefinition{
+				Name:        s.Name,
+				Description: s.Description,
+				Parameters:  skillToolParams,
+			},
+		})
+	}
+	return tools
 }
 
 // BuildSkillSystemPrompt 将已加载的 skills 拼成一段系统提示，供 LLM 使用。
