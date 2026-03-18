@@ -244,6 +244,7 @@ export default function CurlComparePage() {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<CompareCurlOutput | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [fullscreen, setFullscreen] = useState(false);
 
   const canSubmit = useMemo(() => {
     return (
@@ -333,7 +334,45 @@ export default function CurlComparePage() {
         <div className="curl-compare-submit-err">{submitError}</div>
       )}
 
-      {result && <ResultView result={result} />}
+      {result && (
+        <>
+          <div className="curl-compare-result-wrap">
+            <div className="curl-compare-result-toolbar">
+              <button
+                type="button"
+                className="curl-compare-fullscreen-btn"
+                onClick={() => setFullscreen(true)}
+                title="全屏查看"
+              >
+                全屏
+              </button>
+            </div>
+            <ResultView result={result} />
+          </div>
+          {fullscreen && (
+            <div
+              className="curl-compare-fullscreen"
+              role="dialog"
+              aria-modal="true"
+              aria-label="接口对比结果全屏"
+            >
+              <div className="curl-compare-fullscreen-header">
+                <span className="curl-compare-fullscreen-title">接口对比结果</span>
+                <button
+                  type="button"
+                  className="curl-compare-fullscreen-close"
+                  onClick={() => setFullscreen(false)}
+                >
+                  退出全屏
+                </button>
+              </div>
+              <div className="curl-compare-fullscreen-body">
+                <ResultView result={result} />
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

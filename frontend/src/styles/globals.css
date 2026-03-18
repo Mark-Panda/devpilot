@@ -1706,6 +1706,81 @@ body {
   margin-top: 24px;
 }
 
+.curl-compare-result-wrap {
+  position: relative;
+  margin-top: 24px;
+}
+
+.curl-compare-result-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.curl-compare-fullscreen-btn {
+  font-size: 13px;
+  color: #64748b;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  padding: 6px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.curl-compare-fullscreen-btn:hover {
+  color: #2563eb;
+  border-color: #2563eb;
+}
+
+/* 全屏遮罩 */
+.curl-compare-fullscreen {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.curl-compare-fullscreen-header {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 20px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.curl-compare-fullscreen-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.curl-compare-fullscreen-close {
+  font-size: 14px;
+  color: #64748b;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  padding: 8px 16px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.curl-compare-fullscreen-close:hover {
+  color: #2563eb;
+  border-color: #2563eb;
+}
+
+.curl-compare-fullscreen-body {
+  flex: 1;
+  overflow: auto;
+  padding: 20px 24px;
+}
+
 /* 一行状态摘要 */
 .curl-compare-status-inline {
   font-size: 13px;
