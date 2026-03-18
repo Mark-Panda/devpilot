@@ -1704,61 +1704,32 @@ body {
 
 .curl-compare-result {
   margin-top: 24px;
-  padding: 20px;
-  background: #fff;
-  border-radius: 12px;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
 }
 
-.curl-compare-status-row {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 16px;
-}
-
-.curl-compare-status-card {
-  flex: 1;
-  padding: 14px 16px;
-  border-radius: 10px;
-  border: 1px solid #e2e8f0;
-}
-
-.curl-compare-status-card.ok {
-  border-color: #86efac;
-  background: #f0fdf4;
-}
-
-.curl-compare-status-card.err {
-  border-color: #fecaca;
-  background: #fef2f2;
-}
-
-.curl-compare-status-label {
-  display: block;
-  font-size: 12px;
-  font-weight: 600;
-  color: #64748b;
-  margin-bottom: 4px;
-}
-
-.curl-compare-status-code {
-  font-size: 18px;
-  font-weight: 700;
-  color: #0f172a;
-}
-
-.curl-compare-status-err {
-  display: block;
-  margin-top: 6px;
+/* 一行状态摘要 */
+.curl-compare-status-inline {
   font-size: 13px;
+  color: #64748b;
+  margin-bottom: 16px;
+  padding: 8px 0;
+}
+
+.curl-compare-status-inline-item strong.ok {
+  color: #15803d;
+}
+
+.curl-compare-status-inline-item strong.err {
   color: #b91c1c;
 }
 
-.curl-compare-status-meta {
-  display: block;
-  margin-top: 4px;
+.curl-compare-status-inline-item .err-msg {
+  color: #b91c1c;
   font-size: 12px;
-  color: #64748b;
+}
+
+.curl-compare-status-inline-sep {
+  margin: 0 10px;
+  color: #cbd5e1;
 }
 
 .curl-compare-parse-err {
@@ -1777,36 +1748,72 @@ body {
   color: #64748b;
 }
 
-.curl-compare-diff-summary {
+/* 核心：数据差异区块 — 视觉重心 */
+.curl-compare-diff-section {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px 24px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+  border: 1px solid #e2e8f0;
   margin-bottom: 16px;
-  font-size: 14px;
-  color: #475569;
 }
 
-.curl-compare-diff-summary strong {
+.curl-compare-diff-section-title {
+  margin: 0 0 6px;
+  font-size: 18px;
+  font-weight: 700;
   color: #0f172a;
+}
+
+.curl-compare-diff-count {
+  display: inline-block;
+  min-width: 1.6em;
+  margin-left: 6px;
+  padding: 2px 8px;
+  font-size: 14px;
+  font-weight: 700;
+  background: #fee2e2;
+  color: #991b1b;
+  border-radius: 6px;
+}
+
+.curl-compare-diff-section-desc {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: #64748b;
 }
 
 .curl-compare-no-diff {
   margin: 0;
-  padding: 12px 16px;
+  padding: 16px 20px;
   background: #f0fdf4;
-  border-radius: 8px;
+  border-radius: 10px;
   color: #166534;
+  font-size: 15px;
+  font-weight: 500;
+}
+
+.curl-compare-diff-placeholder {
+  margin: 0;
+  padding: 16px 20px;
+  background: #fef3c7;
+  border-radius: 10px;
+  color: #92400e;
   font-size: 14px;
 }
 
 .curl-compare-diff-list {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
 }
 
 .curl-compare-diff-row {
-  padding: 14px 16px;
+  padding: 16px 18px;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
-  background: #f8fafc;
+  background: #fafbfc;
+  border-left: 3px solid #94a3b8;
 }
 
 .curl-compare-diff-head {
@@ -1912,20 +1919,31 @@ body {
   color: #94a3b8;
 }
 
-/* 请求与响应日志 */
+/* 请求与响应日志：可折叠 */
+.curl-compare-request-log-wrap {
+  margin-top: 8px;
+}
+
+.curl-compare-log-toggle {
+  font-size: 13px;
+  color: #64748b;
+  background: none;
+  border: none;
+  padding: 6px 0;
+  cursor: pointer;
+}
+
+.curl-compare-log-toggle:hover {
+  color: #2563eb;
+  text-decoration: underline;
+}
+
 .curl-compare-request-log {
-  margin-top: 20px;
+  margin-top: 12px;
   padding: 16px;
   background: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
-}
-
-.curl-compare-log-title {
-  margin: 0 0 12px;
-  font-size: 14px;
-  font-weight: 600;
-  color: #475569;
 }
 
 .curl-compare-log-grid {

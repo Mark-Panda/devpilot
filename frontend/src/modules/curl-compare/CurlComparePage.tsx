@@ -72,159 +72,166 @@ function DiffRow({ d }: { d: JSONDiffItem }) {
 }
 
 function ResultView({ result }: { result: CompareCurlOutput }) {
+  const [logExpanded, setLogExpanded] = useState(false);
   const hasError =
     result.parse_curl_error ||
     result.source_body_err ||
     result.target_body_err;
   const okSource = !result.source_body_err && result.source_status >= 200 && result.source_status < 300;
   const okTarget = !result.target_body_err && result.target_status >= 200 && result.target_status < 300;
-
   const hasRequestLog =
     result.source_request_url ||
     result.target_request_url ||
     result.request_method;
+  const hasDiffs = result.diffs && result.diffs.length > 0;
+  const noDiffYet = !hasError && result.diff_count === 0 && result.source_status !== 0;
 
   return (
     <div className="curl-compare-result">
-      <div className="curl-compare-status-row">
-        <div
-          className={`curl-compare-status-card ${okSource ? "ok" : "err"}`}
-        >
-          <span className="curl-compare-status-label">来源响应</span>
-          <span className="curl-compare-status-code">{result.source_status || "—"}</span>
-          {result.source_body_err && (
-            <span className="curl-compare-status-err">{result.source_body_err}</span>
-          )}
-          {!result.source_body_err && (
-            <span className="curl-compare-status-meta">
-              Body 长度: {result.source_body_len}
-            </span>
-          )}
-        </div>
-        <div
-          className={`curl-compare-status-card ${okTarget ? "ok" : "err"}`}
-        >
-          <span className="curl-compare-status-label">目标响应</span>
-          <span className="curl-compare-status-code">{result.target_status || "—"}</span>
-          {result.target_body_err && (
-            <span className="curl-compare-status-err">{result.target_body_err}</span>
-          )}
-          {!result.target_body_err && (
-            <span className="curl-compare-status-meta">
-              Body 长度: {result.target_body_len}
-            </span>
-          )}
-        </div>
-      </div>
-
-      {hasRequestLog && (
-        <div className="curl-compare-request-log">
-          <h4 className="curl-compare-log-title">请求与响应日志</h4>
-          <div className="curl-compare-log-grid">
-            <div className="curl-compare-log-block">
-              <div className="curl-compare-log-head">请求参数（共用）</div>
-              <div className="curl-compare-log-body">
-                {result.request_method && (
-                  <div className="curl-compare-log-line">
-                    <span className="curl-compare-log-key">Method</span>{" "}
-                    {result.request_method}
-                  </div>
-                )}
-                {result.request_headers && (
-                  <div className="curl-compare-log-line">
-                    <span className="curl-compare-log-key">Headers</span>
-                    <pre className="curl-compare-log-pre">{result.request_headers}</pre>
-                  </div>
-                )}
-                {result.request_body !== undefined && result.request_body !== "" && (
-                  <div className="curl-compare-log-line">
-                    <span className="curl-compare-log-key">Body</span>
-                    <pre className="curl-compare-log-pre">{result.request_body || "(空)"}</pre>
-                  </div>
-                )}
-                {!result.request_method && !result.request_headers && (result.request_body === undefined || result.request_body === "") && (
-                  <div className="curl-compare-log-line">—</div>
-                )}
-              </div>
-            </div>
-            <div className="curl-compare-log-block">
-              <div className="curl-compare-log-head">来源请求</div>
-              <div className="curl-compare-log-body">
-                <div className="curl-compare-log-line">
-                  <span className="curl-compare-log-key">URL</span>
-                  <pre className="curl-compare-log-pre curl-compare-log-url">{result.source_request_url || "—"}</pre>
-                </div>
-              </div>
-            </div>
-            <div className="curl-compare-log-block">
-              <div className="curl-compare-log-head">来源响应</div>
-              <div className="curl-compare-log-body">
-                <div className="curl-compare-log-line">
-                  <span className="curl-compare-log-key">Status</span> {result.source_status ?? "—"}
-                </div>
-                {result.source_response_preview !== undefined && result.source_response_preview !== "" && (
-                  <div className="curl-compare-log-line">
-                    <span className="curl-compare-log-key">Body</span>
-                    <pre className="curl-compare-log-pre curl-compare-log-response">{result.source_response_preview}</pre>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="curl-compare-log-block">
-              <div className="curl-compare-log-head">目标请求</div>
-              <div className="curl-compare-log-body">
-                <div className="curl-compare-log-line">
-                  <span className="curl-compare-log-key">URL</span>
-                  <pre className="curl-compare-log-pre curl-compare-log-url">{result.target_request_url || "—"}</pre>
-                </div>
-              </div>
-            </div>
-            <div className="curl-compare-log-block">
-              <div className="curl-compare-log-head">目标响应</div>
-              <div className="curl-compare-log-body">
-                <div className="curl-compare-log-line">
-                  <span className="curl-compare-log-key">Status</span> {result.target_status ?? "—"}
-                </div>
-                {result.target_response_preview !== undefined && result.target_response_preview !== "" && (
-                  <div className="curl-compare-log-line">
-                    <span className="curl-compare-log-key">Body</span>
-                    <pre className="curl-compare-log-pre curl-compare-log-response">{result.target_response_preview}</pre>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
+      {/* 顶部错误：解析错误或请求错误 */}
       {result.parse_curl_error && (
         <div className="curl-compare-parse-err">
           curl 解析错误: {result.parse_curl_error}
         </div>
       )}
-
       {hasError && !result.parse_curl_error && (
         <p className="curl-compare-hint">
           请检查来源 URL、目标 URL 是否可访问，以及 curl 命令格式是否正确。
         </p>
       )}
 
-      {result.diff_count >= 0 && (
-        <div className="curl-compare-diff-summary">
-          共发现 <strong>{result.diff_count}</strong> 处差异（以来源 JSON 为基准，对比目标中是否存在且一致）
-        </div>
-      )}
+      {/* 一行状态摘要：不抢差异的视线 */}
+      <div className="curl-compare-status-inline">
+        <span className="curl-compare-status-inline-item">
+          来源 <strong className={okSource ? "ok" : "err"}>{result.source_status || "—"}</strong>
+          {result.source_body_err && <span className="err-msg"> {result.source_body_err}</span>}
+        </span>
+        <span className="curl-compare-status-inline-sep">·</span>
+        <span className="curl-compare-status-inline-item">
+          目标 <strong className={okTarget ? "ok" : "err"}>{result.target_status || "—"}</strong>
+          {result.target_body_err && <span className="err-msg"> {result.target_body_err}</span>}
+        </span>
+      </div>
 
-      {result.diffs && result.diffs.length > 0 && (
-        <div className="curl-compare-diff-list">
-          {result.diffs.map((d, i) => (
-            <DiffRow key={`${d.path}-${i}`} d={d} />
-          ))}
-        </div>
-      )}
+      {/* 核心：数据差异对比 — 置顶且视觉最重 */}
+      <section className="curl-compare-diff-section" aria-label="数据差异对比">
+        <h3 className="curl-compare-diff-section-title">
+          {hasDiffs ? (
+            <>数据差异 <span className="curl-compare-diff-count">{result.diff_count}</span> 处</>
+          ) : (
+            "数据差异"
+          )}
+        </h3>
+        {hasDiffs && (
+          <p className="curl-compare-diff-section-desc">
+            以来源 JSON 为基准，对比目标中是否存在且一致
+          </p>
+        )}
+        {hasDiffs && (
+          <div className="curl-compare-diff-list">
+            {result.diffs!.map((d, i) => (
+              <DiffRow key={`${d.path}-${i}`} d={d} />
+            ))}
+          </div>
+        )}
+        {noDiffYet && (
+          <p className="curl-compare-no-diff">两份 JSON 结果一致，无差异。</p>
+        )}
+        {hasError && !hasDiffs && !noDiffYet && (
+          <p className="curl-compare-diff-placeholder">请求异常或响应非 JSON，无法对比。</p>
+        )}
+      </section>
 
-      {!hasError && result.diff_count === 0 && result.source_status !== 0 && (
-        <p className="curl-compare-no-diff">两份 JSON 结果一致，无差异。</p>
+      {/* 请求与响应日志：可折叠，默认收起 */}
+      {hasRequestLog && (
+        <div className="curl-compare-request-log-wrap">
+          <button
+            type="button"
+            className="curl-compare-log-toggle"
+            onClick={() => setLogExpanded((e) => !e)}
+            aria-expanded={logExpanded}
+          >
+            {logExpanded ? "收起" : "查看"}请求与响应日志
+          </button>
+          {logExpanded && (
+            <div className="curl-compare-request-log">
+              <div className="curl-compare-log-grid">
+                <div className="curl-compare-log-block">
+                  <div className="curl-compare-log-head">请求参数（共用）</div>
+                  <div className="curl-compare-log-body">
+                    {result.request_method && (
+                      <div className="curl-compare-log-line">
+                        <span className="curl-compare-log-key">Method</span>{" "}
+                        {result.request_method}
+                      </div>
+                    )}
+                    {result.request_headers && (
+                      <div className="curl-compare-log-line">
+                        <span className="curl-compare-log-key">Headers</span>
+                        <pre className="curl-compare-log-pre">{result.request_headers}</pre>
+                      </div>
+                    )}
+                    {result.request_body !== undefined && result.request_body !== "" && (
+                      <div className="curl-compare-log-line">
+                        <span className="curl-compare-log-key">Body</span>
+                        <pre className="curl-compare-log-pre">{result.request_body || "(空)"}</pre>
+                      </div>
+                    )}
+                    {!result.request_method && !result.request_headers && (result.request_body === undefined || result.request_body === "") && (
+                      <div className="curl-compare-log-line">—</div>
+                    )}
+                  </div>
+                </div>
+                <div className="curl-compare-log-block">
+                  <div className="curl-compare-log-head">来源请求</div>
+                  <div className="curl-compare-log-body">
+                    <div className="curl-compare-log-line">
+                      <span className="curl-compare-log-key">URL</span>
+                      <pre className="curl-compare-log-pre curl-compare-log-url">{result.source_request_url || "—"}</pre>
+                    </div>
+                  </div>
+                </div>
+                <div className="curl-compare-log-block">
+                  <div className="curl-compare-log-head">来源响应</div>
+                  <div className="curl-compare-log-body">
+                    <div className="curl-compare-log-line">
+                      <span className="curl-compare-log-key">Status</span> {result.source_status ?? "—"}
+                    </div>
+                    {result.source_response_preview !== undefined && result.source_response_preview !== "" && (
+                      <div className="curl-compare-log-line">
+                        <span className="curl-compare-log-key">Body</span>
+                        <pre className="curl-compare-log-pre curl-compare-log-response">{result.source_response_preview}</pre>
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="curl-compare-log-block">
+                  <div className="curl-compare-log-head">目标请求</div>
+                  <div className="curl-compare-log-body">
+                    <div className="curl-compare-log-line">
+                      <span className="curl-compare-log-key">URL</span>
+                      <pre className="curl-compare-log-pre curl-compare-log-url">{result.target_request_url || "—"}</pre>
+                    </div>
+                  </div>
+                </div>
+                <div className="curl-compare-log-block">
+                  <div className="curl-compare-log-head">目标响应</div>
+                  <div className="curl-compare-log-body">
+                    <div className="curl-compare-log-line">
+                      <span className="curl-compare-log-key">Status</span> {result.target_status ?? "—"}
+                    </div>
+                    {result.target_response_preview !== undefined && result.target_response_preview !== "" && (
+                      <div className="curl-compare-log-line">
+                        <span className="curl-compare-log-key">Body</span>
+                        <pre className="curl-compare-log-pre curl-compare-log-response">{result.target_response_preview}</pre>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
