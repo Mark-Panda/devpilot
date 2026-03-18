@@ -32,13 +32,29 @@ func NodeConfigToConfig(nc *NodeConfig) Config {
 	return cfg
 }
 
+// BuildSystemUserMessages 构建仅含一条 system（可选）与一条 user 的 MessageContent 列表，供统一复用。
+func BuildSystemUserMessages(systemPrompt, userMessage string) []llms.MessageContent {
+	var out []llms.MessageContent
+	if systemPrompt != "" {
+		out = append(out, llms.MessageContent{
+			Role:  llms.ChatMessageTypeSystem,
+			Parts: []llms.ContentPart{llms.TextContent{Text: systemPrompt}},
+		})
+	}
+	out = append(out, llms.MessageContent{
+		Role:  llms.ChatMessageTypeHuman,
+		Parts: []llms.ContentPart{llms.TextContent{Text: userMessage}},
+	})
+	return out
+}
+
 // BuildMessageContentFromNodeConfig 将 NodeConfig 的 systemPrompt + messages 转为 langchaingo MessageContent 列表。
 // substitute 用于替换 content 中的 ${key} 占位符，可为 nil。
 func BuildMessageContentFromNodeConfig(nc *NodeConfig, substitute map[string]string) []llms.MessageContent {
 	var out []llms.MessageContent
 	systemPrompt := nc.SystemPrompt
 	if len(substitute) > 0 {
-		systemPrompt = replacePlaceholders(systemPrompt, substitute)
+		systemPrompt = ReplacePlaceholders(systemPrompt, substitute)
 	}
 	if systemPrompt != "" {
 		out = append(out, llms.MessageContent{
@@ -49,7 +65,7 @@ func BuildMessageContentFromNodeConfig(nc *NodeConfig, substitute map[string]str
 	for _, m := range nc.Messages {
 		content := m.Content
 		if len(substitute) > 0 {
-			content = replacePlaceholders(content, substitute)
+			content = ReplacePlaceholders(content, substitute)
 		}
 		role := llms.ChatMessageTypeHuman
 		if strings.ToLower(strings.TrimSpace(m.Role)) == "assistant" {
@@ -63,7 +79,8 @@ func BuildMessageContentFromNodeConfig(nc *NodeConfig, substitute map[string]str
 	return out
 }
 
-func replacePlaceholders(s string, m map[string]string) string {
+// ReplacePlaceholders 将 s 中的 ${key} 与 ${vars.key} 用 m 替换，供节点配置与消息模板复用。
+func ReplacePlaceholders(s string, m map[string]string) string {
 	for k, v := range m {
 		s = strings.ReplaceAll(s, "${"+k+"}", v)
 		s = strings.ReplaceAll(s, "${vars."+k+"}", v)

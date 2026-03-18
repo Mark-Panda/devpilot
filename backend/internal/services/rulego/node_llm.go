@@ -60,7 +60,7 @@ func (n *LLMNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) {
 	} else {
 		// 未配置 messages 时：systemPrompt（可选）+ 单条或多轮消息（来自 msg.Data）
 		if n.config.SystemPrompt != "" {
-			system := replacePlaceholders(n.config.SystemPrompt, substitute)
+			system := llm.ReplacePlaceholders(n.config.SystemPrompt, substitute)
 			messages = append(messages, llms.MessageContent{
 				Role:  llms.ChatMessageTypeSystem,
 				Parts: []llms.ContentPart{llms.TextContent{Text: system}},
@@ -192,14 +192,6 @@ func buildSubstituteFromMsg(msg types.RuleMsg) map[string]string {
 		return nil
 	}
 	return msg.Metadata.GetReadOnlyValues()
-}
-
-func replacePlaceholders(s string, m map[string]string) string {
-	for k, v := range m {
-		s = strings.ReplaceAll(s, "${"+k+"}", v)
-		s = strings.ReplaceAll(s, "${vars."+k+"}", v)
-	}
-	return s
 }
 
 // maskAPIKey 脱敏 API Key 用于日志：前 6 位 + *** + 后 4 位，便于排查配置错误又避免泄露。
