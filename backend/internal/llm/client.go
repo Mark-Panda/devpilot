@@ -2,11 +2,22 @@ package llm
 
 import (
 	"context"
+	"log"
 	"strings"
 
 	"github.com/tmc/langchaingo/llms"
 	"github.com/tmc/langchaingo/llms/openai"
 )
+
+// truncateForLog 截断字符串用于日志，避免过长；换行改为空格。
+func truncateForLog(s string, maxLen int) string {
+	s = strings.ReplaceAll(s, "\n", " ")
+	s = strings.TrimSpace(s)
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
+}
 
 // Client 基于 langchaingo 的自定义 LLM 客户端，支持 baseUrl/apiKey/model、Skill 与 MCP 配置。
 type Client struct {
@@ -129,7 +140,9 @@ func (c *Client) GenerateFromMessagesWithOptions(ctx context.Context, messages [
 	if len(resp.Choices) == 0 {
 		return "", ErrEmptyResponse
 	}
-	return resp.Choices[0].Content, nil
+	content := resp.Choices[0].Content
+	log.Printf("[llm] 大模型响应 contentLen=%d preview=%s", len(content), truncateForLog(content, 200))
+	return content, nil
 }
 
 // DefaultToolLoopMaxRounds 工具调用循环最大轮数，避免无限递归。
@@ -160,6 +173,18 @@ func (c *Client) GenerateWithToolLoop(ctx context.Context, messages []llms.Messa
 			return "", ErrEmptyResponse
 		}
 		choice := resp.Choices[0]
+		if choice.Content != "" {
+			log.Printf("[llm] 大模型响应 round=%d contentLen=%d preview=%s", round+1, len(choice.Content), truncateForLog(choice.Content, 200))
+		}
+		if len(choice.ToolCalls) > 0 {
+			names := make([]string, 0, len(choice.ToolCalls))
+			for _, tc := range choice.ToolCalls {
+				if tc.FunctionCall != nil {
+					names = append(names, tc.FunctionCall.Name)
+				}
+			}
+			log.Printf("[llm] 大模型响应 round=%d tool_calls=%v", round+1, names)
+		}
 		if len(choice.ToolCalls) == 0 || executor == nil {
 			return choice.Content, nil
 		}
@@ -180,10 +205,14 @@ func (c *Client) GenerateWithToolLoop(ctx context.Context, messages []llms.Messa
 			if tc.FunctionCall == nil {
 				continue
 			}
-			content, err := executor.Execute(ctx, tc.FunctionCall.Name, tc.FunctionCall.Arguments)
+			name := tc.FunctionCall.Name
+			args := tc.FunctionCall.Arguments
+			log.Printf("[llm] tool 调用 name=%s argumentsLen=%d", name, len(args))
+			content, err := executor.Execute(ctx, name, args)
 			if err != nil {
 				content = "error: " + err.Error()
 			}
+			log.Printf("[llm] tool 返回 name=%s success=%v resultLen=%d", name, err == nil, len(content))
 			messages = append(messages, llms.MessageContent{
 				Role: llms.ChatMessageTypeTool,
 				Parts: []llms.ContentPart{

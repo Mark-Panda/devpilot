@@ -147,9 +147,25 @@ func main() {
 - **`enabled_skill_names`**：勾选启用的技能名列表（如 `["create-rule", "feishu-doc"]`）。仅列表中的技能会注入系统提示；**为空表示不注入任何技能**。在可视化编辑器中打开 LLM 块配置时可勾选「启用技能」。
 - **`mcp`**：MCP 配置（结构见上文）；完整工具调用需在业务层提供 tools 与 `ToolExecutor` 后使用 `GenerateWithToolLoop`。
 
+### 技能 `command`：规则链中直接执行脚本
+
+在 SKILL.md 的 YAML frontmatter 中可增加 **`command`** 字段。当 LLM 节点识别到模型调用了该技能时，会**直接执行该命令**（以技能所在目录为工作目录，tool 的 arguments 作为标准输入），并等待命令结束后将标准输出作为结果返回，从而真正跑完脚本而非“再问一轮 LLM”。
+
+示例（api-route-tracer）：
+
+```yaml
+---
+name: api-route-tracer
+description: ...
+command: "python3 scripts/run_skill.py"
+---
+```
+
+命令通过 `sh -c` 执行；标准输入为一次 tool 调用的 arguments 字符串（通常为 JSON）。若脚本需要 URL、method、scope 等，可在技能目录下提供 `run_skill.py` 等包装脚本：从 stdin 读 JSON、解析后调用原有 `trace_api.sh` / `trace_api.py`。
+
 ### 行为说明
 
-- **Skill 注入与执行**：节点从 `skill_dir`（或默认 `~/.devpilot/skills/`）加载 SKILL.md。仅当 **`enabled_skill_names` 非空**时：将勾选技能的 **name + description** 并入系统提示，并把这些技能转为 **tools** 传入模型；当模型返回 **tool_calls**（识别到要调用某技能）时，节点会执行该技能：以技能正文为系统提示、传入参数为用户输入，做一次子轮 LLM 调用，结果回传后继续生成，从而**成功调用**。未勾选任何技能时不注入、也不暴露 tools。
+- **Skill 注入与执行**：节点从 `skill_dir`（或默认 `~/.devpilot/skills/`）加载 SKILL.md。仅当 **`enabled_skill_names` 非空**时：将勾选技能的 **name + description** 并入系统提示，并把这些技能转为 **tools** 传入模型；当模型返回 **tool_calls**（识别到要调用某技能）时，节点会**真正执行**该技能，执行顺序为：**(1) 若 SKILL 的 frontmatter 中配置了 `command`**：在技能目录下执行该命令，将 tool 的 arguments（JSON 字符串）作为**标准输入**传入，等待命令结束并取其标准输出作为结果返回，实现“直接跑脚本”；**(2) 若配置了 `rule_chain_id`**：调用对应规则链并返回结果；**(3) 否则**：以技能正文为系统提示、传入参数为用户输入做一次子轮 LLM 调用。未勾选任何技能时不注入、也不暴露 tools。
 - 若配置了 **messages**：使用 `systemPrompt` + **messages** 作为对话内容，其中 `systemPrompt` 与各条 `content` 中的 `${key}`、`${vars.key}` 会用当前消息的 **metadata** 替换。
 - 若未配置 **messages**：使用 **systemPrompt**（可选）+ 当前消息的 **msg.Data** 作为单条用户消息调用大模型，结果写回 **msg.Data** 并走 Success 下游。
 

@@ -12,12 +12,14 @@ import (
 )
 
 type Service struct {
-	store       *Store
-	execLogStore *ExecutionLogStore
+	store          *Store
+	execLogStore   *ExecutionLogStore
+	llmConfigLister LLMConfigLister // 可选：用于执行时用模型管理中的 API Key 覆盖 ai/llm 节点 key
 }
 
-func NewService(store *Store, execLogStore *ExecutionLogStore) *Service {
-	s := &Service{store: store, execLogStore: execLogStore}
+// NewService 创建 RuleGo 服务。llmConfigLister 可选，非 nil 时执行/加载规则链前会用模型管理中的配置覆盖 ai/llm 的 key。
+func NewService(store *Store, execLogStore *ExecutionLogStore, llmConfigLister LLMConfigLister) *Service {
+	s := &Service{store: store, execLogStore: execLogStore, llmConfigLister: llmConfigLister}
 	if execLogStore != nil {
 		SetGlobalExecutionLogStore(execLogStore)
 	}

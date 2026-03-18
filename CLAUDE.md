@@ -4,6 +4,8 @@
 
 Wails + Go 后端 + React 前端。项目架构参考根目录的 devpilot-architecture.md。
 
+**Go 版本**：需 **Go 1.24+**（依赖链使用标准库 `crypto/mlkem`）。若 IDE 报错 `package crypto/mlkem is not in std`，请将 GOROOT 或 IDE 的 Go 解释器指向 Go 1.24+ 安装目录（或在本项目中执行 `go build` 以使用 go.mod 的 toolchain）。
+
 ## 常用命令
 
 - 开发：`make dev`

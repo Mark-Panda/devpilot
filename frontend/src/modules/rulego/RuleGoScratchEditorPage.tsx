@@ -1476,6 +1476,9 @@ export default function RuleGoScratchEditorPage() {
   const [testDataJson, setTestDataJson] = useState("{}");
   const [testResult, setTestResult] = useState<ExecuteRuleOutput | null>(null);
   const [testRunning, setTestRunning] = useState(false);
+  /** 多轮对话：上一轮的用户+助手消息列表，用于「继续对话」时带给后端 */
+  const [testConversationHistory, setTestConversationHistory] = useState<Array<{ role: string; content: string }>>([]);
+  const [testFollowUpInput, setTestFollowUpInput] = useState("");
   const [saveFeedback, setSaveFeedback] = useState<{ type: "success" } | { type: "error"; message: string } | null>(null);
   const [selectedBlockId, setSelectedBlockId] = useState<string | null>(null);
   /** 上次保存或加载时的 DSL，用于判断是否有未保存变更 */
@@ -1848,6 +1851,8 @@ export default function RuleGoScratchEditorPage() {
     }
     setError(null);
     setTestResult(null);
+    setTestConversationHistory([]);
+    setTestFollowUpInput("");
     setTestModalOpen(true);
   };
 
@@ -1867,13 +1872,42 @@ export default function RuleGoScratchEditorPage() {
     }
     setTestRunning(true);
     setTestResult(null);
+    const dataPayload =
+      testConversationHistory.length > 0 && testFollowUpInput.trim()
+        ? JSON.stringify({
+            data: testFollowUpInput.trim(),
+            conversation_history: testConversationHistory,
+          })
+        : testDataJson.trim() || "{}";
     try {
       const result = await executeRuleGoRuleByDefinition(currentDsl, {
         message_type: testMessageType || "default",
         metadata,
-        data: testDataJson.trim() || "{}",
+        data: dataPayload,
       });
       setTestResult(result);
+      if (result.success && result.data != null) {
+        if (testConversationHistory.length > 0) {
+          setTestConversationHistory((prev) => [
+            ...prev,
+            { role: "user", content: testFollowUpInput.trim() },
+            { role: "assistant", content: result.data ?? "" },
+          ]);
+          setTestFollowUpInput("");
+        } else {
+          let userContent = testDataJson.trim();
+          try {
+            const parsed = JSON.parse(userContent || "{}");
+            if (parsed && typeof parsed.data === "string") userContent = parsed.data;
+          } catch {
+            // ignore
+          }
+          setTestConversationHistory([
+            { role: "user", content: userContent || "" },
+            { role: "assistant", content: result.data ?? "" },
+          ]);
+        }
+      }
     } catch (err) {
       setTestResult({
         success: false,
@@ -2545,16 +2579,19 @@ export default function RuleGoScratchEditorPage() {
 
       {testModalOpen && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setTestModalOpen(false)}>
-          <div className="modal" style={{ maxWidth: 640 }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal" style={{ maxWidth: 640, maxHeight: "90vh", display: "flex", flexDirection: "column" }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>模拟测试规则链</h3>
               <button type="button" className="text-button" onClick={() => setTestModalOpen(false)} aria-label="关闭">
                 ×
               </button>
             </div>
-            <div className="modal-body">
+            <div className="modal-body" style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
               <p className="form-hint" style={{ marginBottom: 12 }}>
                 参考 RuleGo 调试：输入消息类型、元数据与消息体，对当前画布规则链执行一次，查看末端输出。
+              </p>
+              <p className="form-hint" style={{ marginBottom: 12, padding: 8, background: "var(--color-warning-bg, #fffbeb)", borderRadius: 6, border: "1px solid var(--color-warning, #f59e0b)", fontSize: 13 }}>
+                <strong>注意：</strong>若规则链中启用了技能（如 API 追踪），技能执行可能需 <strong>1–3 分钟</strong>。执行期间请<strong>勿关闭本弹窗或应用</strong>，否则会导致技能未执行完毕即终止、结果无法返回。
               </p>
               <label className="form-field">
                 <span>消息类型 (message_type)</span>
@@ -2599,35 +2636,84 @@ export default function RuleGoScratchEditorPage() {
                   className="primary-button"
                   disabled={testRunning}
                   onClick={() => void handleTestRun()}
+                  title={testRunning ? "技能执行可能需 1–3 分钟，请耐心等待" : ""}
                 >
-                  {testRunning ? "执行中…" : "执行"}
+                  {testRunning ? "执行中…（请勿关闭窗口）" : "执行"}
                 </button>
               </div>
               {testResult !== null && (
-                <div
-                  className="form-field"
-                  style={{
-                    marginTop: 16,
-                    padding: 12,
-                    background: testResult.success ? "var(--color-success-bg, #ecfdf5)" : "var(--color-error-bg, #fef2f2)",
-                    borderRadius: 8,
-                    border: `1px solid ${testResult.success ? "var(--color-success, #10b981)" : "var(--color-error, #ef4444)"}`,
-                  }}
-                >
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-                    <span style={{ fontWeight: 600 }}>{testResult.success ? "成功" : "失败"}</span>
-                    <span style={{ fontSize: 13, color: "#64748b" }}>耗时 {testResult.elapsed} ms</span>
+                <>
+                  <div
+                    className="form-field"
+                    style={{
+                      marginTop: 16,
+                      padding: 12,
+                      background: testResult.success ? "var(--color-success-bg, #ecfdf5)" : "var(--color-error-bg, #fef2f2)",
+                      borderRadius: 8,
+                      border: `1px solid ${testResult.success ? "var(--color-success, #10b981)" : "var(--color-error, #ef4444)"}`,
+                    }}
+                  >
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                      <span style={{ fontWeight: 600 }}>{testResult.success ? "成功" : "失败"}</span>
+                      <span style={{ fontSize: 13, color: "#64748b" }}>耗时 {testResult.elapsed} ms</span>
+                    </div>
+                    {testResult.success ? (
+                      <>
+                        <pre style={{ margin: 0, fontSize: 13, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
+                          {testResult.data || "(无输出)"}
+                        </pre>
+                        <p className="form-hint" style={{ marginTop: 8, marginBottom: 0, fontSize: 12 }}>
+                          下方可输入回复并点击「发送」继续对话（若未看到输入框请向下滚动）。
+                        </p>
+                      </>
+                    ) : (
+                      <pre style={{ margin: 0, fontSize: 13, color: "var(--color-error, #b91c1c)", whiteSpace: "pre-wrap" }}>
+                        {testResult.error || "未知错误"}
+                      </pre>
+                    )}
                   </div>
-                  {testResult.success ? (
-                    <pre style={{ margin: 0, fontSize: 13, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
-                      {testResult.data || "(无输出)"}
-                    </pre>
-                  ) : (
-                    <pre style={{ margin: 0, fontSize: 13, color: "var(--color-error, #b91c1c)", whiteSpace: "pre-wrap" }}>
-                      {testResult.error || "未知错误"}
-                    </pre>
+                  {testResult.success && (
+                    <div
+                      className="form-field"
+                      style={{
+                        marginTop: 16,
+                        padding: 12,
+                        background: "var(--color-block-bg, #f1f5f9)",
+                        borderRadius: 8,
+                        border: "1px solid var(--color-border, #e2e8f0)",
+                      }}
+                    >
+                      <span style={{ display: "block", marginBottom: 4, fontSize: 14, fontWeight: 600 }}>继续对话</span>
+                      <p className="form-hint" style={{ marginBottom: 8, fontSize: 12 }}>
+                        模型若要求补充信息（如范围：前端/后端/全部），在下方输入后点击「发送」继续，无需关闭弹窗。
+                      </p>
+                      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                        <input
+                          type="text"
+                          className="form-input"
+                          value={testFollowUpInput}
+                          onChange={(e) => setTestFollowUpInput(e.target.value)}
+                          placeholder="例如：全部、前端、后端"
+                          style={{ flex: 1, minWidth: 0 }}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !e.shiftKey) {
+                              e.preventDefault();
+                              if (testFollowUpInput.trim()) void handleTestRun();
+                            }
+                          }}
+                        />
+                        <button
+                          type="button"
+                          className="primary-button"
+                          disabled={testRunning || !testFollowUpInput.trim()}
+                          onClick={() => void handleTestRun()}
+                        >
+                          {testRunning ? "执行中…" : "发送"}
+                        </button>
+                      </div>
+                    </div>
                   )}
-                </div>
+                </>
               )}
             </div>
           </div>

@@ -55,7 +55,13 @@ func (s *Service) LoadRuleChain(ruleID string) error {
 		return errors.New("规则定义为空")
 	}
 
-	def := []byte(rule.Definition)
+	defStr := rule.Definition
+	if s.llmConfigLister != nil {
+		if patched, err := PatchDefinitionWithLLMKeys(context.Background(), defStr, s.llmConfigLister); err == nil {
+			defStr = patched
+		}
+	}
+	def := []byte(defStr)
 	if eng, ok := rulego.Get(ruleID); ok && eng.Initialized() {
 		if err := eng.ReloadSelf(def, types.WithAspects(&LogAspect{})); err != nil {
 			return err
@@ -97,7 +103,13 @@ func (s *Service) LoadAllEnabledRuleChains() (loaded int, err error) {
 		if _, ok := rulego.Get(rule.ID); ok {
 			_ = s.UnloadRuleChain(rule.ID)
 		}
-		engine, createErr := rulego.New(rule.ID, []byte(rule.Definition), types.WithAspects(&LogAspect{}))
+		defStr := rule.Definition
+		if s.llmConfigLister != nil {
+			if patched, err := PatchDefinitionWithLLMKeys(context.Background(), defStr, s.llmConfigLister); err == nil {
+				defStr = patched
+			}
+		}
+		engine, createErr := rulego.New(rule.ID, []byte(defStr), types.WithAspects(&LogAspect{}))
 		if createErr != nil {
 			log.Printf("[rulego] 启动加载规则链失败 id=%s name=%s: %v", rule.ID, rule.Name, createErr)
 			if err == nil {

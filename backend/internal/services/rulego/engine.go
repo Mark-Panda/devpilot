@@ -46,12 +46,21 @@ func (s *Service) ExecuteRule(ruleID string, input ExecuteRuleInput) (ExecuteRul
 		return ExecuteRuleOutput{Success: false, Error: "规则定义为空"}, errors.New("empty definition")
 	}
 
+	def := rule.Definition
+	if s.llmConfigLister != nil {
+		if patched, err := PatchDefinitionWithLLMKeys(context.Background(), def, s.llmConfigLister); err == nil {
+			def = patched
+		}
+	}
+	defBytes := []byte(def)
 	var engine types.RuleEngine
 	if existing, ok := rulego.Get(ruleID); ok && existing.Initialized() {
+		// 已加载的引擎用当前（可能已 patch key）的 definition 重载，保证使用最新模型配置
+		_ = existing.ReloadSelf(defBytes, types.WithAspects(&LogAspect{}))
 		engine = existing
 	} else {
 		var createErr error
-		engine, createErr = rulego.New(ruleID, []byte(rule.Definition), types.WithAspects(&LogAspect{}))
+		engine, createErr = rulego.New(ruleID, defBytes, types.WithAspects(&LogAspect{}))
 		if createErr != nil {
 			return ExecuteRuleOutput{Success: false, Error: createErr.Error()}, createErr
 		}
@@ -132,6 +141,7 @@ func (s *Service) ExecuteRule(ruleID string, input ExecuteRuleInput) (ExecuteRul
 
 // ExecuteRuleDefinition 使用给定的规则链定义 JSON 同步执行一次（模拟测试），不写入数据库。
 // 用于可视化编辑器中“测试”按钮：对当前画布内容进行调试运行。
+// 会阻塞直至整条规则链执行完毕（含 ai/llm 节点的多轮 tool 调用与技能执行）；若启用了技能，可能需数分钟，调用方应避免超时或断开。
 func (s *Service) ExecuteRuleDefinition(definition string, input ExecuteRuleInput) (ExecuteRuleOutput, error) {
 	def := definition
 	if def == "" {
@@ -139,6 +149,11 @@ func (s *Service) ExecuteRuleDefinition(definition string, input ExecuteRuleInpu
 	}
 	if json.Unmarshal([]byte(def), &map[string]interface{}{}) != nil {
 		return ExecuteRuleOutput{Success: false, Error: "规则定义不是合法 JSON"}, errors.New("invalid definition json")
+	}
+	if s.llmConfigLister != nil {
+		if patched, err := PatchDefinitionWithLLMKeys(context.Background(), def, s.llmConfigLister); err == nil {
+			def = patched
+		}
 	}
 	const testRuleID = "_test_"
 	engine, createErr := rulego.New(testRuleID, []byte(def), types.WithAspects(&LogAspect{}))
