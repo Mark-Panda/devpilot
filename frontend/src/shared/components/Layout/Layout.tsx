@@ -1,11 +1,11 @@
 import { NavLink, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
 
-const menuItems = [
+const menuItems: { path: string; label: string; end?: boolean }[] = [
   { path: "/route-rewrite", label: "重构路由管理" },
   { path: "/curl-compare", label: "接口对比" },
   { path: "/terminal", label: "终端" },
-  { path: "/rulego", label: "RuleGo 规则管理" },
+  { path: "/rulego", label: "RuleGo 规则管理", end: true },
   { path: "/rulego/logs", label: "RuleGo 执行日志" },
   { path: "/skill-repo", label: "技能仓库" },
   { path: "/settings/models", label: "模型管理" }
@@ -31,6 +31,7 @@ export default function Layout({ children }: LayoutProps) {
               <NavLink
                 key={item.path}
                 to={item.path}
+                end={item.end ?? false}
                 className={({ isActive }) =>
                   `app-nav-item${isActive ? " is-active" : ""}`
                 }
