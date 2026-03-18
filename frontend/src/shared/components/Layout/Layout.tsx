@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 
 const menuItems = [
   { path: "/route-rewrite", label: "重构路由管理" },
+  { path: "/curl-compare", label: "接口对比" },
   { path: "/terminal", label: "终端" },
   { path: "/rulego", label: "RuleGo 规则管理" },
   { path: "/rulego/logs", label: "RuleGo 执行日志" },

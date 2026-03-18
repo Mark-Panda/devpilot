@@ -42,6 +42,7 @@ func main() {
 			runtime.ModelManagementService(),
 			runtime.RuleGoService(),
 			runtime.SkillRepoService(),
+			runtime.CurlCompareService(),
 		},
 	})
 	if err != nil {

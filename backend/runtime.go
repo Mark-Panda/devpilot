@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 
+	"devpilot/backend/internal/services/curl_compare"
 	"devpilot/backend/internal/services/model_management"
 	"devpilot/backend/internal/services/route_rewrite"
 	"devpilot/backend/internal/services/rulego"
@@ -29,11 +30,12 @@ func (r *ruleGoLLMConfigLister) ListLLMConfigs(ctx context.Context) ([]rulego.LL
 }
 
 type Runtime struct {
-	routeRewrite interface{}
-	modelManage  interface{}
-	ruleGo       interface{}
-	skillRepo    interface{}
-	close        func() error
+	routeRewrite  interface{}
+	modelManage   interface{}
+	ruleGo        interface{}
+	skillRepo     interface{}
+	curlCompare   interface{}
+	close         func() error
 }
 
 func InitRuntime(dataDir string) (*Runtime, error) {
@@ -60,6 +62,7 @@ func InitRuntime(dataDir string) (*Runtime, error) {
 		modelManage:  modelService,
 		ruleGo:       ruleGoService,
 		skillRepo:    skill_repo.NewService(),
+		curlCompare:  curl_compare.NewService(),
 		close:        db.Close,
 	}, nil
 }
@@ -78,6 +81,10 @@ func (r *Runtime) RuleGoService() interface{} {
 
 func (r *Runtime) SkillRepoService() interface{} {
 	return r.skillRepo
+}
+
+func (r *Runtime) CurlCompareService() interface{} {
+	return r.curlCompare
 }
 
 func (r *Runtime) Close() error {

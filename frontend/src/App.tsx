@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { Layout } from "./shared/components";
 import { RouteRewritePage } from "./modules/route-rewrite";
+import { CurlComparePage } from "./modules/curl-compare";
 import { ModelManagementPage } from "./modules/model-management";
 import { RuleGoPage, RuleGoScratchEditorPage, RuleGoLogsPage, RuleGoLogDetailPage } from "./modules/rulego";
 import { SkillRepoPage } from "./modules/skill-repo";
@@ -13,6 +14,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/route-rewrite" replace />} />
           <Route path="/route-rewrite" element={<RouteRewritePage />} />
+          <Route path="/curl-compare" element={<CurlComparePage />} />
           <Route path="/terminal" element={<PlaceholderPage title="终端" />} />
           <Route path="/settings/models" element={<ModelManagementPage />} />
           <Route path="/rulego" element={<RuleGoPage />} />

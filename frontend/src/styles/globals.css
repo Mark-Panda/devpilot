@@ -1643,3 +1643,359 @@ body {
   font-size: 12px;
   color: #94a3b8;
 }
+
+/* Curl Compare / 接口对比 */
+.curl-compare-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  max-width: 720px;
+}
+
+.curl-compare-field label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  color: #475569;
+  margin-bottom: 6px;
+}
+
+.curl-compare-field input,
+.curl-compare-field textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #fff;
+}
+
+.curl-compare-field input:focus,
+.curl-compare-field textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.curl-compare-field input:disabled,
+.curl-compare-field textarea:disabled {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.curl-compare-field textarea {
+  resize: vertical;
+  min-height: 120px;
+}
+
+.curl-compare-actions {
+  padding-top: 8px;
+}
+
+.curl-compare-submit-err {
+  padding: 12px 16px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #991b1b;
+  font-size: 14px;
+}
+
+.curl-compare-result {
+  margin-top: 24px;
+  padding: 20px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+}
+
+.curl-compare-status-row {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.curl-compare-status-card {
+  flex: 1;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+}
+
+.curl-compare-status-card.ok {
+  border-color: #86efac;
+  background: #f0fdf4;
+}
+
+.curl-compare-status-card.err {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.curl-compare-status-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 4px;
+}
+
+.curl-compare-status-code {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.curl-compare-status-err {
+  display: block;
+  margin-top: 6px;
+  font-size: 13px;
+  color: #b91c1c;
+}
+
+.curl-compare-status-meta {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.curl-compare-parse-err {
+  padding: 12px 16px;
+  background: #fef3c7;
+  border: 1px solid #fcd34d;
+  border-radius: 8px;
+  color: #92400e;
+  font-size: 14px;
+  margin-bottom: 12px;
+}
+
+.curl-compare-hint {
+  margin: 0 0 12px;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.curl-compare-diff-summary {
+  margin-bottom: 16px;
+  font-size: 14px;
+  color: #475569;
+}
+
+.curl-compare-diff-summary strong {
+  color: #0f172a;
+}
+
+.curl-compare-no-diff {
+  margin: 0;
+  padding: 12px 16px;
+  background: #f0fdf4;
+  border-radius: 8px;
+  color: #166534;
+  font-size: 14px;
+}
+
+.curl-compare-diff-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.curl-compare-diff-row {
+  padding: 14px 16px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.curl-compare-diff-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.curl-compare-diff-path {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  background: #e2e8f0;
+  padding: 2px 8px;
+  border-radius: 4px;
+  word-break: break-all;
+}
+
+.curl-compare-diff-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.curl-compare-diff-badge.missing {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.curl-compare-diff-badge.type-diff {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.curl-compare-diff-badge.different {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.curl-compare-diff-values {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.curl-compare-diff-side {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.curl-compare-diff-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.curl-compare-diff-val {
+  font-size: 13px;
+  color: #334155;
+  word-break: break-word;
+}
+
+.curl-compare-diff-toggle {
+  margin-top: 10px;
+  padding: 4px 0;
+  font-size: 12px;
+  color: #2563eb;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.curl-compare-diff-toggle:hover {
+  text-decoration: underline;
+}
+
+.curl-compare-diff-json {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #1e293b;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #e2e8f0;
+}
+
+.curl-compare-diff-json pre {
+  margin: 0 0 8px;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.curl-compare-diff-json pre:last-child {
+  margin-bottom: 0;
+}
+
+.curl-compare-diff-json .curl-compare-diff-label {
+  color: #94a3b8;
+}
+
+/* 请求与响应日志 */
+.curl-compare-request-log {
+  margin-top: 20px;
+  padding: 16px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.curl-compare-log-title {
+  margin: 0 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.curl-compare-log-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+@media (max-width: 900px) {
+  .curl-compare-log-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.curl-compare-log-block {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.curl-compare-log-head {
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #64748b;
+  background: #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.curl-compare-log-body {
+  padding: 10px 12px;
+  font-size: 12px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.curl-compare-log-line {
+  margin-bottom: 8px;
+}
+
+.curl-compare-log-line:last-child {
+  margin-bottom: 0;
+}
+
+.curl-compare-log-key {
+  color: #64748b;
+  font-weight: 600;
+  margin-right: 6px;
+}
+
+.curl-compare-log-pre {
+  margin: 4px 0 0;
+  padding: 8px;
+  background: #1e293b;
+  color: #e2e8f0;
+  border-radius: 6px;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 200px;
+  overflow: auto;
+}
+
+.curl-compare-log-url {
+  font-size: 11px;
+  word-break: break-all;
+}
+
+.curl-compare-log-response {
+  max-height: 240px;
+}
