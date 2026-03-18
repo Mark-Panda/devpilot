@@ -14,7 +14,10 @@ import (
 )
 
 
-// GenerateSkillFromRuleChain 使用大模型调用内置 create-skill 技能，生成 SKILL.md 并写入 ~/.devpilot/skills/{dirName}，
+// createSkillToolName 用于“根据规则链生成技能”流程的工具名，与 initSkills/skill-creator 的 name 一致。
+const createSkillToolName = "skill-creator"
+
+// GenerateSkillFromRuleChain 使用大模型调用 skill-creator 技能，生成 SKILL.md 并写入 ~/.devpilot/skills/{dirName}，
 // 同时更新规则的 SkillDirName。baseURL、apiKey、model 为调用大模型所需；若为空则返回错误。
 // 注意：供 Wails 绑定时由前端调用，不要将 context.Context 作为首参，否则 JSON 参数会绑定错误。
 func (s *Service) GenerateSkillFromRuleChain(ruleID string, baseURL, apiKey, model string) (skillDirName string, err error) {
@@ -38,12 +41,15 @@ func (s *Service) GenerateSkillFromRuleChain(ruleID string, baseURL, apiKey, mod
 		return "", fmt.Errorf("规则链定义为空")
 	}
 
-	if err := llm.EnsureBuiltinCreateSkillDir(); err != nil {
-		return "", fmt.Errorf("确保内置 create-skill 目录失败: %w", err)
-	}
-	createSkill, err := llm.GetBuiltinCreateSkill()
+	skillDir := filepath.Join(llm.DefaultSkillDir(), createSkillToolName)
+	createSkill, err := llm.LoadSkillFromDir(skillDir)
 	if err != nil {
-		return "", fmt.Errorf("加载内置 create-skill 失败: %w", err)
+		log.Printf("[rulego] GenerateSkillFromRuleChain 加载 skill-creator 失败 dir=%s err=%v", skillDir, err)
+		return "", fmt.Errorf("加载 skill-creator 失败: %w", err)
+	}
+	if createSkill == nil {
+		log.Printf("[rulego] GenerateSkillFromRuleChain skill-creator 未找到 dir=%s", skillDir)
+		return "", fmt.Errorf("skill-creator 未找到，请确保已初始化（启动时会从 initSkills 同步到 ~/.devpilot/skills/）")
 	}
 
 	cfg := llm.Config{BaseURL: baseURL, APIKey: apiKey, Model: model}
@@ -66,14 +72,14 @@ func (s *Service) GenerateSkillFromRuleChain(ruleID string, baseURL, apiKey, mod
 		return "", llm.FormatErrorForUser(err)
 	}
 	if executor.writtenDir == "" {
-		log.Printf("[rulego] GenerateSkillFromRuleChain 模型未调用 create-skill ruleID=%s", ruleID)
-		return "", fmt.Errorf("模型未调用 create-skill 提交内容，请重试")
+		log.Printf("[rulego] GenerateSkillFromRuleChain 模型未调用 skill-creator ruleID=%s", ruleID)
+		return "", fmt.Errorf("模型未调用 skill-creator 提交内容，请重试")
 	}
 	log.Printf("[rulego] GenerateSkillFromRuleChain 完成 ruleID=%s skillDir=%s", ruleID, executor.writtenDir)
 	return executor.writtenDir, nil
 }
 
-// createSkillExecutor 在模型调用 create-skill 时解析参数并写入 SKILL.md、更新规则关联。
+// createSkillExecutor 在模型调用 skill-creator 时解析参数并写入 SKILL.md、更新规则关联。
 type createSkillExecutor struct {
 	s          *Service
 	ruleID     string
@@ -82,10 +88,10 @@ type createSkillExecutor struct {
 }
 
 func (e *createSkillExecutor) Execute(ctx context.Context, name, arguments string) (string, error) {
-	if name != llm.BuiltinCreateSkillName {
+	if name != createSkillToolName {
 		return "", fmt.Errorf("未知工具: %s", name)
 	}
-	log.Printf("[rulego] create-skill 被调用 ruleID=%s argumentsLen=%d", e.ruleID, len(arguments))
+	log.Printf("[rulego] skill-creator 被调用 ruleID=%s argumentsLen=%d", e.ruleID, len(arguments))
 	args := []byte(arguments)
 	var nameStr, descStr, bodyStr string
 	// 先尝试直接解析为 { "name", "description", "body" }
@@ -101,7 +107,7 @@ func (e *createSkillExecutor) Execute(ctx context.Context, name, arguments strin
 			Input string `json:"input"`
 		}
 		if err := json.Unmarshal(args, &input); err != nil {
-			return "", fmt.Errorf("解析 create-skill 参数失败: %w", err)
+			return "", fmt.Errorf("解析 skill-creator 参数失败: %w", err)
 		}
 		var payload struct {
 			Name        string `json:"name"`
@@ -135,10 +141,10 @@ func (e *createSkillExecutor) writeSkillFile(name, description, body string) (st
 	}
 	skillPath := filepath.Join(skillDir, "SKILL.md")
 	if err := os.WriteFile(skillPath, []byte(content), 0644); err != nil {
-		log.Printf("[rulego] create-skill 写入 SKILL.md 失败 path=%s err=%v", skillPath, err)
+		log.Printf("[rulego] skill-creator 写入 SKILL.md 失败 path=%s err=%v", skillPath, err)
 		return "", fmt.Errorf("写入 SKILL.md 失败: %w", err)
 	}
-	log.Printf("[rulego] create-skill 已写入 path=%s name=%s", skillPath, name)
+	log.Printf("[rulego] skill-creator 已写入 path=%s name=%s", skillPath, name)
 
 	e.rule.SkillDirName = dirName
 	if _, err := e.s.store.Update(context.Background(), e.ruleID, e.rule); err != nil {
@@ -147,7 +153,7 @@ func (e *createSkillExecutor) writeSkillFile(name, description, body string) (st
 		return "", fmt.Errorf("更新规则关联失败: %w", err)
 	}
 	e.writtenDir = dirName
-	log.Printf("[rulego] create-skill 完成 ruleID=%s dirName=%s", e.ruleID, dirName)
+	log.Printf("[rulego] skill-creator 完成 ruleID=%s dirName=%s", e.ruleID, dirName)
 	return "技能已创建：" + dirName, nil
 }
 
@@ -167,7 +173,7 @@ func buildSkillMDContent(name, description, body, ruleChainID string) string {
 
 func buildCreateSkillUserMessage(rule models.RuleGoRule) string {
 	var b strings.Builder
-	b.WriteString("请根据以下规则链信息，调用 create-skill 工具提交生成的技能。\n\n")
+	b.WriteString("请根据以下规则链信息，调用 skill-creator 工具提交生成的技能。\n\n")
 	b.WriteString("规则链 ID：")
 	b.WriteString(rule.ID)
 	b.WriteString("\n\n规则链名称：")

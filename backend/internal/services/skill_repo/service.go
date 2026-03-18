@@ -6,6 +6,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"io"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,20 +15,33 @@ import (
 	"devpilot/backend/internal/llm"
 )
 
-// 内置技能目录名（不可在技能仓库中删除）
-const builtinSkillDirName = "create-skill"
+// builtinInitSkillDirNames 为 initSkills 下内置技能目录名，与 initSkills/ 子目录一一对应，不可在技能仓库中删除。
+var builtinInitSkillDirNames = []string{"skill-creator"}
 
 // ruleChainSkillPrefix 规则链生成技能的目录名前缀（rule-{id}），此类技能不可在技能仓库中删除。
 const ruleChainSkillPrefix = "rule-"
 
-// Service 提供技能仓库能力：列举 ~/.devpilot/skills/ 下技能包、解压上传的 zip。
-type Service struct {
-	skillDir string
+func isBuiltinOrRuleSkill(dirName string) bool {
+	if strings.HasPrefix(dirName, ruleChainSkillPrefix) {
+		return true
+	}
+	for _, b := range builtinInitSkillDirNames {
+		if dirName == b {
+			return true
+		}
+	}
+	return false
 }
 
-// NewService 使用默认技能目录 ~/.devpilot/skills/ 创建服务。
-func NewService() *Service {
-	return &Service{skillDir: llm.DefaultSkillDir()}
+// Service 提供技能仓库能力：列举 ~/.devpilot/skills/ 下技能包、解压上传的 zip。
+type Service struct {
+	skillDir     string
+	initSkillsFS fs.FS // 非 nil 时，列举前会先同步 initSkills，用于恢复用户手动删除的内置技能
+}
+
+// NewService 使用默认技能目录 ~/.devpilot/skills/ 创建服务。initSkillsFS 可为 nil；非 nil 时每次列举前会尝试同步 initSkills。
+func NewService(initSkillsFS fs.FS) *Service {
+	return &Service{skillDir: llm.DefaultSkillDir(), initSkillsFS: initSkillsFS}
 }
 
 // SkillPackageItem 表示技能仓库中的一项技能包（一个子目录下的 SKILL.md）。
@@ -35,6 +49,7 @@ type SkillPackageItem struct {
 	DirName     string `json:"dir_name"`     // 子目录名
 	Name        string `json:"name"`         // SKILL.md frontmatter name
 	Description string `json:"description"` // SKILL.md frontmatter description
+	Deletable   bool   `json:"deletable"`   // 是否允许在技能仓库中删除（内置 initSkills 与 rule-* 不可删除）
 }
 
 // SkillPackageDetail 表示单个技能包目录的详情（路径 + 文件列表）。
@@ -44,7 +59,11 @@ type SkillPackageDetail struct {
 }
 
 // ListSkillPackages 列举 skillDir 下所有包含 SKILL.md 的子目录，返回名称与描述。
+// 若 initSkillsFS 非 nil，会先执行 initSkills 同步，从而在用户手动删除内置技能后能检测并恢复。
 func (s *Service) ListSkillPackages() ([]SkillPackageItem, error) {
+	if s.initSkillsFS != nil {
+		_ = llm.EnsureInitSkillsFromFS(s.initSkillsFS, "initSkills")
+	}
 	dir := s.skillDir
 	entries, err := os.ReadDir(dir)
 	if err != nil {
@@ -66,10 +85,12 @@ func (s *Service) ListSkillPackages() ([]SkillPackageItem, error) {
 		if skill == nil {
 			continue
 		}
+		dirName := e.Name()
 		out = append(out, SkillPackageItem{
-			DirName:     e.Name(),
+			DirName:     dirName,
 			Name:        skill.Name,
 			Description: skill.Description,
+			Deletable:   !isBuiltinOrRuleSkill(dirName),
 		})
 	}
 	return out, nil
@@ -232,22 +253,16 @@ func (s *Service) ExtractSkillZipFromData(dataBase64 string) error {
 }
 
 // IsSkillPackageDeletable 判断该技能包是否允许在技能仓库中删除。
-// 内置技能（create-skill）和规则链生成的技能（rule-*）不可删除。
+// initSkills 下内置技能与规则链生成的技能（rule-*）不可删除。
 func IsSkillPackageDeletable(dirName string) bool {
 	dirName = strings.TrimSpace(filepath.Clean(dirName))
 	if dirName == "" || dirName == "." || strings.Contains(dirName, "..") {
 		return false
 	}
-	if dirName == builtinSkillDirName {
-		return false
-	}
-	if strings.HasPrefix(dirName, ruleChainSkillPrefix) {
-		return false
-	}
-	return true
+	return !isBuiltinOrRuleSkill(dirName)
 }
 
-// DeleteSkillPackage 删除指定技能包子目录。内置技能（create-skill）和规则链生成的技能（rule-*）禁止删除，返回错误。
+// DeleteSkillPackage 删除指定技能包子目录。initSkills 内置技能与规则链生成的技能（rule-*）禁止删除，返回错误。
 func (s *Service) DeleteSkillPackage(dirName string) error {
 	dirName = strings.TrimSpace(filepath.Clean(dirName))
 	if dirName == "" || dirName == "." || strings.Contains(dirName, "..") {

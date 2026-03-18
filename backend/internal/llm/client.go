@@ -61,7 +61,7 @@ func NewClient(ctx context.Context, config Config) (*Client, error) {
 }
 
 // NewClientWithSkills 根据 config 创建 LLM 客户端，并仅使用指定的 skills（不从 SkillDir 加载）。
-// 用于“仅暴露 create-skill 等内置技能”的流程。
+// 用于“仅暴露 skill-creator 等技能”的流程。
 func NewClientWithSkills(ctx context.Context, config Config, skills []Skill) (*Client, error) {
 	config.BaseURL = strings.TrimSpace(config.BaseURL)
 	config.APIKey = strings.TrimSpace(config.APIKey)

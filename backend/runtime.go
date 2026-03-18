@@ -2,6 +2,7 @@ package backend
 
 import (
 	"context"
+	"io/fs"
 	"log"
 
 	"devpilot/backend/internal/services/curl_compare"
@@ -38,7 +39,8 @@ type Runtime struct {
 	close         func() error
 }
 
-func InitRuntime(dataDir string) (*Runtime, error) {
+// InitRuntime 初始化运行时。initSkillsFS 为嵌入的 initSkills 文件系统，用于启动时及列举技能时同步到 ~/.devpilot/skills/，可为 nil。
+func InitRuntime(dataDir string, initSkillsFS fs.FS) (*Runtime, error) {
 	db, err := pebble.Open(dataDir)
 	if err != nil {
 		return nil, err
@@ -57,11 +59,13 @@ func InitRuntime(dataDir string) (*Runtime, error) {
 		log.Printf("[rulego] 启动加载启用规则链: 共 %d 条", n)
 	}
 
+	EnsureSkillsFromInitFS(initSkillsFS, "initSkills")
+
 	return &Runtime{
 		routeRewrite: routeRewriteService,
 		modelManage:  modelService,
 		ruleGo:       ruleGoService,
-		skillRepo:    skill_repo.NewService(),
+		skillRepo:    skill_repo.NewService(initSkillsFS),
 		curlCompare:  curl_compare.NewService(),
 		close:        db.Close,
 	}, nil

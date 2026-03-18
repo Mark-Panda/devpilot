@@ -6,7 +6,6 @@ import {
   getSkillPackageDetail,
   getSkillPackageFileContent,
   deleteSkillPackage,
-  isSkillPackageDeletable,
   type SkillPackageItem,
   type SkillPackageDetail,
 } from "./useSkillRepoApi";
@@ -112,7 +111,8 @@ export default function SkillRepoPage() {
 
   const handleDelete = useCallback(
     async (dirName: string) => {
-      if (!isSkillPackageDeletable(dirName)) return;
+      const pkg = packages.find((p) => p.dir_name === dirName);
+      if (!pkg?.deletable) return;
       setDeletingDirName(dirName);
       setError(null);
       try {
@@ -125,7 +125,7 @@ export default function SkillRepoPage() {
         setDeletingDirName(null);
       }
     },
-    [load]
+    [load, packages]
   );
 
   const handleViewFile = useCallback(
@@ -206,7 +206,7 @@ export default function SkillRepoPage() {
                   >
                     查看
                   </button>
-                  {isSkillPackageDeletable(pkg.dir_name) ? (
+                  {pkg.deletable ? (
                     <button
                       className="text-button danger"
                       type="button"

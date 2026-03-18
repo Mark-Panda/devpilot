@@ -16,13 +16,16 @@ import (
 //go:embed all:frontend/dist
 var assets embed.FS
 
+//go:embed all:initSkills
+var initSkillsFS embed.FS
+
 func main() {
 	home, err := os.UserHomeDir()
 	if err != nil {
 		log.Fatal(err)
 	}
 	dataDir := filepath.Join(home, ".devpilot")
-	runtime, err := backend.InitRuntime(dataDir)
+	runtime, err := backend.InitRuntime(dataDir, initSkillsFS)
 	if err != nil {
 		log.Fatal(err)
 	}
