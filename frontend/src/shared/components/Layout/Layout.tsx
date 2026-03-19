@@ -38,6 +38,7 @@ type LayoutProps = {
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const isRuleGoEditor = location.pathname.startsWith("/rulego/editor");
+  const isChatRoute = location.pathname === "/agent";
 
   return (
     <div className={`app-shell${isRuleGoEditor ? " app-shell-full" : ""}`}>
@@ -73,8 +74,8 @@ export default function Layout({ children }: LayoutProps) {
           </div>
         </aside>
       )}
-      <main className="app-content">
-        <div className="app-route">{children}</div>
+      <main className={`app-content${isChatRoute ? " app-content--chat" : ""}`}>
+        <div className={`app-route${isChatRoute ? " app-route--chat-fill" : ""}`}>{children}</div>
       </main>
     </div>
   );

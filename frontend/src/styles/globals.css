@@ -111,7 +111,7 @@ body {
   overflow-y: auto;
 }
 
-/* 路由出口：保证 main 内子树参与 flex 限高；纵向可滚动避免非聊天页内容被裁切 */
+/* 路由出口：保证 main 内子树参与 flex 限高；非聊天页纵向可滚动 */
 .app-route {
   flex: 1 1 0%;
   min-height: 0;
@@ -121,6 +121,40 @@ body {
   flex-direction: column;
   overflow-x: hidden;
   overflow-y: auto;
+}
+
+/* 聊天壳：Grid 明确「顶栏 / 控制条 / 可滚消息区 / 底栏」，minmax(0,1fr) 防止 WebView 里 1fr 不收缩 */
+.agent-chat-shell {
+  flex: 1 1 0%;
+  min-height: 0;
+  width: 100%;
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  background: #f8fafc;
+}
+
+.agent-chat-shell--welcome {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.agent-chat-messages {
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 12px 24px 8px;
+}
+
+.agent-chat-composer {
+  flex-shrink: 0;
+  background: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  padding: 16px 24px 20px;
+}
+
+.agent-chat-composer-inner {
+  max-width: 48rem;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .app-nav-group {
@@ -181,6 +215,16 @@ body {
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+}
+
+/* 聊天页：主区全幅铺高，避免 padding 导致 flex 子项高度错觉；由内层 agent-chat-shell 控制边距 */
+.app-content--chat {
+  padding: 0;
+}
+
+/* 聊天路由：禁止整页滚动，由聊天区内部 messages 区域滚动（对齐 OpenClaw 顶栏+中区+底栏固定） */
+.app-route--chat-fill {
+  overflow-y: hidden;
 }
 
 .page {
