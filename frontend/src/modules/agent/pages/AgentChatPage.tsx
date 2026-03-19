@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAgentStore } from '../store'
 import { modelManagementApi, type ModelOption } from '../modelApi'
@@ -39,9 +39,8 @@ export const AgentChatPage: React.FC = () => {
     initialize()
   }, [loadAgents])
 
-  const handleCreateDefaultAgent = async () => {
+  const handleCreateDefaultAgent = useCallback(async () => {
     if (!selectedModel) {
-      alert('请先在"模型管理"中配置至少一个模型')
       return
     }
     try {
@@ -67,7 +66,7 @@ export const AgentChatPage: React.FC = () => {
     } catch (err) {
       console.error('创建主助手失败:', err)
     }
-  }
+  }, [selectedModel, createAgent, selectAgent])
 
   useEffect(() => {
     if (
@@ -78,7 +77,7 @@ export const AgentChatPage: React.FC = () => {
     ) {
       handleCreateDefaultAgent()
     }
-  }, [isInitializing, agents.length, modelOptions.length, showWelcome])
+  }, [isInitializing, agents.length, modelOptions.length, showWelcome, handleCreateDefaultAgent])
 
   const currentAgent = agents.find((a) => a.config.id === currentAgentId)
   const currentMessages = currentAgentId ? messages : []
@@ -220,7 +219,12 @@ export const AgentChatPage: React.FC = () => {
           <button type="button" className="p-2 rounded-lg hover:bg-slate-100 text-slate-500" title="刷新">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
           </button>
-          <button type="button" className="p-2 rounded-lg hover:bg-slate-100 text-slate-500" title="停止">
+          <button
+            type="button"
+            className={`p-2 rounded-lg text-slate-500 ${isLoading ? 'hover:bg-slate-100 cursor-pointer' : 'opacity-40 cursor-not-allowed'}`}
+            title={isLoading ? "停止（暂不支持）" : "停止"}
+            disabled={!isLoading}
+          >
             <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" /></svg>
           </button>
           <button type="button" className="p-2 rounded-lg hover:bg-slate-100 text-slate-500" title="历史">
