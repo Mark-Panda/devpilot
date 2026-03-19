@@ -27,7 +27,7 @@ export function ChatMessages({
 
   if (!hasContent) {
     return (
-      <div className="flex flex-col items-center justify-center h-full min-h-[320px] text-center px-4 py-12">
+      <div className="mx-auto flex h-full w-full max-w-3xl min-h-[320px] flex-col items-center justify-center px-4 py-12 text-center">
         <div className="mb-6 text-slate-400">
           <svg className="w-14 h-14 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
@@ -50,7 +50,7 @@ export function ChatMessages({
   }
 
   return (
-    <div className="space-y-4 pb-4">
+    <div className="mx-auto w-full max-w-3xl space-y-4 px-2 pb-4 sm:px-4">
       {/* 系统消息块（OpenClaw 风格橙色框） */}
       {systemPrompt && (
         <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 text-sm text-amber-900 animate-fade-in">

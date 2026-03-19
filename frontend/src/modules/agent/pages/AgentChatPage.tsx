@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAgentStore } from '../store'
 import { modelManagementApi, type ModelOption } from '../modelApi'
@@ -22,6 +22,8 @@ export const AgentChatPage: React.FC = () => {
   const [selectedModel, setSelectedModel] = useState<ModelOption | null>(null)
   const [isInitializing, setIsInitializing] = useState(true)
   const [showWelcome, setShowWelcome] = useState(true)
+  const [agentMenuOpen, setAgentMenuOpen] = useState(false)
+  const agentMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const initialize = async () => {
@@ -79,6 +81,16 @@ export const AgentChatPage: React.FC = () => {
     }
   }, [isInitializing, agents.length, modelOptions.length, showWelcome, handleCreateDefaultAgent])
 
+  useEffect(() => {
+    if (!agentMenuOpen) return
+    const onDocMouseDown = (e: MouseEvent) => {
+      const el = agentMenuRef.current
+      if (el && !el.contains(e.target as Node)) setAgentMenuOpen(false)
+    }
+    document.addEventListener('mousedown', onDocMouseDown)
+    return () => document.removeEventListener('mousedown', onDocMouseDown)
+  }, [agentMenuOpen])
+
   const currentAgent = agents.find((a) => a.config.id === currentAgentId)
   const currentMessages = currentAgentId ? messages : []
 
@@ -96,7 +108,7 @@ export const AgentChatPage: React.FC = () => {
   // 欢迎：选择模型（OpenClaw 风格，统一卡片列表）
   if (!currentAgent || showWelcome) {
     return (
-      <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex flex-col flex-1 min-h-0 w-full min-w-0">
         {/* 欢迎页顶部 */}
         <div className="flex items-center gap-2 border-b border-slate-200 bg-white/95 pb-3 mb-4">
           <nav className="flex items-center gap-1.5 text-sm text-slate-500">
@@ -172,9 +184,9 @@ export const AgentChatPage: React.FC = () => {
 
   // OpenClaw 风格主对话界面
   return (
-    <div className="flex flex-col flex-1 min-h-0">
+    <div className="flex flex-col flex-1 min-h-0 w-full min-w-0">
       {/* 顶部单行工具栏 */}
-      <div className="flex items-center gap-3 border-b border-slate-200 bg-white pb-3 mb-2">
+      <div className="flex flex-shrink-0 flex-wrap items-center gap-3 border-b border-slate-200 bg-white pb-3 mb-2">
         {/* 汉堡菜单（预留） */}
         <button type="button" className="p-1.5 rounded-lg hover:bg-slate-100 text-slate-500 flex-shrink-0" aria-label="菜单">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -189,24 +201,41 @@ export const AgentChatPage: React.FC = () => {
           <span className="text-slate-800 font-medium">聊天</span>
         </nav>
 
-        {/* Agent pill */}
-        <div className="relative flex-shrink-0">
-          <div className="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm text-slate-700 cursor-pointer hover:bg-slate-100 transition-colors pointer-events-none select-none">
-            <span>{agents.find(a => a.config.id === currentAgentId)?.config.name ?? 'main'}</span>
-            <svg className="w-3 h-3 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        {/* Agent pill：自定义下拉，避免 Wails WebView 中透明 select 覆盖层异常放大 */}
+        <div className="relative flex-shrink-0" ref={agentMenuRef}>
+          <button
+            type="button"
+            onClick={() => setAgentMenuOpen((o) => !o)}
+            className="flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm text-slate-700 hover:bg-slate-100 transition-colors"
+            aria-expanded={agentMenuOpen}
+            aria-haspopup="listbox"
+          >
+            <span>{currentAgent?.config.name ?? 'main'}</span>
+            <svg className={`w-3 h-3 text-slate-400 transition-transform ${agentMenuOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
             </svg>
-          </div>
-          <select
-            value={currentAgentId ?? ''}
-            onChange={(e) => { const id = e.target.value; if (id) selectAgent(id); }}
-            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
-            style={{ fontSize: '16px' }}
-          >
-            {agents.map((a) => (
-              <option key={a.config.id} value={a.config.id}>{a.config.name}</option>
-            ))}
-          </select>
+          </button>
+          {agentMenuOpen && (
+            <ul
+              className="absolute left-0 top-full z-50 mt-1 min-w-[160px] rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+              role="listbox"
+            >
+              {agents.map((a) => (
+                <li key={a.config.id} role="option" aria-selected={a.config.id === currentAgentId}>
+                  <button
+                    type="button"
+                    className={`w-full px-3 py-2 text-left text-sm hover:bg-slate-50 ${a.config.id === currentAgentId ? 'bg-red-50 font-medium text-red-700' : 'text-slate-700'}`}
+                    onClick={() => {
+                      selectAgent(a.config.id)
+                      setAgentMenuOpen(false)
+                    }}
+                  >
+                    {a.config.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
 
         {/* Model pill */}
@@ -243,8 +272,8 @@ export const AgentChatPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 消息区域 */}
-      <div className="flex-1 min-h-0 overflow-y-auto">
+      {/* 消息区域：min-w-0 防止 flex 子项横向撑破导致布局错位 */}
+      <div className="min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden">
         <ChatMessages
           messages={currentMessages}
           isLoading={isLoading}
@@ -254,8 +283,8 @@ export const AgentChatPage: React.FC = () => {
         />
       </div>
 
-      {/* 浮动输入栏 */}
-      <div className="pt-4 pb-2">
+      {/* 底部输入栏 */}
+      <div className="flex-shrink-0 border-t border-slate-100 bg-white pt-4 pb-2">
         <ChatInput
           onSend={(msg) => sendMessage(msg)}
           isLoading={isLoading}

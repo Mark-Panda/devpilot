@@ -73,7 +73,9 @@ export default function Layout({ children }: LayoutProps) {
           </div>
         </aside>
       )}
-      <main className="app-content">{children}</main>
+      <main className="app-content">
+        <div className="app-route">{children}</div>
+      </main>
     </div>
   );
 }
