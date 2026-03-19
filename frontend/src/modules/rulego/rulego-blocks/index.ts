@@ -7,6 +7,7 @@ import "./blocks/jsTransform";
 import "./blocks/jsSwitch";
 import "./blocks/break";
 import "./blocks/join";
+import "./blocks/flow";
 import "./blocks/fork";
 import "./blocks/for";
 import "./blocks/groupAction";
@@ -80,6 +81,7 @@ export const toolbox = {
       name: "流程控制",
       categorystyle: "rulego_flow",
       contents: [
+        { kind: "block" as const, type: "rulego_flow" },
         { kind: "block" as const, type: "rulego_fork" },
         { kind: "block" as const, type: "rulego_break" },
       ],

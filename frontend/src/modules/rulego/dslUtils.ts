@@ -16,6 +16,21 @@ export function getEnabledFromDefinition(definition: string): boolean {
 }
 
 /**
+ * 判断规则链是否为子规则链（DSL 中 ruleChain.root === false）。
+ * 用于子规则链组件的 targetId 下拉选项筛选。
+ */
+export function isSubRuleChain(definition: string): boolean {
+  if (!definition?.trim()) return false;
+  try {
+    const parsed = JSON.parse(definition);
+    const chain = parsed?.ruleChain;
+    return chain != null && typeof chain === "object" && chain.root === false;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * 将 definition 中的 ruleChain.disabled 设为指定值，用于列表「开启/关闭」持久化。
  */
 export function setDisabledInDefinition(definition: string, disabled: boolean): string {

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as ScratchBlocks from "scratch-blocks";
 import type { WorkspaceSvg, Block, BlockSvg } from "blockly/core";
-import { getEnabledFromDefinition } from "./dslUtils";
+import { getEnabledFromDefinition, isSubRuleChain } from "./dslUtils";
 import { useRuleGoRules } from "./useRuleGoRules";
 import {
   executeRuleGoRuleByDefinition,
@@ -67,6 +67,8 @@ const scratchTheme = new ScratchBlocks.Theme(
 
 (ScratchBlocks as { ScratchMsgs?: { setLocale?: (locale: string) => void } }).ScratchMsgs?.setLocale?.("zh-cn");
 
+type SubRuleChainOption = { id: string; name: string };
+
 type BlockConfigModalProps = {
   blockId: string | null;
   workspaceRef: React.RefObject<WorkspaceSvg | null>;
@@ -74,11 +76,13 @@ type BlockConfigModalProps = {
   onSaved?: () => void;
   /** 内嵌模式：在右侧属性面板中渲染，无遮罩无取消 */
   inline?: boolean;
+  /** 子规则链列表（DSL 中 root 为 false 的规则链），用于 flow 块的 targetId 下拉 */
+  subRuleChains?: SubRuleChainOption[];
 };
 
 type CaseItem = { case: string; then: string };
 
-function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: BlockConfigModalProps) {
+function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline, subRuleChains = [] }: BlockConfigModalProps) {
   const block = blockId && workspaceRef.current ? workspaceRef.current.getBlockById(blockId) : null;
   const [form, setForm] = useState<Record<string, string | boolean>>({});
   const [switchCases, setSwitchCases] = useState<CaseItem[]>([{ case: "true", then: "Case1" }]);
@@ -228,6 +232,10 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
     if (block.type === "rulego_fork") {
       next.FORK_BRANCH_COUNT = String((block as Block & { forkCount_?: number }).forkCount_ ?? 2);
     }
+    if (block.type === "rulego_flow") {
+      next.FLOW_TARGET_ID = get("FLOW_TARGET_ID") ?? "";
+      next.FLOW_EXTEND = getBool("FLOW_EXTEND");
+    }
     if (block.type === "rulego_join") {
       const raw = get("JOIN_EXTRA_INCOMINGS") || "";
       const extra = raw ? raw.split(",").map((s) => s.trim()).filter(Boolean) : [];
@@ -368,6 +376,10 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
       const b = block as Block & { forkCount_?: number; updateShape_?: () => void };
       b.forkCount_ = branchCount;
       b.updateShape_?.();
+    }
+    if (block.type === "rulego_flow") {
+      block.setFieldValue(String(form.FLOW_TARGET_ID ?? ""), "FLOW_TARGET_ID");
+      block.setFieldValue(form.FLOW_EXTEND ? "TRUE" : "FALSE", "FLOW_EXTEND");
     }
     if (block.type === "rulego_dbClient") {
       const sql = String(form.DB_SQL ?? "");
@@ -793,6 +805,35 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline }: B
             />
           </label>
         )}
+      {block.type === "rulego_flow" && (
+        <>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>子规则链 (targetId)</span>
+            <select
+              value={String(form.FLOW_TARGET_ID ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, FLOW_TARGET_ID: e.target.value }))}
+              aria-label="选择子规则链"
+            >
+              <option value="">请选择子规则链</option>
+              {subRuleChains.map((sc) => (
+                <option key={sc.id} value={sc.id}>
+                  {sc.name} ({sc.id})
+                </option>
+              ))}
+            </select>
+            <small className="form-hint">仅显示规则管理中 root 为 false 的子规则链，选择后自动填充 ID</small>
+          </label>
+          <label className="form-field">
+            <span>继承子规则输出 (extend)</span>
+            <input
+              type="checkbox"
+              checked={Boolean(form.FLOW_EXTEND)}
+              onChange={(e) => setForm((f) => ({ ...f, FLOW_EXTEND: e.target.checked }))}
+            />
+            <small className="form-hint">true 时子规则链每个输出作为下一节点输入；false 时合并为 Success/Failure</small>
+          </label>
+        </>
+      )}
       {block.type === "rulego_delay" && (
         <>
           <label className="form-field">
@@ -1507,6 +1548,12 @@ export default function RuleGoScratchEditorPage() {
   }, [name, debugMode, root, enabled]);
 
   const editingRule = useMemo(() => rules.find((rule) => rule.id === id), [rules, id]);
+
+  /** 规则管理中 root 为 false 的子规则链，供 flow 块 targetId 下拉选择 */
+  const subRuleChains = useMemo(
+    () => rules.filter((r) => isSubRuleChain(r.definition ?? "")).map((r) => ({ id: r.id, name: r.name })),
+    [rules]
+  );
 
   const handleCanvasDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -2439,6 +2486,7 @@ export default function RuleGoScratchEditorPage() {
                 }
               }}
               inline
+              subRuleChains={subRuleChains}
             />
           </div>
         ) : null}
