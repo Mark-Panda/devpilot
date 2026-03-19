@@ -130,7 +130,7 @@ body {
   width: 100%;
   display: grid;
   grid-template-rows: auto auto minmax(0, 1fr) auto;
-  background: #f8fafc;
+  background: #fafafa;
 }
 
 .agent-chat-shell--welcome {
@@ -147,12 +147,12 @@ body {
 .agent-chat-composer {
   flex-shrink: 0;
   background: #ffffff;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid #e7e5e4;
   padding: 16px 24px 20px;
 }
 
 .agent-chat-composer-inner {
-  max-width: 48rem;
+  max-width: 56rem;
   margin: 0 auto;
   width: 100%;
 }
@@ -206,6 +206,48 @@ body {
 .app-nav-item.is-active {
   background: rgba(59, 130, 246, 0.25);
   color: #ffffff;
+}
+
+/* ========== OpenClaw 参考：浅色壳 + 侧栏红色选中条（RuleGo 全屏编辑器除外）========== */
+.app-shell--openclaw {
+  background: #fafafa;
+}
+
+.app-sidebar.app-sidebar--openclaw {
+  background: #f5f5f5;
+  border-right: 1px solid #e7e5e4;
+  color: #44403c;
+}
+
+.app-sidebar--openclaw .app-nav-group-label {
+  color: #78716c;
+}
+
+.app-sidebar--openclaw .app-nav-item {
+  color: #57534e;
+}
+
+.app-sidebar--openclaw .app-nav-item:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #1c1917;
+}
+
+.app-sidebar--openclaw .app-nav-item.is-active {
+  background: #ffe4e6;
+  color: #be123c;
+  border-left: 3px solid #e11d48;
+  padding-left: 9px;
+  border-radius: 0 10px 10px 0;
+}
+
+.app-sidebar--openclaw .app-version {
+  color: #78716c;
+  border-top: 1px solid #e7e5e4;
+  padding-top: 16px;
+}
+
+.app-shell--openclaw .app-content {
+  background: #fafafa;
 }
 
 .app-content {

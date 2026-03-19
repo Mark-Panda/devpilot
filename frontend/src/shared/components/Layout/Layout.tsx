@@ -39,11 +39,15 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const isRuleGoEditor = location.pathname.startsWith("/rulego/editor");
   const isChatRoute = location.pathname === "/agent";
+  /** OpenClaw 风格浅色侧栏 + 主区底（RuleGo 全屏编辑器除外） */
+  const openClawChrome = !isRuleGoEditor;
 
   return (
-    <div className={`app-shell${isRuleGoEditor ? " app-shell-full" : ""}`}>
+    <div
+      className={`app-shell${isRuleGoEditor ? " app-shell-full" : ""}${openClawChrome ? " app-shell--openclaw" : ""}`}
+    >
       {!isRuleGoEditor && (
-        <aside className="app-sidebar">
+        <aside className={`app-sidebar${openClawChrome ? " app-sidebar--openclaw" : ""}`}>
           <div className="app-brand">
             <img src="/devpilot-logo.png" alt="DevPilot" className="app-brand-logo" />
           </div>
