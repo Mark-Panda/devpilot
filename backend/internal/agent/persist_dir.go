@@ -96,6 +96,15 @@ func globalMcpConfigPath() string {
 	return filepath.Join(base, "mcp.json")
 }
 
+// globalStudiosPath ~/.devpilot/studios.json
+func globalStudiosPath() string {
+	base := agentGlobalDataDirOrEmpty()
+	if base == "" {
+		return ""
+	}
+	return filepath.Join(base, "studios.json")
+}
+
 func globalAgentMemoryDir() string {
 	base := agentGlobalDataDirOrEmpty()
 	if base == "" {

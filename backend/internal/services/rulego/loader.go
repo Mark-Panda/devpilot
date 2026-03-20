@@ -41,7 +41,8 @@ func logRegisteredComponents() {
 // LoadRuleChain 将指定规则链从数据库加载到规则引擎池。
 // 仅当规则存在、已启用且 definition 非空时加载；若已在池中则 ReloadSelf 更新定义。
 func (s *Service) LoadRuleChain(ruleID string) error {
-	rule, err := s.store.GetByID(context.Background(), ruleID)
+	ctx := context.Background()
+	rule, err := s.store.GetByID(ctx, ruleID)
 	if err != nil {
 		if errors.Is(err, pebble.ErrNotFound) {
 			return errors.New("规则不存在")
@@ -57,7 +58,7 @@ func (s *Service) LoadRuleChain(ruleID string) error {
 
 	defStr := rule.Definition
 	if s.llmConfigLister != nil {
-		if patched, err := PatchDefinitionWithLLMKeys(context.Background(), defStr, s.llmConfigLister); err == nil {
+		if patched, err := PatchDefinitionWithLLMKeys(ctx, defStr, s.llmConfigLister); err == nil {
 			defStr = patched
 		}
 	}
@@ -92,7 +93,8 @@ func (s *Service) UnloadRuleChain(ruleID string) error {
 // 系统启动时调用；返回成功加载的数量与首次遇到的错误（若有）。
 func (s *Service) LoadAllEnabledRuleChains() (loaded int, err error) {
 	logRegisteredComponents()
-	rules, err := s.store.List(context.Background())
+	ctx := context.Background()
+	rules, err := s.store.List(ctx)
 	if err != nil {
 		return 0, err
 	}
@@ -105,7 +107,7 @@ func (s *Service) LoadAllEnabledRuleChains() (loaded int, err error) {
 		}
 		defStr := rule.Definition
 		if s.llmConfigLister != nil {
-			if patched, err := PatchDefinitionWithLLMKeys(context.Background(), defStr, s.llmConfigLister); err == nil {
+			if patched, err := PatchDefinitionWithLLMKeys(ctx, defStr, s.llmConfigLister); err == nil {
 				defStr = patched
 			}
 		}

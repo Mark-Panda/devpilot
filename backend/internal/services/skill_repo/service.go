@@ -7,6 +7,7 @@ import (
 	"errors"
 	"io"
 	"io/fs"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -80,6 +81,7 @@ func (s *Service) ListSkillPackages() ([]SkillPackageItem, error) {
 		subDir := filepath.Join(dir, e.Name())
 		skill, err := llm.LoadSkillFromDir(subDir)
 		if err != nil {
+			log.Printf("[skill_repo] 跳过技能目录 %q: %v", e.Name(), err)
 			continue
 		}
 		if skill == nil {

@@ -62,8 +62,8 @@ declare global {
           Chat: (agentId: string, message: string) => Promise<string>
           SendMessage: (fromAgentId: string, toAgentId: string, content: string, msgType: string) => Promise<void>
           GetAgentTree: (rootId: string) => Promise<AgentTreeNode>
-          GetAgentChatHistory: (agentId: string) => Promise<ChatHistoryEntry[]>
-          ClearAgentChatHistory: (agentId: string) => Promise<void>
+          GetAgentChatHistory: (agentId: string, studioId: string) => Promise<ChatHistoryEntry[]>
+          ClearAgentChatHistory: (agentId: string, studioId: string) => Promise<void>
           UpdateAgentModelConfig: (agentId: string, mc: ModelConfig) => Promise<AgentInfo>
           UpdateAgent: (config: AgentConfig) => Promise<AgentInfo>
           ListMCPServerPresets: () => Promise<MCPServerPreset[]>
@@ -76,6 +76,12 @@ declare global {
           ListFiles: (pattern: string) => Promise<string[]>
           GetProjectConfig: (key: string) => Promise<any>
           SetProjectConfig: (key: string, value: any) => Promise<void>
+          ListStudios: () => Promise<import('../studio/types').Studio[]>
+          CreateStudio: (name: string, mainAgentID: string) => Promise<import('../studio/types').Studio>
+          DeleteStudio: (studioID: string) => Promise<void>
+          GetStudioDetail: (studioID: string) => Promise<import('../studio/types').StudioDetail>
+          GetStudioProgress: (studioID: string) => Promise<import('../studio/types').StudioProgressEvent[]>
+          ChatInStudio: (studioID: string, agentID: string, message: string) => Promise<string>
         }
       }
     }
@@ -126,12 +132,13 @@ export const agentApi = {
     return await window.go.main.App.GetAgentTree(rootId)
   },
 
-  getAgentChatHistory: async (agentId: string): Promise<ChatHistoryEntry[]> => {
-    return await window.go.main.App.GetAgentChatHistory(agentId)
+  /** studioId 为空为聊天页全局会话；非空为工作室独立会话 */
+  getAgentChatHistory: async (agentId: string, studioId = ''): Promise<ChatHistoryEntry[]> => {
+    return await window.go.main.App.GetAgentChatHistory(agentId, studioId)
   },
 
-  clearAgentChatHistory: async (agentId: string): Promise<void> => {
-    return await window.go.main.App.ClearAgentChatHistory(agentId)
+  clearAgentChatHistory: async (agentId: string, studioId = ''): Promise<void> => {
+    return await window.go.main.App.ClearAgentChatHistory(agentId, studioId)
   },
 
   updateAgentModelConfig: async (agentId: string, mc: ModelConfig): Promise<AgentInfo> => {

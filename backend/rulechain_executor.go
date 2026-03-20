@@ -14,8 +14,8 @@ func InitRuleChainExecutor(r *Runtime) {
 	if r == nil {
 		return
 	}
-	svc, ok := r.RuleGoService().(*rulego.Service)
-	if !ok {
+	svc := r.RuleGoService()
+	if svc == nil {
 		return
 	}
 	llm.RuleChainExecutor = func(ctx context.Context, ruleChainID string, userInput string) (string, error) {

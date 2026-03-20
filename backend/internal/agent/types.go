@@ -96,6 +96,17 @@ type AgentInfo struct {
 	Children    []string    `json:"children,omitempty"` // 子代理 ID 列表
 }
 
+// AgentPeerSummary 系统提示中展示其他 Agent（如子代理）的简要信息
+type AgentPeerSummary struct {
+	ID   string    `json:"id"`
+	Name string    `json:"name"`
+	Role string    `json:"role"`
+	Type AgentType `json:"type"`
+}
+
+// PeerAgentLookup 按 ID 查询其他 Agent；实现须并发安全（如对编排器读锁）
+type PeerAgentLookup func(agentID string) (AgentPeerSummary, bool)
+
 // Agent 代理接口
 type Agent interface {
 	// ID 返回代理唯一标识

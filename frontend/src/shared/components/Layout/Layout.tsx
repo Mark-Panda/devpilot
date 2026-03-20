@@ -5,6 +5,7 @@ const menuGroups: { group?: string; items: { path: string; label: string; end?: 
   {
     items: [
       { path: "/agent", label: "聊天" },
+      { path: "/studios", label: "工作室" },
     ],
   },
   {
@@ -40,7 +41,8 @@ type LayoutProps = {
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
   const isRuleGoEditor = location.pathname.startsWith("/rulego/editor");
-  const isChatRoute = location.pathname === "/agent";
+  const isChatRoute =
+    location.pathname === "/agent" || location.pathname.startsWith("/studios");
   /** OpenClaw 风格浅色侧栏 + 主区底（RuleGo 全屏编辑器除外） */
   const openClawChrome = !isRuleGoEditor;
 

@@ -32,11 +32,13 @@ type UpdateModelConfigInput struct {
 	Models          []string `json:"models"`
 }
 
+// ListModelConfigs 供 Wails 绑定：首参不可为 context.Context，否则前端旧调用会与生成绑定错位，导致回调 JSON 解析失败。
 func (s *Service) ListModelConfigs() ([]models.ModelConfig, error) {
 	return s.store.List(context.Background())
 }
 
 func (s *Service) CreateModelConfig(input CreateModelConfigInput) (models.ModelConfig, error) {
+	ctx := context.Background()
 	modelsTrimmed := make([]string, 0, len(input.Models))
 	for _, m := range input.Models {
 		if s := strings.TrimSpace(m); s != "" {
@@ -53,7 +55,7 @@ func (s *Service) CreateModelConfig(input CreateModelConfigInput) (models.ModelC
 		return models.ModelConfig{}, err
 	}
 
-	result, err := s.store.Create(context.Background(), config)
+	result, err := s.store.Create(ctx, config)
 	if err != nil {
 		return models.ModelConfig{}, err
 	}
@@ -61,7 +63,8 @@ func (s *Service) CreateModelConfig(input CreateModelConfigInput) (models.ModelC
 }
 
 func (s *Service) UpdateModelConfig(id string, input UpdateModelConfigInput) (models.ModelConfig, error) {
-	existing, err := s.store.GetByID(context.Background(), id)
+	ctx := context.Background()
+	existing, err := s.store.GetByID(ctx, id)
 	if err != nil {
 		return models.ModelConfig{}, err
 	}
@@ -85,7 +88,7 @@ func (s *Service) UpdateModelConfig(id string, input UpdateModelConfigInput) (mo
 		return models.ModelConfig{}, err
 	}
 
-	return s.store.Update(context.Background(), id, config)
+	return s.store.Update(ctx, id, config)
 }
 
 func (s *Service) DeleteModelConfig(id string) error {

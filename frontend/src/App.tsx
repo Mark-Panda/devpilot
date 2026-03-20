@@ -9,6 +9,8 @@ import { PlaceholderPage } from "./modules/placeholder";
 import { AgentChatPage } from "./modules/agent/pages/AgentChatPage";
 import { AgentManagementPage } from "./modules/agent/pages/AgentManagementPage";
 import { MCPManagementPage } from "./modules/agent/pages/MCPManagementPage";
+import { StudioListPage } from "./modules/studio/pages/StudioListPage";
+import { StudioWorkspacePage } from "./modules/studio/pages/StudioWorkspacePage";
 
 export default function App() {
   return (
@@ -17,6 +19,8 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Navigate to="/agent" replace />} />
           <Route path="/agent" element={<AgentChatPage />} />
+          <Route path="/studios" element={<StudioListPage />} />
+          <Route path="/studios/:studioId" element={<StudioWorkspacePage />} />
           <Route path="/route-rewrite" element={<RouteRewritePage />} />
           <Route path="/curl-compare" element={<CurlComparePage />} />
           <Route path="/terminal" element={<PlaceholderPage title="终端" />} />

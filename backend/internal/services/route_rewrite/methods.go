@@ -38,6 +38,7 @@ func (s *Service) ListRouteRewriteRules() ([]models.RouteRewriteRule, error) {
 }
 
 func (s *Service) CreateRouteRewriteRule(input CreateRouteRewriteInput) (models.RouteRewriteRule, error) {
+	ctx := context.Background()
 	base := models.RouteRewriteRule{
 		Route:        strings.TrimSpace(input.Route),
 		Method:       strings.ToUpper(strings.TrimSpace(input.Method)),
@@ -48,7 +49,7 @@ func (s *Service) CreateRouteRewriteRule(input CreateRouteRewriteInput) (models.
 		return models.RouteRewriteRule{}, err
 	}
 
-	rule, err := s.store.Create(context.Background(), base)
+	rule, err := s.store.Create(ctx, base)
 	if err != nil {
 		return models.RouteRewriteRule{}, err
 	}
@@ -56,7 +57,8 @@ func (s *Service) CreateRouteRewriteRule(input CreateRouteRewriteInput) (models.
 }
 
 func (s *Service) UpdateRouteRewriteRule(id string, input UpdateRouteRewriteInput) (models.RouteRewriteRule, error) {
-	existing, err := s.store.GetByID(context.Background(), id)
+	ctx := context.Background()
+	existing, err := s.store.GetByID(ctx, id)
 	if err != nil {
 		return models.RouteRewriteRule{}, err
 	}
@@ -75,7 +77,7 @@ func (s *Service) UpdateRouteRewriteRule(id string, input UpdateRouteRewriteInpu
 		return models.RouteRewriteRule{}, err
 	}
 
-	return s.store.Update(context.Background(), id, rule)
+	return s.store.Update(ctx, id, rule)
 }
 
 func (s *Service) DeleteRouteRewriteRule(id string) error {

@@ -30,8 +30,14 @@ func sanitizeAgentIDForFile(id string) string {
 	}, id)
 }
 
-// agentMemoryFilePath 全局 ~/.devpilot/agent-memory/<id>.json
+// agentMemoryFilePath 全局聊天会话：~/.devpilot/agent-memory/<id>.json
 func agentMemoryFilePath(agentID string) string {
+	return agentMemoryFilePathForSession(agentID, "")
+}
+
+// agentMemoryFilePathForSession studioID 为空为「聊天」页全局会话；非空为某工作室内该 Agent 的独立会话（与 OpenClaw 多 session 一致）
+func agentMemoryFilePathForSession(agentID, studioID string) string {
+	studioID = strings.TrimSpace(studioID)
 	if agentID == "" {
 		return ""
 	}
@@ -39,7 +45,33 @@ func agentMemoryFilePath(agentID string) string {
 	if dir == "" {
 		return ""
 	}
-	return filepath.Join(dir, sanitizeAgentIDForFile(agentID)+".json")
+	safeAgent := sanitizeAgentIDForFile(agentID)
+	if studioID == "" {
+		return filepath.Join(dir, safeAgent+".json")
+	}
+	safeStudio := sanitizeAgentIDForFile(studioID)
+	return filepath.Join(dir, "studio_"+safeStudio+"_"+safeAgent+".json")
+}
+
+// DeleteAllSessionMemoryFilesForAgent 删除该 Agent 的全局会话与所有 studio_*_<agent>.json 及摘要
+func DeleteAllSessionMemoryFilesForAgent(agentID string) {
+	if agentID == "" {
+		return
+	}
+	dir := globalAgentMemoryDir()
+	if dir == "" {
+		return
+	}
+	safe := sanitizeAgentIDForFile(agentID)
+	globalPath := filepath.Join(dir, safe+".json")
+	deleteAgentMemoryFile(globalPath)
+	deleteMemorySummaryFile(memorySummaryFilePath(globalPath))
+	pattern := filepath.Join(dir, "studio_*_"+safe+".json")
+	matches, _ := filepath.Glob(pattern)
+	for _, m := range matches {
+		deleteAgentMemoryFile(m)
+		deleteMemorySummaryFile(memorySummaryFilePath(m))
+	}
 }
 
 func projectScopedAgentMemoryFilePath(projectRoot, agentID string) string {

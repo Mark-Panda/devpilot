@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"strings"
 	"sync"
 
 	"github.com/rs/zerolog/log"
@@ -29,6 +30,9 @@ type Orchestrator struct {
 	agents     map[string]Agent
 	messageBus MessageBus
 	projectCtx ProjectContext
+
+	studioMu       sync.RWMutex
+	studioProgress func(StudioProgressEvent) // 工作室委派/子 Agent 进度，可为 nil
 }
 
 // NewOrchestrator 创建编排器
@@ -37,6 +41,38 @@ func NewOrchestrator(projectCtx ProjectContext) *Orchestrator {
 		agents:     make(map[string]Agent),
 		messageBus: NewMessageBus(100),
 		projectCtx: projectCtx,
+	}
+}
+
+// SetStudioProgressHook 注册工作室进度回调（须在恢复 Agent 之前调用）
+func (o *Orchestrator) SetStudioProgressHook(h func(StudioProgressEvent)) {
+	o.studioMu.Lock()
+	defer o.studioMu.Unlock()
+	o.studioProgress = h
+}
+
+func (o *Orchestrator) studioProgressHook() func(StudioProgressEvent) {
+	o.studioMu.RLock()
+	defer o.studioMu.RUnlock()
+	return o.studioProgress
+}
+
+// peerAgentLookup 供各 Agent 构建系统提示时解析其他 Agent（须并发安全）
+func (o *Orchestrator) peerAgentLookup() PeerAgentLookup {
+	return func(agentID string) (AgentPeerSummary, bool) {
+		o.mu.RLock()
+		defer o.mu.RUnlock()
+		ag, ok := o.agents[agentID]
+		if !ok {
+			return AgentPeerSummary{}, false
+		}
+		c := ag.Config()
+		return AgentPeerSummary{
+			ID:   c.ID,
+			Name: c.Name,
+			Role: c.Role,
+			Type: c.Type,
+		}, true
 	}
 }
 
@@ -50,8 +86,9 @@ func (o *Orchestrator) CreateAgent(ctx context.Context, config AgentConfig) (Age
 		return nil, fmt.Errorf("agent %s already exists", config.ID)
 	}
 
-	// 创建代理
-	agent, err := NewAgent(ctx, config, o.messageBus, o.projectCtx)
+	lookup := o.peerAgentLookup()
+	hook := o.studioProgressHook()
+	agent, err := NewAgent(ctx, config, o.messageBus, o.projectCtx, lookup, hook)
 	if err != nil {
 		return nil, fmt.Errorf("create agent: %w", err)
 	}
@@ -129,8 +166,9 @@ func (o *Orchestrator) DestroyAgent(agentID string) error {
 	}
 
 	if impl, ok := agent.(*agentImpl); ok {
-		_ = impl.ClearChatHistory()
+		impl.wipeMemoryState()
 	}
+	DeleteAllSessionMemoryFilesForAgent(agentID)
 
 	// 从父代理移除
 	config := agent.Config()
@@ -174,30 +212,43 @@ func (o *Orchestrator) Chat(ctx context.Context, agentID string, userMessage str
 	return agent.Process(ctx, userMessage)
 }
 
-// GetAgentChatHistory 返回代理的 user/assistant 对话记忆（与模型上下文一致）
-func (o *Orchestrator) GetAgentChatHistory(agentID string) ([]ChatHistoryEntry, error) {
-	agent, err := o.GetAgent(agentID)
+// GetAgentChatHistory 从磁盘读取会话；studioID 为空为聊天页全局会话，非空为对应工作室的独立会话
+func (o *Orchestrator) GetAgentChatHistory(ctx context.Context, agentID, studioID string) ([]ChatHistoryEntry, error) {
+	_ = ctx
+	agentID = strings.TrimSpace(agentID)
+	if agentID == "" {
+		return nil, fmt.Errorf("agent id empty")
+	}
+	studioID = strings.TrimSpace(studioID)
+	path := agentMemoryFilePathForSession(agentID, studioID)
+	mem, err := loadChatHistoryFromFile(path)
 	if err != nil {
 		return nil, err
 	}
-	impl, ok := agent.(*agentImpl)
-	if !ok {
-		return nil, fmt.Errorf("unexpected agent implementation")
-	}
-	return impl.ChatHistory(), nil
+	return memoryToEntries(mem), nil
 }
 
-// ClearAgentChatHistory 清空代理对话记忆并删除本地持久化文件
-func (o *Orchestrator) ClearAgentChatHistory(agentID string) error {
+// ClearAgentChatHistory 清空指定会话的磁盘与（若与当前内存会话一致）内存
+func (o *Orchestrator) ClearAgentChatHistory(agentID, studioID string) error {
+	agentID = strings.TrimSpace(agentID)
+	if agentID == "" {
+		return fmt.Errorf("agent id empty")
+	}
+	studioID = strings.TrimSpace(studioID)
+	path := agentMemoryFilePathForSession(agentID, studioID)
+	deleteAgentMemoryFile(path)
+	deleteMemorySummaryFile(memorySummaryFilePath(path))
+
 	agent, err := o.GetAgent(agentID)
 	if err != nil {
-		return err
+		return nil
 	}
 	impl, ok := agent.(*agentImpl)
 	if !ok {
 		return fmt.Errorf("unexpected agent implementation")
 	}
-	return impl.ClearChatHistory()
+	impl.clearMemoryIfSessionMatches(studioID)
+	return nil
 }
 
 // UpdateAgentModelConfig 更新代理的模型配置并重建 LLM 客户端

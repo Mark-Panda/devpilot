@@ -24,6 +24,7 @@ Wails + Go 后端 + React 前端。项目架构参考根目录的 devpilot-archi
 - 遵循架构文档中约定的模块划分与文件命名。
 - Go 结构体添加 `json` tag；前端接口字段使用 snake_case。
 - IPC 走 Wails，HTTP 走内置 Gin Server。
+- **Wails 绑定**：通过 `main.Bind` 暴露的 `*Service` 方法**不要**把 `context.Context` 作为第一个参数；生成的前端绑定不会与 Go 侧自动对齐，易造成参数错位，进而在 `runtime.js` 的 `Callback` 里出现 `Invalid JSON passed to callback: Unexpected EOF`。应在方法内使用 `context.Background()`（`main.App` 上已由 Wails 注入的 `ctx` 除外）。
 - 避免未被需求驱动的抽象与“顺手重构”。
 
 ## RuleGo 可视化组件块（frontend/src/modules/rulego）

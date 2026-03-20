@@ -2,7 +2,9 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/rs/zerolog/log"
 )
@@ -11,6 +13,12 @@ import (
 type Service struct {
 	orchestrator *Orchestrator
 	projectCtx   ProjectContext
+
+	studioStore   *StudioStore
+	studioEmitMu  sync.RWMutex
+	studioEmitter func(StudioProgressEvent)
+
+	persistMu sync.Mutex // 串行化 agents.json 写入，避免并发丢更新
 }
 
 // NewService 创建代理服务
@@ -24,9 +32,27 @@ func NewService(projectPath string) (*Service, error) {
 	// 创建编排器
 	orchestrator := NewOrchestrator(projectCtx)
 
+	var studioStore *StudioStore
+	if p := globalStudiosPath(); p != "" {
+		st, err := NewStudioStore(p)
+		if err != nil {
+			log.Warn().Err(err).Msg("studio store init failed, studio features disabled")
+		} else {
+			studioStore = st
+		}
+	}
+
 	s := &Service{
-		orchestrator: orchestrator,
-		projectCtx:   projectCtx,
+		orchestrator:  orchestrator,
+		projectCtx:    projectCtx,
+		studioStore:   studioStore,
+		studioEmitter: nil,
+	}
+
+	if studioStore != nil {
+		orchestrator.SetStudioProgressHook(func(ev StudioProgressEvent) {
+			s.onStudioProgress(ev)
+		})
 	}
 
 	configs, err := loadAgentRegistry(projectCtx.RootPath())
@@ -53,7 +79,9 @@ func (s *Service) CreateAgent(ctx context.Context, config AgentConfig) (AgentInf
 	if err != nil {
 		return AgentInfo{}, err
 	}
-	s.persistAgentsRegistry()
+	if err := s.persistAgentsRegistry(); err != nil {
+		return AgentInfo{}, err
+	}
 	return agent.Info(), nil
 }
 
@@ -76,8 +104,7 @@ func (s *Service) DestroyAgent(ctx context.Context, agentID string) error {
 	if err := s.orchestrator.DestroyAgent(agentID); err != nil {
 		return err
 	}
-	s.persistAgentsRegistry()
-	return nil
+	return s.persistAgentsRegistry()
 }
 
 // Chat 与代理对话
@@ -100,14 +127,14 @@ func (s *Service) GetAgentTree(ctx context.Context, rootID string) (*AgentTreeNo
 	return s.orchestrator.GetAgentTree(rootID)
 }
 
-// GetAgentChatHistory 获取代理对话记忆
-func (s *Service) GetAgentChatHistory(ctx context.Context, agentID string) ([]ChatHistoryEntry, error) {
-	return s.orchestrator.GetAgentChatHistory(agentID)
+// GetAgentChatHistory 获取代理对话记忆；studioID 为空为聊天页全局会话，非空为工作室独立会话
+func (s *Service) GetAgentChatHistory(ctx context.Context, agentID, studioID string) ([]ChatHistoryEntry, error) {
+	return s.orchestrator.GetAgentChatHistory(ctx, agentID, studioID)
 }
 
-// ClearAgentChatHistory 清空代理对话记忆
-func (s *Service) ClearAgentChatHistory(ctx context.Context, agentID string) error {
-	return s.orchestrator.ClearAgentChatHistory(agentID)
+// ClearAgentChatHistory 清空指定会话的记忆文件
+func (s *Service) ClearAgentChatHistory(agentID, studioID string) error {
+	return s.orchestrator.ClearAgentChatHistory(agentID, studioID)
 }
 
 // UpdateAgentModelConfig 热切换模型
@@ -119,7 +146,9 @@ func (s *Service) UpdateAgentModelConfig(ctx context.Context, agentID string, mc
 	if err != nil {
 		return AgentInfo{}, err
 	}
-	s.persistAgentsRegistry()
+	if err := s.persistAgentsRegistry(); err != nil {
+		return AgentInfo{}, err
+	}
 	return ag.Info(), nil
 }
 
@@ -132,7 +161,9 @@ func (s *Service) UpdateAgent(ctx context.Context, cfg AgentConfig) (AgentInfo, 
 	if err != nil {
 		return AgentInfo{}, err
 	}
-	s.persistAgentsRegistry()
+	if err := s.persistAgentsRegistry(); err != nil {
+		return AgentInfo{}, err
+	}
 	return ag.Info(), nil
 }
 
@@ -161,7 +192,10 @@ func (s *Service) SaveMCPServerDefinitions(ctx context.Context, servers []MCPSer
 }
 
 // persistAgentsRegistry 将内存中全部 Agent 的配置写回 ~/.devpilot/agents.json。
-func (s *Service) persistAgentsRegistry() {
+func (s *Service) persistAgentsRegistry() error {
+	s.persistMu.Lock()
+	defer s.persistMu.Unlock()
+
 	infos := s.orchestrator.ListAgents()
 	configs := make([]AgentConfig, 0, len(infos))
 	for _, info := range infos {
@@ -169,11 +203,13 @@ func (s *Service) persistAgentsRegistry() {
 	}
 	if len(configs) == 0 {
 		deleteAgentRegistry()
-		return
+		return nil
 	}
 	if err := saveAgentRegistry(configs); err != nil {
 		log.Warn().Err(err).Msg("persist agents registry failed")
+		return fmt.Errorf("persist agents registry: %w", err)
 	}
+	return nil
 }
 
 // GetProjectInfo 获取项目信息
@@ -214,6 +250,12 @@ func (s *Service) SetProjectConfig(ctx context.Context, key string, value interf
 // Shutdown 关闭服务
 func (s *Service) Shutdown() error {
 	log.Info().Msg("shutting down agent service")
-	s.persistAgentsRegistry()
-	return s.orchestrator.Shutdown()
+	var errs []error
+	if err := s.persistAgentsRegistry(); err != nil {
+		errs = append(errs, err)
+	}
+	if err := s.orchestrator.Shutdown(); err != nil {
+		errs = append(errs, err)
+	}
+	return errors.Join(errs...)
 }

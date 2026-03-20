@@ -2,6 +2,8 @@ package backend
 
 import (
 	"context"
+	"fmt"
+
 	"devpilot/backend/internal/agent"
 )
 
@@ -81,18 +83,19 @@ func (w *AgentServiceWrapper) GetAgentTree(ctx context.Context, rootID string) (
 	return w.svc.GetAgentTree(ctx, rootID)
 }
 
-func (w *AgentServiceWrapper) GetAgentChatHistory(ctx context.Context, agentID string) ([]ChatHistoryEntry, error) {
+func (w *AgentServiceWrapper) GetAgentChatHistory(ctx context.Context, agentID, studioID string) ([]ChatHistoryEntry, error) {
 	if w == nil || w.svc == nil {
 		return []ChatHistoryEntry{}, nil
 	}
-	return w.svc.GetAgentChatHistory(ctx, agentID)
+	return w.svc.GetAgentChatHistory(ctx, agentID, studioID)
 }
 
-func (w *AgentServiceWrapper) ClearAgentChatHistory(ctx context.Context, agentID string) error {
+func (w *AgentServiceWrapper) ClearAgentChatHistory(ctx context.Context, agentID, studioID string) error {
 	if w == nil || w.svc == nil {
 		return nil
 	}
-	return w.svc.ClearAgentChatHistory(ctx, agentID)
+	_ = ctx
+	return w.svc.ClearAgentChatHistory(agentID, studioID)
 }
 
 func (w *AgentServiceWrapper) UpdateAgentModelConfig(ctx context.Context, agentID string, mc ModelConfig) (AgentInfo, error) {
@@ -181,4 +184,54 @@ func (w *AgentServiceWrapper) SetProjectConfig(ctx context.Context, key string, 
 		return nil
 	}
 	return w.svc.SetProjectConfig(ctx, key, value)
+}
+
+func (w *AgentServiceWrapper) ListStudios(ctx context.Context) []Studio {
+	if w == nil || w.svc == nil {
+		return []Studio{}
+	}
+	list := w.svc.ListStudios(ctx)
+	if list == nil {
+		return []Studio{}
+	}
+	return list
+}
+
+func (w *AgentServiceWrapper) CreateStudio(ctx context.Context, name, mainAgentID string) (Studio, error) {
+	if w == nil || w.svc == nil {
+		return Studio{}, fmt.Errorf("agent 服务未就绪")
+	}
+	return w.svc.CreateStudio(ctx, name, mainAgentID)
+}
+
+func (w *AgentServiceWrapper) DeleteStudio(ctx context.Context, studioID string) error {
+	if w == nil || w.svc == nil {
+		return fmt.Errorf("agent 服务未就绪")
+	}
+	return w.svc.DeleteStudio(ctx, studioID)
+}
+
+func (w *AgentServiceWrapper) GetStudioDetail(ctx context.Context, studioID string) (StudioDetail, error) {
+	if w == nil || w.svc == nil {
+		return StudioDetail{}, fmt.Errorf("agent 服务未就绪")
+	}
+	return w.svc.GetStudioDetail(ctx, studioID)
+}
+
+func (w *AgentServiceWrapper) GetStudioProgress(ctx context.Context, studioID string) []StudioProgressEvent {
+	if w == nil || w.svc == nil {
+		return []StudioProgressEvent{}
+	}
+	p := w.svc.GetStudioProgress(ctx, studioID)
+	if p == nil {
+		return []StudioProgressEvent{}
+	}
+	return p
+}
+
+func (w *AgentServiceWrapper) ChatInStudio(ctx context.Context, studioID, agentID, message string) (string, error) {
+	if w == nil || w.svc == nil {
+		return "", fmt.Errorf("agent 服务未就绪")
+	}
+	return w.svc.ChatInStudio(ctx, studioID, agentID, message)
 }

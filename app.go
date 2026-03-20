@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 
 	"devpilot/backend"
 
@@ -20,6 +21,7 @@ func NewApp(runtime *backend.Runtime) *App {
 func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	backend.InitRuleChainExecutor(a.runtime)
+	backend.BindStudioProgressEvents(ctx, a.runtime.AgentService())
 }
 
 // OpenSkillZipDialog 打开系统文件选择对话框，让用户选择技能包 zip 文件。返回选中文件路径，取消时返回空字符串。
@@ -97,20 +99,20 @@ func (a *App) GetAgentTree(rootID string) (*backend.AgentTreeNode, error) {
 	return a.runtime.AgentWrapper().GetAgentTree(a.ctx, rootID)
 }
 
-// GetAgentChatHistory 获取代理对话记忆（user/assistant）
-func (a *App) GetAgentChatHistory(agentID string) ([]backend.ChatHistoryEntry, error) {
+// GetAgentChatHistory 获取代理对话记忆（user/assistant）；studioID 为空为聊天页会话，非空为工作室独立会话
+func (a *App) GetAgentChatHistory(agentID string, studioID string) ([]backend.ChatHistoryEntry, error) {
 	if a.runtime.AgentWrapper() == nil {
 		return []backend.ChatHistoryEntry{}, nil
 	}
-	return a.runtime.AgentWrapper().GetAgentChatHistory(a.ctx, agentID)
+	return a.runtime.AgentWrapper().GetAgentChatHistory(a.ctx, agentID, studioID)
 }
 
-// ClearAgentChatHistory 清空代理对话记忆
-func (a *App) ClearAgentChatHistory(agentID string) error {
+// ClearAgentChatHistory 清空指定会话的对话记忆（studioID 空 = 聊天页）
+func (a *App) ClearAgentChatHistory(agentID string, studioID string) error {
 	if a.runtime.AgentWrapper() == nil {
 		return nil
 	}
-	return a.runtime.AgentWrapper().ClearAgentChatHistory(a.ctx, agentID)
+	return a.runtime.AgentWrapper().ClearAgentChatHistory(a.ctx, agentID, studioID)
 }
 
 // UpdateAgentModelConfig 热切换当前代理使用的模型（保留会话记忆）
@@ -211,4 +213,48 @@ func (a *App) SetProjectConfig(key string, value interface{}) error {
 		return nil
 	}
 	return a.runtime.AgentWrapper().SetProjectConfig(a.ctx, key, value)
+}
+
+// ============ 工作室 ============
+
+func (a *App) ListStudios() []backend.Studio {
+	if a.runtime.AgentWrapper() == nil {
+		return []backend.Studio{}
+	}
+	return a.runtime.AgentWrapper().ListStudios(a.ctx)
+}
+
+func (a *App) CreateStudio(name string, mainAgentID string) (backend.Studio, error) {
+	if a.runtime.AgentWrapper() == nil {
+		return backend.Studio{}, fmt.Errorf("agent 服务未就绪")
+	}
+	return a.runtime.AgentWrapper().CreateStudio(a.ctx, name, mainAgentID)
+}
+
+func (a *App) DeleteStudio(studioID string) error {
+	if a.runtime.AgentWrapper() == nil {
+		return fmt.Errorf("agent 服务未就绪")
+	}
+	return a.runtime.AgentWrapper().DeleteStudio(a.ctx, studioID)
+}
+
+func (a *App) GetStudioDetail(studioID string) (backend.StudioDetail, error) {
+	if a.runtime.AgentWrapper() == nil {
+		return backend.StudioDetail{}, fmt.Errorf("agent 服务未就绪")
+	}
+	return a.runtime.AgentWrapper().GetStudioDetail(a.ctx, studioID)
+}
+
+func (a *App) GetStudioProgress(studioID string) []backend.StudioProgressEvent {
+	if a.runtime.AgentWrapper() == nil {
+		return []backend.StudioProgressEvent{}
+	}
+	return a.runtime.AgentWrapper().GetStudioProgress(a.ctx, studioID)
+}
+
+func (a *App) ChatInStudio(studioID string, agentID string, message string) (string, error) {
+	if a.runtime.AgentWrapper() == nil {
+		return "", fmt.Errorf("agent 服务未就绪")
+	}
+	return a.runtime.AgentWrapper().ChatInStudio(a.ctx, studioID, agentID, message)
 }

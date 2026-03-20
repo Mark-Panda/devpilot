@@ -33,11 +33,11 @@ func (r *ruleGoLLMConfigLister) ListLLMConfigs(ctx context.Context) ([]rulego.LL
 }
 
 type Runtime struct {
-	routeRewrite  interface{}
-	modelManage   interface{}
-	ruleGo        interface{}
-	skillRepo     interface{}
-	curlCompare   interface{}
+	routeRewrite  *route_rewrite.Service
+	modelManage   *model_management.Service
+	ruleGo        *rulego.Service
+	skillRepo     *skill_repo.Service
+	curlCompare   *curl_compare.Service
 	agentService  *agent.Service
 	agentWrapper  *AgentServiceWrapper
 	close         func() error
@@ -92,23 +92,23 @@ func InitRuntime(dataDir string, initSkillsFS fs.FS) (*Runtime, error) {
 	}, nil
 }
 
-func (r *Runtime) RouteRewriteService() interface{} {
+func (r *Runtime) RouteRewriteService() *route_rewrite.Service {
 	return r.routeRewrite
 }
 
-func (r *Runtime) ModelManagementService() interface{} {
+func (r *Runtime) ModelManagementService() *model_management.Service {
 	return r.modelManage
 }
 
-func (r *Runtime) RuleGoService() interface{} {
+func (r *Runtime) RuleGoService() *rulego.Service {
 	return r.ruleGo
 }
 
-func (r *Runtime) SkillRepoService() interface{} {
+func (r *Runtime) SkillRepoService() *skill_repo.Service {
 	return r.skillRepo
 }
 
-func (r *Runtime) CurlCompareService() interface{} {
+func (r *Runtime) CurlCompareService() *curl_compare.Service {
 	return r.curlCompare
 }
 

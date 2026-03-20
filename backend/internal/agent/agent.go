@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -46,6 +47,8 @@ type agentImpl struct {
 	// 多轮对话记忆（仅 user/assistant 文本；与 OpenClaw 类 session 一致，供模型上下文）
 	memory     []llms.MessageContent
 	memoryPath string
+	// 当前载入的记忆所属工作室：空串 = 聊天页全局会话；非空 = ~/.devpilot/agent-memory/studio_<id>_<agent>.json
+	memorySessionStudioID string
 	// 超长记忆压缩后的滚动摘要（注入系统提示；持久化 *-summary.txt）
 	memorySummary     string
 	memorySummaryPath string
@@ -53,10 +56,18 @@ type agentImpl struct {
 	messagesCh <-chan Message
 	stopCh     chan struct{}
 	children   map[string]bool
+
+	// 解析其他 Agent 信息（系统提示中列出子代理等）；由 Orchestrator 注入，可为 nil
+	peerLookup PeerAgentLookup
+
+	delegateMu      sync.Mutex
+	delegateWaiters map[string]chan delegateRPCResult // 委派 RPC：request_id -> 等待子 Agent Response
+
+	studioProgress func(StudioProgressEvent) // 工作室进度上报，可为 nil
 }
 
-// NewAgent 创建新代理
-func NewAgent(ctx context.Context, config AgentConfig, messageBus MessageBus, projectCtx ProjectContext) (Agent, error) {
+// NewAgent 创建新代理；peerLookup 用于在系统提示中展示子代理等，可为 nil；studioProgress 用于工作室委派进度
+func NewAgent(ctx context.Context, config AgentConfig, messageBus MessageBus, projectCtx ProjectContext, peerLookup PeerAgentLookup, studioProgress func(StudioProgressEvent)) (Agent, error) {
 	// 构建 LLM 配置
 	llmCfg := llm.Config{
 		BaseURL:     config.ModelConfig.BaseURL,
@@ -126,7 +137,9 @@ func NewAgent(ctx context.Context, config AgentConfig, messageBus MessageBus, pr
 		lastActiveAt: time.Now(),
 		llmClient:    client,
 		messageBus:   messageBus,
-		projectCtx:   projectCtx,
+		projectCtx:     projectCtx,
+		peerLookup:     peerLookup,
+		studioProgress: studioProgress,
 		memory:            loadedMem,
 		memoryPath:        memPath,
 		memorySummary:     sumText,
@@ -145,6 +158,32 @@ func NewAgent(ctx context.Context, config AgentConfig, messageBus MessageBus, pr
 		Msg("agent created")
 
 	return agent, nil
+}
+
+// ensureMemorySession 按 context 中的工作室 ID 切换持久化文件与内存（聊天 vs 各工作室互不共享）
+func (a *agentImpl) ensureMemorySession(ctx context.Context) {
+	sid := StudioIDFromContext(ctx)
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if sid == a.memorySessionStudioID {
+		return
+	}
+	if a.memoryPath != "" {
+		_ = saveChatHistoryToFile(a.memoryPath, a.memory)
+		_ = saveMemorySummaryFile(a.memorySummaryPath, a.memorySummary)
+	}
+	newPath := agentMemoryFilePathForSession(a.config.ID, sid)
+	newSumPath := memorySummaryFilePath(newPath)
+	loadedMem, err := loadChatHistoryFromFile(newPath)
+	if err != nil {
+		log.Warn().Err(err).Str("agent_id", a.config.ID).Str("studio_id", sid).Msg("load session memory failed, starting empty")
+		loadedMem = nil
+	}
+	a.memory = loadedMem
+	a.memoryPath = newPath
+	a.memorySummaryPath = newSumPath
+	a.memorySummary = loadMemorySummaryFromFile(newSumPath)
+	a.memorySessionStudioID = sid
 }
 
 // ID 返回代理 ID
@@ -192,6 +231,8 @@ func (a *agentImpl) SendMessage(ctx context.Context, msg Message) error {
 func (a *agentImpl) Process(ctx context.Context, userMessage string) (string, error) {
 	a.processMu.Lock()
 	defer a.processMu.Unlock()
+
+	a.ensureMemorySession(ctx)
 
 	a.mu.Lock()
 	a.status = AgentStatusBusy
@@ -252,16 +293,30 @@ func (a *agentImpl) Process(ctx context.Context, userMessage string) (string, er
 	}
 	tools = append(tools, mcpTools...)
 
+	a.mu.RLock()
+	hasChildren := len(a.children) > 0
+	a.mu.RUnlock()
+	if hasChildren {
+		tools = append(tools, delegateToSubAgentTool())
+	}
+
 	var skillEx llm.ToolExecutor
 	if len(enabledSkills) > 0 {
 		skillEx = llm.NewSkillExecutor(a.llmClient, enabledSkills)
 	}
 	composite := newCompositeToolExecutor(skillEx, mcpRoute)
 
+	var executor llm.ToolExecutor
+	if hasChildren {
+		executor = &agentToolRouter{agent: a, inner: composite}
+	} else {
+		executor = composite
+	}
+
 	var reply string
 	var err error
-	if len(tools) > 0 && composite != nil {
-		reply, err = a.llmClient.GenerateWithToolLoop(ctx, messages, tools, nil, composite, llm.DefaultToolLoopMaxRounds)
+	if len(tools) > 0 && executor != nil {
+		reply, err = a.llmClient.GenerateWithToolLoop(ctx, messages, tools, nil, executor, llm.DefaultToolLoopMaxRounds)
 	} else {
 		reply, err = a.llmClient.GenerateFromMessages(ctx, messages)
 	}
@@ -319,7 +374,7 @@ func (a *agentImpl) ChatHistory() []ChatHistoryEntry {
 	return memoryToEntries(a.memory)
 }
 
-// ClearChatHistory 清空记忆并删除磁盘文件
+// ClearChatHistory 清空当前载入会话的记忆并删除对应磁盘文件
 func (a *agentImpl) ClearChatHistory() error {
 	a.mu.Lock()
 	a.memory = nil
@@ -330,6 +385,28 @@ func (a *agentImpl) ClearChatHistory() error {
 	deleteAgentMemoryFile(path)
 	deleteMemorySummaryFile(sumPath)
 	return nil
+}
+
+// clearMemoryIfSessionMatches 若当前内存会话与给定工作室 ID 一致则清空内存（磁盘由调用方删）
+func (a *agentImpl) clearMemoryIfSessionMatches(studioID string) {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if studioID != a.memorySessionStudioID {
+		return
+	}
+	a.memory = nil
+	a.memorySummary = ""
+}
+
+// wipeMemoryState 销毁 Agent 前清空内存中的会话状态（磁盘由 DeleteAllSessionMemoryFilesForAgent 处理）
+func (a *agentImpl) wipeMemoryState() {
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	a.memory = nil
+	a.memorySummary = ""
+	a.memorySessionStudioID = ""
+	a.memoryPath = ""
+	a.memorySummaryPath = ""
 }
 
 // SetModelConfig 热切换模型：重建 LLM 客户端并更新配置（对话记忆保留）
@@ -434,26 +511,88 @@ func (a *agentImpl) handleMessage(msg Message) {
 	// 根据消息类型处理
 	switch msg.Type {
 	case MessageTypeRequest:
-		// 处理请求并回复
-		ctx := context.Background()
-		response, err := a.Process(ctx, msg.Content)
-		if err != nil {
-			log.Error().Err(err).Str("agent_id", a.config.ID).Msg("failed to process request")
+		// 必须在独立 goroutine 中 Process：委派子 Agent 时当前 Agent 会阻塞等待 Response，
+		// 若仍在 messageLoop 线程内同步调用 Process，则无法处理随后到达的 MessageTypeResponse（死锁）。
+		msgCopy := msg
+		studioID := ""
+		if msgCopy.Metadata != nil {
+			if v, ok := msgCopy.Metadata["studio_id"].(string); ok {
+				studioID = strings.TrimSpace(v)
+			}
+		}
+		if studioID != "" {
+			a.fireStudioProgress(StudioProgressEvent{
+				StudioID:      studioID,
+				Kind:          "sub_task_accepted",
+				AgentID:       a.config.ID,
+				AgentName:     a.config.Name,
+				ParentAgentID: msgCopy.FromAgent,
+				TaskPreview:   previewTaskText(msgCopy.Content),
+			})
+		}
+		go func() {
+			ctx := context.Background()
+			if studioID != "" {
+				ctx = WithStudioID(ctx, studioID)
+			}
+			response, err := a.Process(ctx, msgCopy.Content)
+			if studioID != "" {
+				if err != nil {
+					a.fireStudioProgress(StudioProgressEvent{
+						StudioID:      studioID,
+						Kind:          "sub_task_failed",
+						AgentID:       a.config.ID,
+						AgentName:     a.config.Name,
+						ParentAgentID: msgCopy.FromAgent,
+						TaskPreview:   previewTaskText(msgCopy.Content),
+						Error:         err.Error(),
+					})
+				} else {
+					a.fireStudioProgress(StudioProgressEvent{
+						StudioID:      studioID,
+						Kind:          "sub_task_finished",
+						AgentID:       a.config.ID,
+						AgentName:     a.config.Name,
+						ParentAgentID: msgCopy.FromAgent,
+						TaskPreview:   previewTaskText(msgCopy.Content),
+						ResultPreview: previewTaskText(response),
+					})
+				}
+			}
+			respMeta := map[string]interface{}{
+				"request_id": msgCopy.ID,
+			}
+			if studioID != "" {
+				respMeta["studio_id"] = studioID
+				respMeta["task_preview"] = previewTaskText(msgCopy.Content)
+			}
+			respMsg := Message{
+				Type:     MessageTypeResponse,
+				ToAgent:  msgCopy.FromAgent,
+				Metadata: respMeta,
+			}
+			if err != nil {
+				log.Error().Err(err).Str("agent_id", a.config.ID).Msg("failed to process request")
+				respMsg.Content = fmt.Sprintf("[子 Agent 处理失败] %v", err)
+			} else {
+				respMsg.Content = response
+			}
+			if err := a.SendMessage(ctx, respMsg); err != nil {
+				log.Error().Err(err).Str("agent_id", a.config.ID).Msg("failed to send response")
+			}
+		}()
+
+	case MessageTypeResponse:
+		if a.completeDelegateWait(msg) {
 			return
 		}
-
-		// 发送响应
-		respMsg := Message{
-			Type:    MessageTypeResponse,
-			Content: response,
-			ToAgent: msg.FromAgent,
-			Metadata: map[string]interface{}{
-				"request_id": msg.ID,
-			},
+		if a.handleStudioAsyncDelegateResult(msg) {
+			return
 		}
-		if err := a.SendMessage(ctx, respMsg); err != nil {
-			log.Error().Err(err).Str("agent_id", a.config.ID).Msg("failed to send response")
-		}
+		log.Debug().
+			Str("agent_id", a.config.ID).
+			Str("from", msg.FromAgent).
+			Msg("received response with no matching delegate waiter (ignored)")
 
 	case MessageTypeEvent:
 		// 处理事件(可扩展)
@@ -482,9 +621,43 @@ func (a *agentImpl) buildSystemPrompt(ctx context.Context) string {
 		}
 	}
 
+	if sid := StudioIDFromContext(ctx); sid != "" {
+		prompt += "\n\n【工作室协作模式】\n当前为工作室对话：用户仅通过你（主 Agent）沟通。你需理解需求、拆解任务，" +
+			"对适合子 Agent 的工作必须调用工具 " + DelegateToSubAgentToolName +
+			" 实际派发。调用后子 Agent 在后台执行，不会阻塞你与用户的对话：你应在收到「委派已提交后台」类观察后尽快用自然语言回复用户（可说明左侧进度面板会更新），用户可同时继续向你提问。" +
+			"子 Agent 完成后进度面板会出现「返回结果」；若用户需要整合产出，再在后续轮次根据进度或追问组织答复。"
+	}
+
 	// 添加代理能力说明
 	if len(a.config.Skills) > 0 {
 		prompt += fmt.Sprintf("\n\n你拥有以下技能: %v", a.config.Skills)
+	}
+
+	a.mu.RLock()
+	childIDs := make([]string, 0, len(a.children))
+	for id := range a.children {
+		childIDs = append(childIDs, id)
+	}
+	a.mu.RUnlock()
+	sort.Strings(childIDs)
+	if len(childIDs) > 0 && a.peerLookup != nil {
+		var lines []string
+		for _, cid := range childIDs {
+			if sum, ok := a.peerLookup(cid); ok {
+				role := strings.TrimSpace(sum.Role)
+				if role != "" {
+					lines = append(lines, fmt.Sprintf("- %s（id=%s，类型=%s）\n  角色：%s", sum.Name, sum.ID, sum.Type, role))
+				} else {
+					lines = append(lines, fmt.Sprintf("- %s（id=%s，类型=%s）", sum.Name, sum.ID, sum.Type))
+				}
+			} else {
+				lines = append(lines, fmt.Sprintf("- id=%s（系统中已登记为子 Agent，详情暂不可读）", cid))
+			}
+		}
+		prompt += "\n\n【下属子 Agent】\n" +
+			"下列子 Agent 已在系统中注册；它们有各自模型、技能与对话记忆。当用户问题更适合由子 Agent 专项处理时，你**必须**使用工具 " + DelegateToSubAgentToolName +
+			" 派发任务（参数 sub_agent_id、task），子 Agent 会独立推理并将结果返回给你，你再向用户整合回答。不要仅在口头上说「交给子 Agent」而不调用该工具。\n" +
+			strings.Join(lines, "\n")
 	}
 
 	a.mu.RLock()
@@ -515,6 +688,7 @@ func (a *agentImpl) buildSystemPrompt(ctx context.Context) string {
 		prompt += fmt.Sprintf("\n\n当前会话已加载 MCP 服务: %s。请通过工具调用（function calling）使用各服务暴露的工具。", strings.Join(labels, "；"))
 	}
 
+	prompt += reactSystemPromptBlock
 	return prompt
 }
 

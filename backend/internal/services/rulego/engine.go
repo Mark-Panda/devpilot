@@ -32,7 +32,8 @@ type ExecuteRuleInput struct {
 // ExecuteRule 根据规则 ID 同步执行一次规则链，返回末端结果或错误。
 // 若该规则链已通过 LoadRuleChain/LoadAllEnabledRuleChains 加载到池中，则直接使用池中引擎；否则按需创建并执行后释放。
 func (s *Service) ExecuteRule(ruleID string, input ExecuteRuleInput) (ExecuteRuleOutput, error) {
-	rule, err := s.store.GetByID(context.Background(), ruleID)
+	ctx := context.Background()
+	rule, err := s.store.GetByID(ctx, ruleID)
 	if err != nil {
 		if errors.Is(err, pebble.ErrNotFound) {
 			return ExecuteRuleOutput{Success: false, Error: "规则不存在"}, err
@@ -48,7 +49,7 @@ func (s *Service) ExecuteRule(ruleID string, input ExecuteRuleInput) (ExecuteRul
 
 	def := rule.Definition
 	if s.llmConfigLister != nil {
-		if patched, err := PatchDefinitionWithLLMKeys(context.Background(), def, s.llmConfigLister); err == nil {
+		if patched, err := PatchDefinitionWithLLMKeys(ctx, def, s.llmConfigLister); err == nil {
 			def = patched
 		}
 	}
@@ -82,7 +83,7 @@ func (s *Service) ExecuteRule(ruleID string, input ExecuteRuleInput) (ExecuteRul
 
 	var execLog models.RuleGoExecutionLog
 	if s.execLogStore != nil {
-		execLog, _ = s.execLogStore.CreateExecutionLog(context.Background(), models.RuleGoExecutionLog{
+		execLog, _ = s.execLogStore.CreateExecutionLog(ctx, models.RuleGoExecutionLog{
 			RuleID:        ruleID,
 			RuleName:      rule.Name,
 			TriggerType:   "manual",
@@ -125,7 +126,7 @@ func (s *Service) ExecuteRule(ruleID string, input ExecuteRuleInput) (ExecuteRul
 		if lastErr != nil {
 			errStr = lastErr.Error()
 		}
-		_ = s.execLogStore.UpdateExecutionLog(context.Background(), execLog.ID, outData, outMeta, errStr, finishAt, lastErr == nil)
+		_ = s.execLogStore.UpdateExecutionLog(ctx, execLog.ID, outData, outMeta, errStr, finishAt, lastErr == nil)
 	}
 
 	out := ExecuteRuleOutput{Elapsed: elapsed}
@@ -143,6 +144,7 @@ func (s *Service) ExecuteRule(ruleID string, input ExecuteRuleInput) (ExecuteRul
 // 用于可视化编辑器中“测试”按钮：对当前画布内容进行调试运行。
 // 会阻塞直至整条规则链执行完毕（含 ai/llm 节点的多轮 tool 调用与技能执行）；若启用了技能，可能需数分钟，调用方应避免超时或断开。
 func (s *Service) ExecuteRuleDefinition(definition string, input ExecuteRuleInput) (ExecuteRuleOutput, error) {
+	ctx := context.Background()
 	def := definition
 	if def == "" {
 		return ExecuteRuleOutput{Success: false, Error: "规则定义为空"}, errors.New("empty definition")
@@ -151,7 +153,7 @@ func (s *Service) ExecuteRuleDefinition(definition string, input ExecuteRuleInpu
 		return ExecuteRuleOutput{Success: false, Error: "规则定义不是合法 JSON"}, errors.New("invalid definition json")
 	}
 	if s.llmConfigLister != nil {
-		if patched, err := PatchDefinitionWithLLMKeys(context.Background(), def, s.llmConfigLister); err == nil {
+		if patched, err := PatchDefinitionWithLLMKeys(ctx, def, s.llmConfigLister); err == nil {
 			def = patched
 		}
 	}
@@ -180,7 +182,7 @@ func (s *Service) ExecuteRuleDefinition(definition string, input ExecuteRuleInpu
 
 	var execLog models.RuleGoExecutionLog
 	if s.execLogStore != nil {
-		execLog, _ = s.execLogStore.CreateExecutionLog(context.Background(), models.RuleGoExecutionLog{
+		execLog, _ = s.execLogStore.CreateExecutionLog(ctx, models.RuleGoExecutionLog{
 			RuleID:        testRuleID,
 			RuleName:      "测试执行",
 			TriggerType:   "test",
@@ -221,7 +223,7 @@ func (s *Service) ExecuteRuleDefinition(definition string, input ExecuteRuleInpu
 		if lastErr != nil {
 			errStr = lastErr.Error()
 		}
-		_ = s.execLogStore.UpdateExecutionLog(context.Background(), execLog.ID, outData, outMeta, errStr, finishAt, lastErr == nil)
+		_ = s.execLogStore.UpdateExecutionLog(ctx, execLog.ID, outData, outMeta, errStr, finishAt, lastErr == nil)
 	}
 
 	out := ExecuteRuleOutput{Elapsed: elapsed}

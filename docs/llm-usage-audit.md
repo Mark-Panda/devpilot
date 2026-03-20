@@ -46,7 +46,7 @@
 
 ```
 模型管理 (model_management.Service)
-    → ListModelConfigs() → ruleGoLLMConfigLister.ListLLMConfigs()
+    → ListModelConfigs() → ruleGoLLMConfigLister.ListLLMConfigs(ctx)（Wails 绑定方法不使用 context 首参，避免与前端参数错位）
     → PatchDefinitionWithLLMKeys() 覆盖 ai/llm 节点 key（执行时）
 
 ai/llm 节点配置 (DSL/前端)

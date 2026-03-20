@@ -3,6 +3,7 @@ package rulego
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 
@@ -45,6 +46,7 @@ func (s *Service) ListRuleGoRules() ([]models.RuleGoRule, error) {
 }
 
 func (s *Service) CreateRuleGoRule(input CreateRuleGoRuleInput) (models.RuleGoRule, error) {
+	ctx := context.Background()
 	rule := models.RuleGoRule{
 		Name:        strings.TrimSpace(input.Name),
 		Description: strings.TrimSpace(input.Description),
@@ -55,18 +57,21 @@ func (s *Service) CreateRuleGoRule(input CreateRuleGoRuleInput) (models.RuleGoRu
 		return models.RuleGoRule{}, err
 	}
 
-	result, err := s.store.Create(context.Background(), rule)
+	result, err := s.store.Create(ctx, rule)
 	if err != nil {
 		return models.RuleGoRule{}, err
 	}
 	if EnabledFromDefinition(result.Definition) && result.Definition != "" {
-		_ = s.LoadRuleChain(result.ID)
+		if err := s.LoadRuleChain(result.ID); err != nil {
+			return result, fmt.Errorf("规则已保存但加载到引擎失败: %w", err)
+		}
 	}
 	return result, nil
 }
 
 func (s *Service) UpdateRuleGoRule(id string, input UpdateRuleGoRuleInput) (models.RuleGoRule, error) {
-	existing, err := s.store.GetByID(context.Background(), id)
+	ctx := context.Background()
+	existing, err := s.store.GetByID(ctx, id)
 	if err != nil {
 		return models.RuleGoRule{}, err
 	}
@@ -85,26 +90,40 @@ func (s *Service) UpdateRuleGoRule(id string, input UpdateRuleGoRuleInput) (mode
 		return models.RuleGoRule{}, err
 	}
 
-	result, err := s.store.Update(context.Background(), id, rule)
+	result, err := s.store.Update(ctx, id, rule)
 	if err != nil {
 		return models.RuleGoRule{}, err
 	}
 	enabled := EnabledFromDefinition(result.Definition)
 	if enabled && result.Definition != "" {
-		_ = s.LoadRuleChain(id)
+		if err := s.LoadRuleChain(id); err != nil {
+			return result, fmt.Errorf("规则已更新但加载到引擎失败: %w", err)
+		}
 	} else {
-		_ = s.UnloadRuleChain(id)
+		if err := s.UnloadRuleChain(id); err != nil {
+			return result, err
+		}
 		if result.SkillDirName != "" {
-			_ = s.DeleteSkillForRuleChain(id)
-			result, _ = s.store.GetByID(context.Background(), id)
+			if err := s.DeleteSkillForRuleChain(id); err != nil {
+				return result, fmt.Errorf("规则已更新但清理关联技能失败: %w", err)
+			}
+			refreshed, gerr := s.store.GetByID(ctx, id)
+			if gerr != nil {
+				return models.RuleGoRule{}, fmt.Errorf("规则已更新但重新读取失败: %w", gerr)
+			}
+			result = refreshed
 		}
 	}
 	return result, nil
 }
 
 func (s *Service) DeleteRuleGoRule(id string) error {
-	_ = s.UnloadRuleChain(id)
-	_ = s.DeleteSkillForRuleChain(id)
+	if err := s.UnloadRuleChain(id); err != nil {
+		return err
+	}
+	if err := s.DeleteSkillForRuleChain(id); err != nil {
+		return fmt.Errorf("清理关联技能: %w", err)
+	}
 	return s.store.Delete(context.Background(), id)
 }
 
@@ -143,11 +162,12 @@ func (s *Service) ListExecutionLogs(limit, offset int) (ListExecutionLogsResult,
 	if limit > 100 {
 		limit = 100
 	}
-	items, err := s.execLogStore.ListExecutionLogs(context.Background(), limit, offset)
+	ctx := context.Background()
+	items, err := s.execLogStore.ListExecutionLogs(ctx, limit, offset)
 	if err != nil {
 		return ListExecutionLogsResult{}, err
 	}
-	total, err := s.execLogStore.CountExecutionLogs(context.Background())
+	total, err := s.execLogStore.CountExecutionLogs(ctx)
 	if err != nil {
 		return ListExecutionLogsResult{}, err
 	}
@@ -165,11 +185,12 @@ func (s *Service) GetExecutionLog(executionID string) (GetExecutionLogResponse, 
 	if s.execLogStore == nil {
 		return GetExecutionLogResponse{}, pebble.ErrNotFound
 	}
-	logRow, err := s.execLogStore.GetExecutionLogByID(context.Background(), executionID)
+	ctx := context.Background()
+	logRow, err := s.execLogStore.GetExecutionLogByID(ctx, executionID)
 	if err != nil {
 		return GetExecutionLogResponse{}, err
 	}
-	nodes, err := s.execLogStore.GetNodeLogsByExecutionID(context.Background(), executionID)
+	nodes, err := s.execLogStore.GetNodeLogsByExecutionID(ctx, executionID)
 	if err != nil {
 		return GetExecutionLogResponse{}, err
 	}
