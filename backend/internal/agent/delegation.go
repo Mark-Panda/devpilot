@@ -63,6 +63,12 @@ func (r *agentToolRouter) Execute(ctx context.Context, name, arguments string) (
 	if name == CreateAgentTeamToolName {
 		return r.agent.executeCreateAgentTeamTool(ctx, arguments)
 	}
+	if name == StudioTodoToolName {
+		return r.agent.executeStudioTodoTool(ctx, arguments)
+	}
+	if name == StudioTodoSnapshotToolName {
+		return r.agent.executeStudioTodoSnapshotTool(ctx, arguments)
+	}
 	if r.inner != nil {
 		return r.inner.Execute(ctx, name, arguments)
 	}
@@ -224,6 +230,9 @@ func (a *agentImpl) handleStudioAsyncDelegateResult(msg Message) bool {
 		TaskPreview:   taskPreview,
 		ResultPreview: previewTaskText(content),
 	})
+	if a.studioSubFinished != nil {
+		a.studioSubFinished(a.config.ID, sid, childID, childName, taskPreview, content)
+	}
 	return true
 }
 

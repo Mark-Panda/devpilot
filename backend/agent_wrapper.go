@@ -235,3 +235,17 @@ func (w *AgentServiceWrapper) ChatInStudio(ctx context.Context, studioID, agentI
 	}
 	return w.svc.ChatInStudio(ctx, studioID, agentID, message)
 }
+
+func (w *AgentServiceWrapper) GetStudioTodoBoard(ctx context.Context, studioID string) ([]StudioTodoBoardRow, error) {
+	if w == nil || w.svc == nil {
+		return []StudioTodoBoardRow{}, fmt.Errorf("agent 服务未就绪")
+	}
+	return w.svc.GetStudioTodoBoard(ctx, studioID)
+}
+
+func (w *AgentServiceWrapper) StudioMaybeProgressBrief(ctx context.Context, studioID string) error {
+	if w == nil || w.svc == nil {
+		return fmt.Errorf("agent 服务未就绪")
+	}
+	return w.svc.StudioMaybeProgressBrief(ctx, studioID)
+}

@@ -66,10 +66,14 @@ type agentImpl struct {
 	studioProgress func(StudioProgressEvent) // 工作室进度上报，可为 nil
 
 	createAgentTool CreateAgentToolFunc // 主 Agent 创建团队工具回调，可为 nil
+
+	studioSubFinished StudioSubFinishedFunc // 工作室子任务完成时通知，可为 nil
+
+	studioTodoRuntime StudioTodoRuntime // 工作室 TODO 持久化，可为 nil
 }
 
-// NewAgent 创建新代理；peerLookup 用于在系统提示中展示子代理等，可为 nil；studioProgress 用于工作室委派进度；createAgentTool 仅对 type=main 生效
-func NewAgent(ctx context.Context, config AgentConfig, messageBus MessageBus, projectCtx ProjectContext, peerLookup PeerAgentLookup, studioProgress func(StudioProgressEvent), createAgentTool CreateAgentToolFunc) (Agent, error) {
+// NewAgent 创建新代理；peerLookup 用于在系统提示中展示子代理等，可为 nil；studioProgress 用于工作室委派进度；createAgentTool 仅对 type=main 生效；studioSubFinished 在子 Agent 完成工作室委派时触发主侧续跑；studioTodoRuntime 工作室内 TODO 工具
+func NewAgent(ctx context.Context, config AgentConfig, messageBus MessageBus, projectCtx ProjectContext, peerLookup PeerAgentLookup, studioProgress func(StudioProgressEvent), createAgentTool CreateAgentToolFunc, studioSubFinished StudioSubFinishedFunc, studioTodoRuntime StudioTodoRuntime) (Agent, error) {
 	// 构建 LLM 配置
 	llmCfg := llm.Config{
 		BaseURL:     config.ModelConfig.BaseURL,
@@ -141,8 +145,10 @@ func NewAgent(ctx context.Context, config AgentConfig, messageBus MessageBus, pr
 		messageBus:   messageBus,
 		projectCtx:     projectCtx,
 		peerLookup:     peerLookup,
-		studioProgress: studioProgress,
+		studioProgress:    studioProgress,
 		createAgentTool:   createAgentTool,
+		studioSubFinished: studioSubFinished,
+		studioTodoRuntime: studioTodoRuntime,
 		memory:            loadedMem,
 		memoryPath:        memPath,
 		memorySummary:     sumText,
@@ -305,6 +311,14 @@ func (a *agentImpl) Process(ctx context.Context, userMessage string) (string, er
 	if agentType == AgentTypeMain && a.createAgentTool != nil {
 		tools = append(tools, createAgentTeamTool())
 	}
+	inStudio := strings.TrimSpace(StudioIDFromContext(ctx)) != ""
+	hasStudioTodos := inStudio && a.studioTodoRuntime != nil
+	if hasStudioTodos {
+		tools = append(tools, studioTodoTool())
+		if agentType == AgentTypeMain {
+			tools = append(tools, studioTodoSnapshotTool())
+		}
+	}
 
 	var skillEx llm.ToolExecutor
 	if len(enabledSkills) > 0 {
@@ -312,7 +326,7 @@ func (a *agentImpl) Process(ctx context.Context, userMessage string) (string, er
 	}
 	composite := newCompositeToolExecutor(skillEx, mcpRoute)
 
-	useToolRouter := hasChildren || (agentType == AgentTypeMain && a.createAgentTool != nil)
+	useToolRouter := hasChildren || (agentType == AgentTypeMain && a.createAgentTool != nil) || hasStudioTodos
 	var executor llm.ToolExecutor
 	if useToolRouter {
 		executor = &agentToolRouter{agent: a, inner: composite}
@@ -542,7 +556,13 @@ func (a *agentImpl) handleMessage(msg Message) {
 			if studioID != "" {
 				ctx = WithStudioID(ctx, studioID)
 			}
-			response, err := a.Process(ctx, msgCopy.Content)
+			var response string
+			var err error
+			if studioID != "" {
+				response, err = a.processStudioDelegatedTask(ctx, msgCopy.Content)
+			} else {
+				response, err = a.Process(ctx, msgCopy.Content)
+			}
 			if studioID != "" {
 				if err != nil {
 					a.fireStudioProgress(StudioProgressEvent{
@@ -629,10 +649,28 @@ func (a *agentImpl) buildSystemPrompt(ctx context.Context) string {
 	}
 
 	if sid := StudioIDFromContext(ctx); sid != "" {
-		prompt += "\n\n【工作室协作模式】\n当前为工作室对话：用户仅通过你（主 Agent）沟通。你需理解需求、拆解任务，" +
-			"对适合子 Agent 的工作必须调用工具 " + DelegateToSubAgentToolName +
-			" 实际派发。调用后子 Agent 在后台执行，不会阻塞你与用户的对话：你应在收到「委派已提交后台」类观察后尽快用自然语言回复用户（可说明左侧进度面板会更新），用户可同时继续向你提问。" +
-			"子 Agent 完成后进度面板会出现「返回结果」；若用户需要整合产出，再在后续轮次根据进度或追问组织答复。"
+		switch a.config.Type {
+		case AgentTypeMain:
+			prompt += "\n\n【工作室协作模式】\n当前为工作室对话：用户仅通过你（主 Agent）沟通。你需理解需求、拆解任务，" +
+				"对适合子 Agent 的工作必须调用工具 " + DelegateToSubAgentToolName +
+				" 实际派发。调用后子 Agent 在后台执行，不会阻塞你与用户的对话：你应在收到「委派已提交后台」类观察后尽快用自然语言回复用户（可说明左侧进度面板会更新），用户可同时继续向你提问。" +
+				"子 Agent 在后台会**多轮调用工具**直至子任务完成；完成后进度面板会出现「返回结果」，系统也可能自动插入一条协调说明。" +
+				"若用户需要整合产出，请在后续轮次根据进度或追问组织答复；若整体需求仍需其它子 Agent，请继续调用委派工具。"
+		case AgentTypeSub, AgentTypeWorker:
+			prompt += "\n\n【工作室子任务自主执行】\n你收到的是主 Agent 的委派。请**持续使用工具**（技能、MCP、" + DelegateToSubAgentToolName +
+				" 等）将任务推进到可交付完成态，避免仅输出一段说明就结束。\n当你确认本子任务**已全部完成**时，在回复**第一行单独一行**输出 " + StudioTaskCompleteToken +
+				" ，然后空一行再写总结。在完成前不要输出该标记。\n若收到「工作室自动续跑」类系统消息，表示需继续执行：必须再次调用工具推进，直至可声明完成。"
+		}
+	}
+
+	if sid := StudioIDFromContext(ctx); sid != "" && a.studioTodoRuntime != nil {
+		prompt += "\n\n【工作室 TODO 清单（强制）】必须使用工具 " + StudioTodoToolName +
+			"：开始执行前先用 operation=replace 写入至少 2 条可执行步骤（每条含唯一 id 与具体 title）；每完成一步用 operation=complete 勾选对应 id；operation=list 可查看当前清单。\n" +
+			"禁止仅用口头描述代替 TODO 工具。委派子 Agent 前，你应已用 replace 维护好自己的协调步骤。"
+		if a.config.Type == AgentTypeMain {
+			prompt += "你应主动、定期使用工具 " + StudioTodoSnapshotToolName +
+				" 拉取本工作室**全部成员**的 TODO JSON，并结合结果用简短中文向用户汇报整体进度；若系统发送「定时进度巡检」消息，须先调用该工具再回复用户。"
+		}
 	}
 
 	// 添加代理能力说明

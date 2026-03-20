@@ -110,6 +110,17 @@ type PeerAgentLookup func(agentID string) (AgentPeerSummary, bool)
 // CreateAgentToolFunc 主 Agent 通过工具创建新 Agent（由 Service 实现校验与 agents.json 落盘）
 type CreateAgentToolFunc func(ctx context.Context, callerID string, cfg AgentConfig) (AgentInfo, error)
 
+// StudioSubFinishedFunc 工作室中子 Agent 向主 Agent 返回结果后回调（用于主 Agent 自动续协调）
+type StudioSubFinishedFunc func(parentAgentID, studioID, childID, childName, taskPreview, result string)
+
+// StudioTodoRuntime 工作室内 TODO 清单的读写与总览（由 Service 实现）
+type StudioTodoRuntime interface {
+	StudioTodoGet(studioID, agentID string) []StudioTodoItem
+	StudioTodoReplace(studioID, agentID string, items []StudioTodoItem) error
+	StudioTodoComplete(studioID, agentID, todoID string) error
+	StudioTodoSnapshotJSON(studioID string) (string, error)
+}
+
 // Agent 代理接口
 type Agent interface {
 	// ID 返回代理唯一标识

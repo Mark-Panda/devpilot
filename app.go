@@ -22,6 +22,7 @@ func (a *App) startup(ctx context.Context) {
 	a.ctx = ctx
 	backend.InitRuleChainExecutor(a.runtime)
 	backend.BindStudioProgressEvents(ctx, a.runtime.AgentService())
+	backend.BindStudioAssistantEvents(ctx, a.runtime.AgentService())
 }
 
 // OpenSkillZipDialog 打开系统文件选择对话框，让用户选择技能包 zip 文件。返回选中文件路径，取消时返回空字符串。
@@ -257,4 +258,20 @@ func (a *App) ChatInStudio(studioID string, agentID string, message string) (str
 		return "", fmt.Errorf("agent 服务未就绪")
 	}
 	return a.runtime.AgentWrapper().ChatInStudio(a.ctx, studioID, agentID, message)
+}
+
+// GetStudioTodoBoard 工作室内各 Agent 的 TODO 看板（持久化于 ~/.devpilot/studio-todos.json）
+func (a *App) GetStudioTodoBoard(studioID string) ([]backend.StudioTodoBoardRow, error) {
+	if a.runtime.AgentWrapper() == nil {
+		return []backend.StudioTodoBoardRow{}, fmt.Errorf("agent 服务未就绪")
+	}
+	return a.runtime.AgentWrapper().GetStudioTodoBoard(a.ctx, studioID)
+}
+
+// StudioMaybeProgressBrief 定时触发主 Agent 拉取 TODO 总览并向用户简报（受后端冷却限制）
+func (a *App) StudioMaybeProgressBrief(studioID string) error {
+	if a.runtime.AgentWrapper() == nil {
+		return fmt.Errorf("agent 服务未就绪")
+	}
+	return a.runtime.AgentWrapper().StudioMaybeProgressBrief(a.ctx, studioID)
 }

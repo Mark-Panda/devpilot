@@ -29,3 +29,24 @@ type StudioProgressEvent struct {
 	ResultPreview string    `json:"result_preview,omitempty"`
 	Error         string    `json:"error,omitempty"`
 }
+
+// StudioAssistantPush 工作室主 Agent 自动续跑产生的新 assistant 消息，供前端追加展示
+type StudioAssistantPush struct {
+	StudioID string `json:"studio_id"`
+	AgentID  string `json:"agent_id"`
+	Content  string `json:"content"`
+}
+
+// StudioTodoItem 工作室内某 Agent 的 TODO 项（持久化于 studio-todos.json）
+type StudioTodoItem struct {
+	ID    string `json:"id"`
+	Title string `json:"title"`
+	Done  bool   `json:"done"`
+}
+
+// StudioTodoBoardRow 供前端或总览工具展示：某成员及其 TODO
+type StudioTodoBoardRow struct {
+	AgentID   string           `json:"agent_id"`
+	AgentName string           `json:"agent_name"`
+	Items     []StudioTodoItem `json:"items"`
+}

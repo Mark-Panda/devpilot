@@ -19,6 +19,12 @@ type Service struct {
 	studioEmitMu  sync.RWMutex
 	studioEmitter func(StudioProgressEvent)
 
+	studioTodoStore *StudioTodoStore
+
+	studioChatEmitMu    sync.RWMutex
+	studioChatEmitter   func(StudioAssistantPush) // 工作室主 Agent 自动续跑回复，供 Wails 推送到前端
+	studioAutoMainSteps sync.Map                 // studioID -> 自上次用户发消息以来的自动续跑次数
+
 	persistMu sync.Mutex // 串行化 agents.json 写入，避免并发丢更新
 }
 
@@ -51,6 +57,14 @@ func NewService(projectPath string) (*Service, error) {
 	}
 
 	orchestrator.SetCreateAgentToolFunc(s.createAgentViaTool)
+	orchestrator.SetStudioSubFinishedHook(func(parentID, studioID, childID, childName, taskPreview, result string) {
+		go s.studioMainAfterChildFinished(parentID, studioID, childID, childName, taskPreview, result)
+	})
+
+	if p := globalStudioTodosPath(); p != "" {
+		s.studioTodoStore = newStudioTodoStore(p)
+		orchestrator.SetStudioTodoRuntime(s)
+	}
 
 	if studioStore != nil {
 		orchestrator.SetStudioProgressHook(func(ev StudioProgressEvent) {

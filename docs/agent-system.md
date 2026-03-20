@@ -82,6 +82,11 @@
 - **进度事件**：委派开始/结束/失败、子 Agent 接单/完成/失败等会写入 `studios.json` 并通过 Wails **`studio:progress`** 事件推送到前端（`backend.BindStudioProgressEvents`）；工作室页同时定时拉取 `GetStudioProgress` 兜底。
 - **前端**：侧栏「工作室」→ `/studios` 列表与创建；`/studios/:studioId` 为左右分栏（进度时间线 + 与主 Agent 对话）。
 - **Team 视图（档位 A）**：进度侧支持按成员筛选事件；输入框支持 `@` 补全子 Agent / worker，发送时在正文前附加「用户 @ 定向」说明（仍只调用 `ChatInStudio` 与主 Agent 对话，气泡中仅展示用户原文）。
+- **子任务多轮执行**：工作室异步委派时，子 Agent 走 `processStudioDelegatedTask`：在单轮 `Process` 内仍有工具循环（最多约 16 轮）；若回复中未出现完成标记 `__STUDIO_TASK_COMPLETE__`，会自动注入「工作室自动续跑」用户消息再 `Process`，外循环最多 10 次。子 Agent 系统提示中约定完成时在首行输出该标记。
+- **主 Agent 自动续协调**：子任务返回主 Agent 并产生 `delegation_finished` 后，`Service` 在 goroutine 内对主 Agent 再跑一轮 `Chat`（合成「子任务完成」提示），并可通过 Wails **`studio:assistant`** 将本轮 assistant 回复推到工作室页追加展示；自用户上次在工作室发消息起，自动续跑最多 8 次（防链式委派失控），用户每发一条工作室消息会重置计数。
+- **工作室 TODO（强制清单）**：工作室内所有 Agent 获得工具 `devpilot_studio_todo`（`list` / `replace` / `complete`），主 Agent 另获 `devpilot_studio_progress_snapshot` 拉取全员 JSON 总览；数据持久化在 **`~/.devpilot/studio-todos.json`**（按 `studio_id` + `agent_id` 分桶）。系统提示要求开始执行前 `replace` 至少 2 条步骤，完成一步 `complete` 勾选。
+- **定时进度巡检**：前端约每 105s 调用 `StudioMaybeProgressBrief(studioID)`；后端对同一工作室 **90s 冷却**，通过合成用户消息驱动主 Agent 先调 `devpilot_studio_progress_snapshot` 再简短汇报，结果经 **`studio:assistant`** 推送。用户每次 `ChatInStudio` 会清除该冷却键以便尽快再次巡检。
+- **前端看板**：`GetStudioTodoBoard(studioID)` 返回各成员 TODO 行，工作室页左侧定时刷新展示。
 
 ### 7. 项目上下文 (`project_context.go`)
 

@@ -82,6 +82,8 @@ declare global {
           GetStudioDetail: (studioID: string) => Promise<import('../studio/types').StudioDetail>
           GetStudioProgress: (studioID: string) => Promise<import('../studio/types').StudioProgressEvent[]>
           ChatInStudio: (studioID: string, agentID: string, message: string) => Promise<string>
+          GetStudioTodoBoard: (studioID: string) => Promise<import('../studio/types').StudioTodoBoardRow[]>
+          StudioMaybeProgressBrief: (studioID: string) => Promise<void>
         }
       }
     }

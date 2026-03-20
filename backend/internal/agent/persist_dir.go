@@ -105,6 +105,15 @@ func globalStudiosPath() string {
 	return filepath.Join(base, "studios.json")
 }
 
+// globalStudioTodosPath ~/.devpilot/studio-todos.json
+func globalStudioTodosPath() string {
+	base := agentGlobalDataDirOrEmpty()
+	if base == "" {
+		return ""
+	}
+	return filepath.Join(base, "studio-todos.json")
+}
+
 func globalAgentMemoryDir() string {
 	base := agentGlobalDataDirOrEmpty()
 	if base == "" {

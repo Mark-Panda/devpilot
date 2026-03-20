@@ -24,3 +24,22 @@ export interface StudioProgressEvent {
   result_preview?: string
   error?: string
 }
+
+/** 工作室主 Agent 自动续跑推送的 assistant 消息 */
+export interface StudioAssistantPush {
+  studio_id: string
+  agent_id: string
+  content: string
+}
+
+export interface StudioTodoItem {
+  id: string
+  title: string
+  done: boolean
+}
+
+export interface StudioTodoBoardRow {
+  agent_id: string
+  agent_name: string
+  items: StudioTodoItem[]
+}

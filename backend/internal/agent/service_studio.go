@@ -2,12 +2,22 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/rs/zerolog/log"
 )
+
+// studioMaxAutoMainContinuations 用户发一条消息后，主 Agent 因「子任务完成」触发的自动续跑最多次数（防无限链式委派）
+const studioMaxAutoMainContinuations = 8
+
+// studioProgressBriefCooldown 前端定时触发「进度巡检」的最小间隔
+const studioProgressBriefCooldown = 90 * time.Second
+
+var studioProgressBriefLast sync.Map // studioID -> time.Time
 
 func flattenAgentTreeMembers(root *AgentTreeNode) []AgentInfo {
 	if root == nil {
@@ -127,6 +137,188 @@ func (s *Service) ChatInStudio(ctx context.Context, studioID, agentID, userMessa
 	if strings.TrimSpace(agentID) != st.MainAgentID {
 		return "", fmt.Errorf("工作室内仅能与主 Agent 对话")
 	}
+	s.resetStudioAutoMainSteps(studioID)
+	studioProgressBriefLast.Delete(studioID)
 	ctx = WithStudioID(ctx, studioID)
 	return s.orchestrator.Chat(ctx, agentID, userMessage)
+}
+
+// SetStudioChatEmitter 由 App 注入，将主 Agent 自动续跑回复推到前端（可为 nil）
+func (s *Service) SetStudioChatEmitter(fn func(StudioAssistantPush)) {
+	s.studioChatEmitMu.Lock()
+	defer s.studioChatEmitMu.Unlock()
+	s.studioChatEmitter = fn
+}
+
+func (s *Service) resetStudioAutoMainSteps(studioID string) {
+	s.studioAutoMainSteps.Store(strings.TrimSpace(studioID), 0)
+}
+
+func truncateForStudioContinuation(s string, max int) string {
+	s = strings.TrimSpace(s)
+	if len(s) <= max {
+		return s
+	}
+	if max <= 4 {
+		return "…"
+	}
+	return s[:max-3] + "..."
+}
+
+func (s *Service) studioMainAfterChildFinished(parentID, studioID, childID, childName, taskPreview, result string) {
+	studioID = strings.TrimSpace(studioID)
+	if studioID == "" {
+		return
+	}
+	v, _ := s.studioAutoMainSteps.LoadOrStore(studioID, 0)
+	n, _ := v.(int)
+	if n >= studioMaxAutoMainContinuations {
+		return
+	}
+	s.studioAutoMainSteps.Store(studioID, n+1)
+
+	ctx := WithStudioID(context.Background(), studioID)
+	prompt := fmt.Sprintf(`【工作室·子任务完成】子 Agent「%s」（id=%s）已完成本轮后台执行。
+
+委派任务摘要：%s
+返回内容（节选）：
+%s
+
+请结合用户在本工作室中的整体需求判断：若仍需其他子 Agent 或后续步骤，请调用工具 %s 继续派发；若本阶段已可交付，请用简短中文说明进度与产出要点，避免不必要的重复委派。`,
+		childName, childID, strings.TrimSpace(taskPreview), truncateForStudioContinuation(result, 6000), DelegateToSubAgentToolName)
+
+	reply, err := s.Chat(ctx, parentID, prompt)
+	if err != nil {
+		log.Warn().Err(err).Str("studio_id", studioID).Str("main_id", parentID).Msg("studio main auto-continuation failed")
+		return
+	}
+	s.studioChatEmitMu.RLock()
+	fn := s.studioChatEmitter
+	s.studioChatEmitMu.RUnlock()
+	if fn != nil && strings.TrimSpace(reply) != "" {
+		fn(StudioAssistantPush{
+			StudioID: studioID,
+			AgentID:  parentID,
+			Content:  reply,
+		})
+	}
+}
+
+// StudioTodoGet 实现 StudioTodoRuntime
+func (s *Service) StudioTodoGet(studioID, agentID string) []StudioTodoItem {
+	if s.studioTodoStore == nil {
+		return nil
+	}
+	return s.studioTodoStore.Get(studioID, agentID)
+}
+
+// StudioTodoReplace 实现 StudioTodoRuntime
+func (s *Service) StudioTodoReplace(studioID, agentID string, items []StudioTodoItem) error {
+	if s.studioTodoStore == nil {
+		return fmt.Errorf("工作室 TODO 存储未初始化")
+	}
+	return s.studioTodoStore.Replace(studioID, agentID, items)
+}
+
+// StudioTodoComplete 实现 StudioTodoRuntime
+func (s *Service) StudioTodoComplete(studioID, agentID, todoID string) error {
+	if s.studioTodoStore == nil {
+		return fmt.Errorf("工作室 TODO 存储未初始化")
+	}
+	return s.studioTodoStore.Complete(studioID, agentID, todoID)
+}
+
+// StudioTodoSnapshotJSON 实现 StudioTodoRuntime
+func (s *Service) StudioTodoSnapshotJSON(studioID string) (string, error) {
+	if s.studioTodoStore == nil {
+		return "[]", nil
+	}
+	ctx := context.Background()
+	det, err := s.GetStudioDetail(ctx, studioID)
+	if err != nil {
+		return "", err
+	}
+	rows := make([]StudioTodoBoardRow, 0, len(det.MemberAgents))
+	for _, m := range det.MemberAgents {
+		rows = append(rows, StudioTodoBoardRow{
+			AgentID:   m.Config.ID,
+			AgentName: m.Config.Name,
+			Items:     s.studioTodoStore.Get(studioID, m.Config.ID),
+		})
+	}
+	b, err := json.MarshalIndent(rows, "", "  ")
+	if err != nil {
+		return "", err
+	}
+	return string(b), nil
+}
+
+// GetStudioTodoBoard 供前端展示各成员 TODO（无 LLM）
+func (s *Service) GetStudioTodoBoard(ctx context.Context, studioID string) ([]StudioTodoBoardRow, error) {
+	_ = ctx
+	studioID = strings.TrimSpace(studioID)
+	if studioID == "" {
+		return nil, fmt.Errorf("studio_id 无效")
+	}
+	if s.studioTodoStore == nil {
+		return []StudioTodoBoardRow{}, nil
+	}
+	det, err := s.GetStudioDetail(ctx, studioID)
+	if err != nil {
+		return nil, err
+	}
+	rows := make([]StudioTodoBoardRow, 0, len(det.MemberAgents))
+	for _, m := range det.MemberAgents {
+		rows = append(rows, StudioTodoBoardRow{
+			AgentID:   m.Config.ID,
+			AgentName: m.Config.Name,
+			Items:     s.studioTodoStore.Get(studioID, m.Config.ID),
+		})
+	}
+	return rows, nil
+}
+
+// StudioMaybeProgressBrief 由前端定时调用：在冷却内跳过；否则让主 Agent 拉取 TODO 总览并向用户简报（经 studio:assistant 推送）
+func (s *Service) StudioMaybeProgressBrief(ctx context.Context, studioID string) error {
+	_ = ctx
+	studioID = strings.TrimSpace(studioID)
+	if studioID == "" || s.studioStore == nil || s.studioTodoStore == nil {
+		return nil
+	}
+	st, err := s.studioStore.GetStudio(studioID)
+	if err != nil {
+		return err
+	}
+	mainID := strings.TrimSpace(st.MainAgentID)
+	if mainID == "" {
+		return nil
+	}
+	now := time.Now()
+	if v, ok := studioProgressBriefLast.Load(studioID); ok {
+		if now.Sub(v.(time.Time)) < studioProgressBriefCooldown {
+			return nil
+		}
+	}
+
+	ctx2 := WithStudioID(context.Background(), studioID)
+	prompt := "【工作室·定时进度巡检】请先调用工具 " + StudioTodoSnapshotToolName + " 获取本工作室全部成员 TODO 的 JSON 总览。\n" +
+		"若整体较上次无明显变化，只回复一行：「进度巡检：暂无新变化。」\n" +
+		"若有事项完成、进行中或阻塞，用 2～5 句中文向用户说明；不要无故重复委派。"
+	reply, err := s.Chat(ctx2, mainID, prompt)
+	if err != nil {
+		log.Warn().Err(err).Str("studio_id", studioID).Msg("studio progress brief failed")
+		return err
+	}
+	studioProgressBriefLast.Store(studioID, time.Now())
+	s.studioChatEmitMu.RLock()
+	fn := s.studioChatEmitter
+	s.studioChatEmitMu.RUnlock()
+	if fn != nil && strings.TrimSpace(reply) != "" {
+		fn(StudioAssistantPush{
+			StudioID: studioID,
+			AgentID:  mainID,
+			Content:  reply,
+		})
+	}
+	return nil
 }

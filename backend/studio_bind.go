@@ -16,3 +16,13 @@ func BindStudioProgressEvents(ctx context.Context, svc *agent.Service) {
 		runtime.EventsEmit(ctx, "studio:progress", ev)
 	})
 }
+
+// BindStudioAssistantEvents 将工作室主 Agent 自动续跑回复推到前端（topic: studio:assistant）
+func BindStudioAssistantEvents(ctx context.Context, svc *agent.Service) {
+	if svc == nil || ctx == nil {
+		return
+	}
+	svc.SetStudioChatEmitter(func(ev agent.StudioAssistantPush) {
+		runtime.EventsEmit(ctx, "studio:assistant", ev)
+	})
+}

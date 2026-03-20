@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { studioApi, subscribeStudioProgress } from '../api'
+import { studioApi, subscribeStudioAssistant, subscribeStudioProgress } from '../api'
 import { agentApi } from '../../agent/api'
 import { ChatMessages } from '../../agent/components/ChatMessages'
 import { StudioTeamChatInput } from '../components/StudioTeamChatInput'
 import type { ChatMessage } from '../../agent/types'
-import type { StudioDetail, StudioProgressEvent } from '../types'
+import type { StudioDetail, StudioProgressEvent, StudioTodoBoardRow } from '../types'
 
 const kindLabels: Record<string, string> = {
   delegation_started: '主 Agent → 委派子 Agent',
@@ -49,6 +49,7 @@ export const StudioWorkspacePage: React.FC = () => {
     nonce: 0,
     text: '',
   })
+  const [todoBoard, setTodoBoard] = useState<StudioTodoBoardRow[]>([])
 
   const mainId = detail?.studio.main_agent_id ?? ''
   const mainName = useMemo(() => {
@@ -86,6 +87,8 @@ export const StudioWorkspacePage: React.FC = () => {
         mergeProgress(p)
         const h = await agentApi.getAgentChatHistory(d.studio.main_agent_id, studioId)
         setMessages(entriesToMessages(d.studio.main_agent_id, h))
+        const board = await studioApi.getStudioTodoBoard(studioId)
+        setTodoBoard(board)
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))
       } finally {
@@ -107,6 +110,41 @@ export const StudioWorkspacePage: React.FC = () => {
       window.clearInterval(t)
     }
   }, [studioId, mergeProgress])
+
+  useEffect(() => {
+    if (!studioId || !mainId) return
+    const off = subscribeStudioAssistant(studioId, (ev) => {
+      setMessages((m) => [
+        ...m,
+        {
+          id: `studio_auto_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`,
+          role: 'assistant',
+          content: ev.content,
+          timestamp: Date.now(),
+          agentId: mainId,
+        },
+      ])
+    })
+    return () => off()
+  }, [studioId, mainId])
+
+  useEffect(() => {
+    if (!studioId) return
+    const refreshBoard = () => {
+      void studioApi.getStudioTodoBoard(studioId).then(setTodoBoard).catch(() => {})
+    }
+    refreshBoard()
+    const t = window.setInterval(refreshBoard, 25000)
+    return () => window.clearInterval(t)
+  }, [studioId])
+
+  useEffect(() => {
+    if (!studioId) return
+    const t = window.setInterval(() => {
+      void studioApi.studioMaybeProgressBrief(studioId)
+    }, 105000)
+    return () => window.clearInterval(t)
+  }, [studioId])
 
   const filteredProgress = useMemo(() => {
     if (!progressFilterAgentId) return progress
@@ -142,6 +180,7 @@ export const StudioWorkspacePage: React.FC = () => {
       ])
       const p = await studioApi.getStudioProgress(studioId)
       mergeProgress(p)
+      void studioApi.getStudioTodoBoard(studioId).then(setTodoBoard).catch(() => {})
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -249,6 +288,45 @@ export const StudioWorkspacePage: React.FC = () => {
                 ))}
               </ul>
             )}
+          </div>
+          <div className="flex-shrink-0 border-t border-stone-100 bg-white px-4 py-2">
+            <p className="text-[11px] font-medium text-stone-500">TODO 看板（各 Agent 通过工具维护）</p>
+            <div className="mt-1 max-h-40 overflow-y-auto text-[11px] text-stone-600">
+              {todoBoard.length === 0 ? (
+                <p className="text-stone-400">暂无数据；Agent 在工作室对话中会使用 devpilot_studio_todo 写入清单。</p>
+              ) : (
+                <ul className="space-y-2">
+                  {todoBoard.map((row) => {
+                    const items = Array.isArray(row.items) ? row.items : []
+                    const rowKey = row.agent_id || `row_${items.length}`
+                    return (
+                      <li key={rowKey} className="rounded border border-stone-100 bg-stone-50 px-2 py-1.5">
+                        <p className="font-medium text-stone-800">{row.agent_name ?? row.agent_id}</p>
+                        {items.length === 0 ? (
+                          <p className="text-stone-400">未设置 TODO</p>
+                        ) : (
+                          <ul className="mt-0.5 list-none space-y-0.5 pl-0">
+                            {items.map((it, idx) => (
+                              <li key={it.id || `todo_${idx}`} className="flex gap-1.5">
+                                <span className={it.done ? 'text-emerald-600' : 'text-stone-400'}>
+                                  {it.done ? '☑' : '☐'}
+                                </span>
+                                <span className={it.done ? 'text-stone-500 line-through' : ''}>
+                                  <code className="text-[10px] text-stone-400">{it.id}</code> {it.title}
+                                </span>
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </li>
+                    )
+                  })}
+                </ul>
+              )}
+            </div>
+            <p className="mt-1.5 text-[10px] text-stone-400">
+              约每 105s 请求主 Agent 进度巡检（90s 后端冷却）；简报出现在右侧对话。
+            </p>
           </div>
           <div className="flex-shrink-0 border-t border-stone-100 bg-stone-50 px-4 py-2">
             <p className="text-[11px] font-medium text-stone-500">协作成员（当前树）</p>
