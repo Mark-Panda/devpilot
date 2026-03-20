@@ -48,6 +48,13 @@ func NewProjectContext(projectPath string) (ProjectContext, error) {
 	return ctx, nil
 }
 
+// RootPath 返回项目根路径
+func (p *projectContextImpl) RootPath() string {
+	p.mu.RLock()
+	defer p.mu.RUnlock()
+	return p.projectPath
+}
+
 // GetProjectInfo 获取项目信息
 func (p *projectContextImpl) GetProjectInfo(ctx context.Context) (ProjectInfo, error) {
 	p.mu.RLock()

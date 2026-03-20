@@ -89,7 +89,7 @@ function TreeNode({
             </div>
           </div>
         </div>
-        {onDestroy && (
+        {onDestroy && agent.config.type !== 'main' && (
           <button
             onClick={(e) => {
               e.stopPropagation()

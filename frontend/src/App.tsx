@@ -7,6 +7,8 @@ import { RuleGoPage, RuleGoScratchEditorPage, RuleGoLogsPage, RuleGoLogDetailPag
 import { SkillRepoPage } from "./modules/skill-repo";
 import { PlaceholderPage } from "./modules/placeholder";
 import { AgentChatPage } from "./modules/agent/pages/AgentChatPage";
+import { AgentManagementPage } from "./modules/agent/pages/AgentManagementPage";
+import { MCPManagementPage } from "./modules/agent/pages/MCPManagementPage";
 
 export default function App() {
   return (
@@ -19,6 +21,8 @@ export default function App() {
           <Route path="/curl-compare" element={<CurlComparePage />} />
           <Route path="/terminal" element={<PlaceholderPage title="终端" />} />
           <Route path="/settings/models" element={<ModelManagementPage />} />
+          <Route path="/settings/agents" element={<AgentManagementPage />} />
+          <Route path="/settings/mcp" element={<MCPManagementPage />} />
           <Route path="/rulego" element={<RuleGoPage />} />
           <Route path="/rulego/editor" element={<RuleGoScratchEditorPage />} />
           <Route path="/rulego/editor/:id" element={<RuleGoScratchEditorPage />} />

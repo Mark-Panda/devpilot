@@ -3,6 +3,7 @@ package agent
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -11,9 +12,26 @@ import (
 	"github.com/tmc/langchaingo/llms"
 )
 
+func modelConfigEqual(a, b ModelConfig) bool {
+	return a.BaseURL == b.BaseURL && a.APIKey == b.APIKey && a.Model == b.Model &&
+		a.MaxTokens == b.MaxTokens && a.Temperature == b.Temperature
+}
+
+func cloneMetadataMap(m map[string]interface{}) map[string]interface{} {
+	if m == nil || len(m) == 0 {
+		return nil
+	}
+	out := make(map[string]interface{}, len(m))
+	for k, v := range m {
+		out[k] = v
+	}
+	return out
+}
+
 // agentImpl 代理实现
 type agentImpl struct {
-	mu sync.RWMutex
+	mu         sync.RWMutex
+	processMu  sync.Mutex // 串行化 Process（含来自消息总线的请求）
 
 	config       AgentConfig
 	status       AgentStatus
@@ -24,6 +42,13 @@ type agentImpl struct {
 	llmClient *llm.Client
 	messageBus MessageBus
 	projectCtx ProjectContext
+
+	// 多轮对话记忆（仅 user/assistant 文本；与 OpenClaw 类 session 一致，供模型上下文）
+	memory     []llms.MessageContent
+	memoryPath string
+	// 超长记忆压缩后的滚动摘要（注入系统提示；持久化 *-summary.txt）
+	memorySummary     string
+	memorySummaryPath string
 
 	messagesCh <-chan Message
 	stopCh     chan struct{}
@@ -53,6 +78,47 @@ func NewAgent(ctx context.Context, config AgentConfig, messageBus MessageBus, pr
 		return nil, fmt.Errorf("subscribe to message bus: %w", err)
 	}
 
+	memPath := agentMemoryFilePath(config.ID)
+	var projRoot string
+	if projectCtx != nil {
+		projRoot = projectCtx.RootPath()
+	}
+	loadedMem, err := loadChatHistoryFromFile(memPath)
+	if err != nil {
+		log.Warn().Err(err).Str("agent_id", config.ID).Msg("load agent memory failed, starting empty")
+		loadedMem = nil
+	}
+	loadedFrom := ""
+	if len(loadedMem) > 0 {
+		loadedFrom = memPath
+	} else {
+		for _, p := range migrationMemoryCandidatePaths(projRoot, config.ID) {
+			if p == "" || p == memPath {
+				continue
+			}
+			if lm, e2 := loadChatHistoryFromFile(p); e2 == nil && len(lm) > 0 {
+				loadedMem = lm
+				loadedFrom = p
+				break
+			}
+		}
+	}
+	if len(loadedMem) > 0 && loadedFrom != "" && loadedFrom != memPath && memPath != "" {
+		if e3 := saveChatHistoryToFile(memPath, loadedMem); e3 != nil {
+			log.Warn().Err(e3).Str("agent_id", config.ID).Str("from", loadedFrom).Msg("migrate agent memory to ~/.devpilot/agent-memory failed")
+		}
+	}
+
+	sumPath := memorySummaryFilePath(memPath)
+	sumText := loadMemorySummaryFromFile(sumPath)
+	if sumText == "" && loadedFrom != "" && loadedFrom != memPath {
+		altSum := memorySummaryFilePath(loadedFrom)
+		sumText = loadMemorySummaryFromFile(altSum)
+		if sumText != "" && memPath != "" {
+			_ = saveMemorySummaryFile(memorySummaryFilePath(memPath), sumText)
+		}
+	}
+
 	agent := &agentImpl{
 		config:       config,
 		status:       AgentStatusIdle,
@@ -61,7 +127,11 @@ func NewAgent(ctx context.Context, config AgentConfig, messageBus MessageBus, pr
 		llmClient:    client,
 		messageBus:   messageBus,
 		projectCtx:   projectCtx,
-		messagesCh:   messagesCh,
+		memory:            loadedMem,
+		memoryPath:        memPath,
+		memorySummary:     sumText,
+		memorySummaryPath: sumPath,
+		messagesCh:        messagesCh,
 		stopCh:       make(chan struct{}),
 		children:     make(map[string]bool),
 	}
@@ -120,10 +190,16 @@ func (a *agentImpl) SendMessage(ctx context.Context, msg Message) error {
 
 // Process 处理用户消息
 func (a *agentImpl) Process(ctx context.Context, userMessage string) (string, error) {
+	a.processMu.Lock()
+	defer a.processMu.Unlock()
+
 	a.mu.Lock()
 	a.status = AgentStatusBusy
 	a.lastActiveAt = time.Now()
 	a.messageCount++
+	memSnapshot := cloneMessageSlice(a.memory)
+	agentType := a.config.Type
+	mcpSelected := append([]string(nil), a.config.MCPServers...)
 	a.mu.Unlock()
 
 	defer func() {
@@ -132,13 +208,20 @@ func (a *agentImpl) Process(ctx context.Context, userMessage string) (string, er
 		a.mu.Unlock()
 	}()
 
-	// 构建系统提示
 	systemPrompt := a.buildSystemPrompt(ctx)
 
-	// 获取已加载的技能
-	skills := a.llmClient.Skills()
+	messages := make([]llms.MessageContent, 0, 2+len(memSnapshot)+1)
+	messages = append(messages, llms.MessageContent{
+		Role:  llms.ChatMessageTypeSystem,
+		Parts: []llms.ContentPart{llms.TextContent{Text: systemPrompt}},
+	})
+	messages = append(messages, memSnapshot...)
+	messages = append(messages, llms.MessageContent{
+		Role:  llms.ChatMessageTypeHuman,
+		Parts: []llms.ContentPart{llms.TextContent{Text: userMessage}},
+	})
 
-	// 过滤启用的技能
+	skills := a.llmClient.Skills()
 	enabledSkills := make([]llm.Skill, 0)
 	if len(a.config.Skills) > 0 {
 		skillMap := make(map[string]llm.Skill)
@@ -152,30 +235,154 @@ func (a *agentImpl) Process(ctx context.Context, userMessage string) (string, er
 		}
 	}
 
-	// 如果启用了技能,使用工具循环
-	if len(enabledSkills) > 0 {
-		// 将技能转为工具
-		tools := llm.SkillsToTools(enabledSkills)
-		executor := llm.NewSkillExecutor(a.llmClient, enabledSkills)
-
-		// 构建消息
-		messages := []llms.MessageContent{
-			{
-				Role:  llms.ChatMessageTypeSystem,
-				Parts: []llms.ContentPart{llms.TextContent{Text: systemPrompt}},
-			},
-			{
-				Role:  llms.ChatMessageTypeHuman,
-				Parts: []llms.ContentPart{llms.TextContent{Text: userMessage}},
-			},
-		}
-
-		// 使用工具循环生成
-		return a.llmClient.GenerateWithToolLoop(ctx, messages, tools, nil, executor, llm.DefaultToolLoopMaxRounds)
+	root := ""
+	if a.projectCtx != nil {
+		root = a.projectCtx.RootPath()
+	}
+	mcpIDs := resolvedMCPServerIDs(root, agentType, mcpSelected)
+	mcpTools, mcpRoute, mcpCleanup, mcpSetupErr := attachMCPForAgent(ctx, root, mcpIDs)
+	defer mcpCleanup()
+	if mcpSetupErr != nil {
+		log.Warn().Err(mcpSetupErr).Str("agent_id", a.config.ID).Msg("mcp attach failed")
 	}
 
-	// 普通对话
-	return a.llmClient.ChatWithSystem(ctx, systemPrompt, userMessage)
+	var tools []llms.Tool
+	if len(enabledSkills) > 0 {
+		tools = append(tools, llm.SkillsToTools(enabledSkills)...)
+	}
+	tools = append(tools, mcpTools...)
+
+	var skillEx llm.ToolExecutor
+	if len(enabledSkills) > 0 {
+		skillEx = llm.NewSkillExecutor(a.llmClient, enabledSkills)
+	}
+	composite := newCompositeToolExecutor(skillEx, mcpRoute)
+
+	var reply string
+	var err error
+	if len(tools) > 0 && composite != nil {
+		reply, err = a.llmClient.GenerateWithToolLoop(ctx, messages, tools, nil, composite, llm.DefaultToolLoopMaxRounds)
+	} else {
+		reply, err = a.llmClient.GenerateFromMessages(ctx, messages)
+	}
+	if err != nil {
+		return "", err
+	}
+
+	a.mu.Lock()
+	a.memory = append(a.memory,
+		llms.MessageContent{
+			Role:  llms.ChatMessageTypeHuman,
+			Parts: []llms.ContentPart{llms.TextContent{Text: userMessage}},
+		},
+		llms.MessageContent{
+			Role:  llms.ChatMessageTypeAI,
+			Parts: []llms.ContentPart{llms.TextContent{Text: reply}},
+		},
+	)
+	memFull := cloneMessageSlice(a.memory)
+	sum := a.memorySummary
+	memPath := a.memoryPath
+	sumPath := a.memorySummaryPath
+	a.mu.Unlock()
+
+	finalMem := memFull
+	finalSum := sum
+	if outMem, outSum, cerr := maybeCompressMemory(ctx, a.llmClient, memFull, sum); cerr != nil {
+		log.Warn().Err(cerr).Str("agent_id", a.config.ID).Msg("memory compress failed, fallback trim only")
+		finalMem = trimMemory(memFull)
+		finalSum = sum
+	} else {
+		finalMem = outMem
+		finalSum = outSum
+	}
+
+	a.mu.Lock()
+	a.memory = finalMem
+	a.memorySummary = finalSum
+	a.mu.Unlock()
+
+	if err := saveChatHistoryToFile(memPath, finalMem); err != nil {
+		log.Warn().Err(err).Str("agent_id", a.config.ID).Msg("persist agent memory failed")
+	}
+	if err := saveMemorySummaryFile(sumPath, finalSum); err != nil {
+		log.Warn().Err(err).Str("agent_id", a.config.ID).Msg("persist memory summary failed")
+	}
+
+	return reply, nil
+}
+
+// ChatHistory 返回已持久化的对话轮次（user/assistant）
+func (a *agentImpl) ChatHistory() []ChatHistoryEntry {
+	a.mu.RLock()
+	defer a.mu.RUnlock()
+	return memoryToEntries(a.memory)
+}
+
+// ClearChatHistory 清空记忆并删除磁盘文件
+func (a *agentImpl) ClearChatHistory() error {
+	a.mu.Lock()
+	a.memory = nil
+	a.memorySummary = ""
+	path := a.memoryPath
+	sumPath := a.memorySummaryPath
+	a.mu.Unlock()
+	deleteAgentMemoryFile(path)
+	deleteMemorySummaryFile(sumPath)
+	return nil
+}
+
+// SetModelConfig 热切换模型：重建 LLM 客户端并更新配置（对话记忆保留）
+func (a *agentImpl) SetModelConfig(ctx context.Context, mc ModelConfig) error {
+	llmCfg := llm.Config{
+		BaseURL:     mc.BaseURL,
+		APIKey:      mc.APIKey,
+		Model:       mc.Model,
+		MaxTokens:   mc.MaxTokens,
+		Temperature: mc.Temperature,
+	}
+	client, err := llm.NewClient(ctx, llmCfg)
+	if err != nil {
+		return fmt.Errorf("create llm client: %w", err)
+	}
+
+	a.processMu.Lock()
+	defer a.processMu.Unlock()
+
+	a.mu.Lock()
+	a.config.ModelConfig = mc
+	a.llmClient = client
+	a.mu.Unlock()
+
+	log.Info().
+		Str("agent_id", a.config.ID).
+		Str("model", mc.Model).
+		Msg("agent model config updated")
+	return nil
+}
+
+// UpdateEditableConfig 更新名称、角色、技能、MCP、系统提示与模型配置（不可改 id / type / parent_id）
+func (a *agentImpl) UpdateEditableConfig(ctx context.Context, newCfg AgentConfig) error {
+	if newCfg.ID != a.config.ID {
+		return fmt.Errorf("agent id mismatch")
+	}
+	a.mu.RLock()
+	oldMC := a.config.ModelConfig
+	a.mu.RUnlock()
+	if !modelConfigEqual(oldMC, newCfg.ModelConfig) {
+		if err := a.SetModelConfig(ctx, newCfg.ModelConfig); err != nil {
+			return err
+		}
+	}
+	a.mu.Lock()
+	a.config.Name = newCfg.Name
+	a.config.Role = newCfg.Role
+	a.config.Skills = append([]string(nil), newCfg.Skills...)
+	a.config.MCPServers = append([]string(nil), newCfg.MCPServers...)
+	a.config.SystemPrompt = newCfg.SystemPrompt
+	a.config.Metadata = cloneMetadataMap(newCfg.Metadata)
+	a.mu.Unlock()
+	return nil
 }
 
 // Stop 停止代理
@@ -260,6 +467,9 @@ func (a *agentImpl) buildSystemPrompt(ctx context.Context) string {
 	if prompt == "" {
 		prompt = fmt.Sprintf("你是一个名为 %s 的 AI 助手。", a.config.Name)
 	}
+	if role := strings.TrimSpace(a.config.Role); role != "" {
+		prompt = fmt.Sprintf("【角色】%s\n\n%s", role, prompt)
+	}
 
 	// 添加项目上下文
 	if a.projectCtx != nil {
@@ -275,6 +485,34 @@ func (a *agentImpl) buildSystemPrompt(ctx context.Context) string {
 	// 添加代理能力说明
 	if len(a.config.Skills) > 0 {
 		prompt += fmt.Sprintf("\n\n你拥有以下技能: %v", a.config.Skills)
+	}
+
+	a.mu.RLock()
+	agentType := a.config.Type
+	mcpSel := append([]string(nil), a.config.MCPServers...)
+	memSummary := strings.TrimSpace(a.memorySummary)
+	a.mu.RUnlock()
+
+	if memSummary != "" {
+		prompt += "\n\n【历史对话摘要】\n" + memSummary
+	}
+
+	promptRoot := ""
+	if a.projectCtx != nil {
+		promptRoot = a.projectCtx.RootPath()
+	}
+	if ids := resolvedMCPServerIDs(promptRoot, agentType, mcpSel); len(ids) > 0 {
+		doc, _ := loadMCPServersDoc(promptRoot)
+		by := mcpDefinitionsByID(doc)
+		var labels []string
+		for _, id := range ids {
+			if d, ok := by[id]; ok && strings.TrimSpace(d.Name) != "" {
+				labels = append(labels, fmt.Sprintf("%s (%s)", d.Name, id))
+			} else {
+				labels = append(labels, id)
+			}
+		}
+		prompt += fmt.Sprintf("\n\n当前会话已加载 MCP 服务: %s。请通过工具调用（function calling）使用各服务暴露的工具。", strings.Join(labels, "；"))
 	}
 
 	return prompt

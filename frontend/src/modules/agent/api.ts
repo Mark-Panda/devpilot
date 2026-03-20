@@ -7,7 +7,47 @@ import type {
   AgentTreeNode,
   ProjectInfo,
   CodeMatch,
+  ChatHistoryEntry,
+  ModelConfig,
+  MCPServerPreset,
+  MCPServerDefinition,
 } from './types'
+
+function normalizeModelConfig(mc: ModelConfig | null | undefined): ModelConfig {
+  if (!mc || typeof mc !== 'object') {
+    return {
+      base_url: '',
+      api_key: '',
+      model: '',
+      max_tokens: 4096,
+      temperature: 0.7,
+    }
+  }
+  return {
+    base_url: typeof mc.base_url === 'string' ? mc.base_url : '',
+    api_key: typeof mc.api_key === 'string' ? mc.api_key : '',
+    model: typeof mc.model === 'string' ? mc.model : '',
+    max_tokens: typeof mc.max_tokens === 'number' ? mc.max_tokens : 4096,
+    temperature: typeof mc.temperature === 'number' ? mc.temperature : 0.7,
+  }
+}
+
+/** Go nil slice / 缺字段 → JS null；统一成安全默认值避免 UI 与 sendMessage 崩溃 */
+function normalizeAgentConfig(c: AgentConfig): AgentConfig {
+  return {
+    ...c,
+    skills: Array.isArray(c.skills) ? c.skills : [],
+    mcp_servers: Array.isArray(c.mcp_servers) ? c.mcp_servers : [],
+    model_config: normalizeModelConfig(c.model_config),
+  }
+}
+
+function normalizeAgentInfo(a: AgentInfo): AgentInfo {
+  if (!a?.config) {
+    return a
+  }
+  return { ...a, config: normalizeAgentConfig(a.config) }
+}
 
 // 导入 Wails 生成的方法(编译后会生成)
 declare global {
@@ -22,6 +62,13 @@ declare global {
           Chat: (agentId: string, message: string) => Promise<string>
           SendMessage: (fromAgentId: string, toAgentId: string, content: string, msgType: string) => Promise<void>
           GetAgentTree: (rootId: string) => Promise<AgentTreeNode>
+          GetAgentChatHistory: (agentId: string) => Promise<ChatHistoryEntry[]>
+          ClearAgentChatHistory: (agentId: string) => Promise<void>
+          UpdateAgentModelConfig: (agentId: string, mc: ModelConfig) => Promise<AgentInfo>
+          UpdateAgent: (config: AgentConfig) => Promise<AgentInfo>
+          ListMCPServerPresets: () => Promise<MCPServerPreset[]>
+          GetMCPServerDefinitions: () => Promise<MCPServerDefinition[]>
+          SaveMCPServerDefinitions: (servers: MCPServerDefinition[]) => Promise<void>
           GetProjectInfo: () => Promise<ProjectInfo>
           SearchCode: (query: string, limit: number) => Promise<CodeMatch[]>
           GetFileContent: (path: string) => Promise<string>
@@ -38,15 +85,19 @@ declare global {
 export const agentApi = {
   // Agent 管理
   createAgent: async (config: AgentConfig): Promise<AgentInfo> => {
-    return await window.go.main.App.CreateAgent(config)
+    const v = await window.go.main.App.CreateAgent(config)
+    return normalizeAgentInfo(v)
   },
 
   getAgent: async (agentId: string): Promise<AgentInfo> => {
-    return await window.go.main.App.GetAgent(agentId)
+    const v = await window.go.main.App.GetAgent(agentId)
+    return normalizeAgentInfo(v)
   },
 
   listAgents: async (): Promise<AgentInfo[]> => {
-    return await window.go.main.App.ListAgents()
+    const v = await window.go.main.App.ListAgents()
+    if (!Array.isArray(v)) return []
+    return v.map((x) => normalizeAgentInfo(x))
   },
 
   destroyAgent: async (agentId: string): Promise<void> => {
@@ -55,7 +106,9 @@ export const agentApi = {
 
   // 对话
   chat: async (agentId: string, message: string): Promise<string> => {
-    return await window.go.main.App.Chat(agentId, message)
+    const v = await window.go.main.App.Chat(agentId, message)
+    if (v == null) return ''
+    return typeof v === 'string' ? v : String(v)
   },
 
   // 消息通信
@@ -71,6 +124,38 @@ export const agentApi = {
   // Agent 树
   getAgentTree: async (rootId: string): Promise<AgentTreeNode> => {
     return await window.go.main.App.GetAgentTree(rootId)
+  },
+
+  getAgentChatHistory: async (agentId: string): Promise<ChatHistoryEntry[]> => {
+    return await window.go.main.App.GetAgentChatHistory(agentId)
+  },
+
+  clearAgentChatHistory: async (agentId: string): Promise<void> => {
+    return await window.go.main.App.ClearAgentChatHistory(agentId)
+  },
+
+  updateAgentModelConfig: async (agentId: string, mc: ModelConfig): Promise<AgentInfo> => {
+    const v = await window.go.main.App.UpdateAgentModelConfig(agentId, mc)
+    return normalizeAgentInfo(v)
+  },
+
+  updateAgent: async (config: AgentConfig): Promise<AgentInfo> => {
+    const v = await window.go.main.App.UpdateAgent(config)
+    return normalizeAgentInfo(v)
+  },
+
+  listMCPServerPresets: async (): Promise<MCPServerPreset[]> => {
+    const v = await window.go.main.App.ListMCPServerPresets()
+    return Array.isArray(v) ? v : []
+  },
+
+  getMCPServerDefinitions: async (): Promise<MCPServerDefinition[]> => {
+    const v = await window.go.main.App.GetMCPServerDefinitions()
+    return Array.isArray(v) ? v : []
+  },
+
+  saveMCPServerDefinitions: async (servers: MCPServerDefinition[]): Promise<void> => {
+    await window.go.main.App.SaveMCPServerDefinitions(servers)
   },
 
   // 项目上下文

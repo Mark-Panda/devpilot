@@ -32,7 +32,7 @@
 
 - **生命周期管理**:
   - 创建 Agent: `CreateAgent(config)` 
-  - 销毁 Agent: `DestroyAgent(agentID)` 自动清理子代理
+  - 销毁 Agent: `DestroyAgent(agentID)` 自动清理子代理；**`type == main` 的主 Agent 不可删除**（后端拒绝，前端隐藏删除入口）
   - Agent 状态: `idle`、`busy`、`stopped`
 
 - **消息总线** (`message_bus.go`):
@@ -40,7 +40,15 @@
   - 支持点对点消息和广播
   - 消息类型: `request`、`response`、`event`、`broadcast`
 
-### 2. LLM 集成
+### 2. 对话记忆（类 OpenClaw session）
+
+- 每个 Agent 在内存中维护 user/assistant 文本轮次，调用模型时注入为完整多轮上下文（技能路径走 `GenerateWithToolLoop`，无技能走 `GenerateFromMessages`）。
+- 持久化路径：`~/.devpilot/agent-memory/<agent_id>.json`（全局，与当前打开的项目无关），应用重启后可恢复。若仍存在旧路径 `~/.devpilot/projects/<项目键>/agent-memory/`、`<项目根>/.devpilot/agent-memory/`，首次加载时会读到并**写回**上述全局目录。
+- **记忆压缩**：当 user/assistant 轮次正文的 token 估值（优先 `cl100k_base`，不可用时用启发式）超过阈值（约 1.4 万）时，在回合结束后用当前模型将**较早**对话折叠为滚动摘要，写入同目录 `*-summary.txt`，并从内存与 JSON 中**删除**已折叠的轮次；最近约 **8 轮**完整对话始终保留。摘要通过系统提示中的「历史对话摘要」块注入后续对话。压缩失败时回退为仅按条数截断（`maxMemoryMessages`）。
+- **Agent 注册表**：`~/.devpilot/agents.json` 保存所有主/子 Agent 的完整 `AgentConfig`；旧版 `~/.devpilot/projects/<项目键>/agents.json`、`<项目根>/.devpilot/agents.json` 会在首次读取时自动迁移到全局路径。创建、销毁、`UpdateAgent`、热切换模型后以及**进程关闭前**会重写该文件。
+- 默认最多保留约 80 条消息（可再调 `maxMemoryMessages`）；销毁 Agent 或调用 `ClearAgentChatHistory` 会删除对应文件。
+
+### 3. LLM 集成
 
 每个 Agent 内置:
 - 基于 `langchaingo` 的 LLM 客户端
@@ -48,20 +56,21 @@
 - Skill 自动注入系统提示
 - MCP 工具循环执行
 
-### 3. Skill 系统
+### 4. Skill 系统
 
 复用项目现有的 Skill 加载器:
 - 从 `~/.devpilot/skills/` 或配置目录加载 SKILL.md
 - Agent 可选择启用特定技能
 - 技能作为 Tools 暴露给模型,支持真实执行
 
-### 4. MCP 工具集成
+### 5. MCP 工具集成
 
-- Agent 配置中可指定启用的 MCP 服务器
-- 通过 `GenerateWithToolLoop` 实现工具调用循环
-- 由业务层实现 `ToolExecutor` 接口执行 MCP 工具
+- **配置文件**：`~/.devpilot/mcp.json` 持久化 MCP 服务列表（全局）；旧版 `~/.devpilot/projects/<项目键>/mcp.json`、`<项目根>/.devpilot/mcp.json` 首次读取时自动迁移。设置页「MCP 配置」或 Wails `GetMCPServerDefinitions` / `SaveMCPServerDefinitions` 读写该文件。
+- **主 Agent**：对话时自动连接所有 **已启用** 且可运行的 MCP，将各服务 `tools/list` 合并为模型 tools，通过 `mark3labs/mcp-go` 执行 `tools/call`。
+- **其他 Agent**：仅在 `agents.json` 的 `mcp_servers` 与上述已启用服务的 **交集** 上连接 MCP。
+- 与技能共用 `GenerateWithToolLoop`：先匹配技能名，否则按 `mcp_<serverId>__<toolName>` 形式路由到对应 MCP。
 
-### 5. 项目上下文 (`project_context.go`)
+### 6. 项目上下文 (`project_context.go`)
 
 - **项目信息**: 自动检测项目名称、语言、总行数
 - **代码搜索**: 简单的文本搜索,支持限制结果数量
@@ -176,6 +185,10 @@ SendMessage(ctx, fromAgentID, toAgentID, content, type) -> error
 
 // Agent 树
 GetAgentTree(ctx, rootID) -> *AgentTreeNode
+
+// 对话记忆
+GetAgentChatHistory(ctx, agentID) -> []ChatHistoryEntry
+ClearAgentChatHistory(ctx, agentID) -> error
 
 // 项目上下文
 GetProjectInfo(ctx) -> ProjectInfo

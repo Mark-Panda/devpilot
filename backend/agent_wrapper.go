@@ -16,6 +16,9 @@ type ModelConfig = agent.ModelConfig
 type AgentType = agent.AgentType
 type AgentStatus = agent.AgentStatus
 type MessageType = agent.MessageType
+type ChatHistoryEntry = agent.ChatHistoryEntry
+type MCPServerPreset = agent.MCPServerPreset
+type MCPServerDefinition = agent.MCPServerDefinition
 
 // AgentServiceWrapper 包装 Agent 服务,提供公开的方法
 type AgentServiceWrapper struct {
@@ -76,6 +79,59 @@ func (w *AgentServiceWrapper) GetAgentTree(ctx context.Context, rootID string) (
 		return nil, nil
 	}
 	return w.svc.GetAgentTree(ctx, rootID)
+}
+
+func (w *AgentServiceWrapper) GetAgentChatHistory(ctx context.Context, agentID string) ([]ChatHistoryEntry, error) {
+	if w == nil || w.svc == nil {
+		return []ChatHistoryEntry{}, nil
+	}
+	return w.svc.GetAgentChatHistory(ctx, agentID)
+}
+
+func (w *AgentServiceWrapper) ClearAgentChatHistory(ctx context.Context, agentID string) error {
+	if w == nil || w.svc == nil {
+		return nil
+	}
+	return w.svc.ClearAgentChatHistory(ctx, agentID)
+}
+
+func (w *AgentServiceWrapper) UpdateAgentModelConfig(ctx context.Context, agentID string, mc ModelConfig) (AgentInfo, error) {
+	if w == nil || w.svc == nil {
+		return AgentInfo{}, nil
+	}
+	return w.svc.UpdateAgentModelConfig(ctx, agentID, mc)
+}
+
+func (w *AgentServiceWrapper) UpdateAgent(ctx context.Context, cfg AgentConfig) (AgentInfo, error) {
+	if w == nil || w.svc == nil {
+		return AgentInfo{}, nil
+	}
+	return w.svc.UpdateAgent(ctx, cfg)
+}
+
+func (w *AgentServiceWrapper) ListMCPServerPresets() []MCPServerPreset {
+	if w == nil || w.svc == nil {
+		return []MCPServerPreset{}
+	}
+	p := w.svc.ListMCPServerPresets()
+	if p == nil {
+		return []MCPServerPreset{}
+	}
+	return p
+}
+
+func (w *AgentServiceWrapper) GetMCPServerDefinitions(ctx context.Context) ([]MCPServerDefinition, error) {
+	if w == nil || w.svc == nil {
+		return nil, nil
+	}
+	return w.svc.GetMCPServerDefinitions(ctx)
+}
+
+func (w *AgentServiceWrapper) SaveMCPServerDefinitions(ctx context.Context, servers []MCPServerDefinition) error {
+	if w == nil || w.svc == nil {
+		return nil
+	}
+	return w.svc.SaveMCPServerDefinitions(ctx, servers)
 }
 
 func (w *AgentServiceWrapper) GetProjectInfo(ctx context.Context) (ProjectInfo, error) {

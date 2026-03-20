@@ -1,9 +1,54 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { useAgentStore } from '../store'
+import { useAgentStore, selectCurrentAgentLoading } from '../store'
 import { modelManagementApi, type ModelOption } from '../modelApi'
 import { ChatMessages } from '../components/ChatMessages'
 import { ChatInput } from '../components/ChatInput'
+import { SubAgentModal } from '../components/SubAgentModal'
+import type { AgentConfig, AgentInfo, ModelConfig } from '../types'
+
+/** 避免 React Strict Mode 双次挂载时重复自动建主 Agent（仅取最后一次 init） */
+let agentChatInitGeneration = 0
+
+function orderedAgentsWithDepth(agents: AgentInfo[]): { agent: AgentInfo; depth: number }[] {
+  const map = new Map(agents.map((a) => [a.config.id, a]))
+  const roots = agents.filter((a) => !a.config.parent_id || !map.has(a.config.parent_id))
+  const out: { agent: AgentInfo; depth: number }[] = []
+  const seen = new Set<string>()
+  const visit = (id: string, depth: number) => {
+    const a = map.get(id)
+    if (!a || seen.has(id)) return
+    seen.add(id)
+    out.push({ agent: a, depth })
+    for (const c of agents.filter((x) => x.config.parent_id === id)) {
+      visit(c.config.id, depth + 1)
+    }
+  }
+  for (const r of roots) {
+    visit(r.config.id, 0)
+  }
+  for (const a of agents) {
+    if (!seen.has(a.config.id)) out.push({ agent: a, depth: 0 })
+  }
+  return out
+}
+
+function modelOptionMatchesAgent(opt: ModelOption, agent: AgentInfo | undefined): boolean {
+  if (!agent) return false
+  const mc = agent.config.model_config
+  return opt.model === mc.model && opt.baseUrl === mc.base_url
+}
+
+function modelConfigForOption(opt: ModelOption, agent: AgentInfo | undefined): ModelConfig {
+  const cur = agent?.config.model_config
+  return {
+    base_url: opt.baseUrl,
+    api_key: opt.apiKey,
+    model: opt.model,
+    max_tokens: cur?.max_tokens ?? 4096,
+    temperature: cur?.temperature ?? 0.7,
+  }
+}
 
 function proxyHostFromBaseUrl(baseUrl: string | undefined): string {
   if (!baseUrl) return ''
@@ -67,89 +112,95 @@ export const AgentChatPage: React.FC = () => {
     agents,
     currentAgentId,
     messages,
-    isLoading,
     error,
     loadAgents,
     createAgent,
     selectAgent,
     sendMessage,
+    clearAgentMemory,
+    updateAgentModel,
   } = useAgentStore()
 
+  const isLoading = useAgentStore(selectCurrentAgentLoading)
+
   const [modelOptions, setModelOptions] = useState<ModelOption[]>([])
-  const [selectedModel, setSelectedModel] = useState<ModelOption | null>(null)
   const [isInitializing, setIsInitializing] = useState(true)
-  const [showWelcome, setShowWelcome] = useState(true)
   const [agentMenuOpen, setAgentMenuOpen] = useState(false)
+  const [modelMenuOpen, setModelMenuOpen] = useState(false)
+  const [showSubAgentModal, setShowSubAgentModal] = useState(false)
   const agentMenuRef = useRef<HTMLDivElement>(null)
+  const modelMenuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const initialize = async () => {
+    const gen = ++agentChatInitGeneration
+    ;(async () => {
       try {
         await loadAgents()
         const options = await modelManagementApi.getAllModelOptions()
+        if (gen !== agentChatInitGeneration) return
         setModelOptions(options)
-        if (options.length > 0) setSelectedModel(options[0])
+
+        const st = useAgentStore.getState()
+        let { agents: ags, currentAgentId: cur } = st
+
+        if (ags.length === 0 && options.length > 0) {
+          const first = options[0]
+          const created = await st.createAgent({
+            id: `agent_main_${Date.now()}`,
+            name: 'main',
+            type: 'main',
+            model_config: {
+              base_url: first.baseUrl,
+              api_key: first.apiKey,
+              model: first.model,
+              max_tokens: 4096,
+              temperature: 0.7,
+            },
+            skills: [],
+            mcp_servers: [],
+            system_prompt:
+              '你是一个专业的 AI 助手，可以帮助用户完成各种任务，包括代码编写、问题解答、创意头脑风暴等。',
+          })
+          if (gen !== agentChatInitGeneration) return
+          await useAgentStore.getState().selectAgent(created.config.id)
+        } else if (ags.length > 0 && !cur) {
+          const preferred =
+            ags.find((a) => a.config.type === 'main' && a.config.name === 'main') ??
+            ags.find((a) => a.config.type === 'main') ??
+            ags[0]
+          await useAgentStore.getState().selectAgent(preferred.config.id)
+        }
       } catch (err) {
         console.error('初始化失败:', err)
       } finally {
-        setIsInitializing(false)
+        if (gen === agentChatInitGeneration) setIsInitializing(false)
       }
-    }
-    initialize()
+    })()
   }, [loadAgents])
 
-  const handleCreateDefaultAgent = useCallback(async () => {
-    if (!selectedModel) {
-      return
-    }
-    try {
-      const config = {
-        id: `agent_main_${Date.now()}`,
-        name: 'main',
-        type: 'main' as const,
-        model_config: {
-          base_url: selectedModel.baseUrl,
-          api_key: selectedModel.apiKey,
-          model: selectedModel.model,
-          max_tokens: 4096,
-          temperature: 0.7,
-        },
-        skills: [],
-        mcp_servers: [],
-        system_prompt:
-          '你是一个专业的 AI 助手，可以帮助用户完成各种任务，包括代码编写、问题解答、创意头脑风暴等。',
-      }
-      const agent = await createAgent(config)
-      selectAgent(agent.config.id)
-      setShowWelcome(false)
-    } catch (err) {
-      console.error('创建主助手失败:', err)
-    }
-  }, [selectedModel, createAgent, selectAgent])
-
   useEffect(() => {
-    if (
-      !isInitializing &&
-      agents.length === 0 &&
-      modelOptions.length > 0 &&
-      showWelcome
-    ) {
-      handleCreateDefaultAgent()
-    }
-  }, [isInitializing, agents.length, modelOptions.length, showWelcome, handleCreateDefaultAgent])
-
-  useEffect(() => {
-    if (!agentMenuOpen) return
+    if (!agentMenuOpen && !modelMenuOpen) return
     const onDocMouseDown = (e: MouseEvent) => {
-      const el = agentMenuRef.current
-      if (el && !el.contains(e.target as Node)) setAgentMenuOpen(false)
+      const t = e.target as Node
+      const agentEl = agentMenuRef.current
+      const modelEl = modelMenuRef.current
+      if (agentMenuOpen && agentEl && !agentEl.contains(t)) setAgentMenuOpen(false)
+      if (modelMenuOpen && modelEl && !modelEl.contains(t)) setModelMenuOpen(false)
     }
     document.addEventListener('mousedown', onDocMouseDown)
     return () => document.removeEventListener('mousedown', onDocMouseDown)
-  }, [agentMenuOpen])
+  }, [agentMenuOpen, modelMenuOpen])
 
   const currentAgent = agents.find((a) => a.config.id === currentAgentId)
   const currentMessages = currentAgentId ? messages : []
+  const agentsOrdered = orderedAgentsWithDepth(agents)
+
+  const handleCreateSubAgent = async (cfg: AgentConfig) => {
+    await createAgent(cfg)
+    await loadAgents()
+    await selectAgent(cfg.id)
+    setAgentMenuOpen(false)
+  }
 
   if (isInitializing) {
     return (
@@ -162,83 +213,14 @@ export const AgentChatPage: React.FC = () => {
     )
   }
 
-  // 欢迎：选择模型（OpenClaw 风格，统一卡片列表）
-  if (!currentAgent || showWelcome) {
-    return (
-      <div className="agent-chat-shell agent-chat-shell--welcome">
-        <OcTopBar />
-
-        <div className="flex flex-shrink-0 items-center border-b border-stone-200 bg-white px-4 py-2.5 text-sm text-stone-600 sm:px-6">
-          选择模型后开始对话
-        </div>
-
-        <div className="min-h-0 overflow-y-auto overflow-x-hidden px-5 py-6 sm:px-6">
-          <div className="mx-auto max-w-2xl">
-            <h2 className="text-lg font-semibold text-slate-800 mb-1">选择模型</h2>
-            <p className="text-sm text-slate-500 mb-4">从已配置的模型中选择一个开始对话</p>
-
-            {modelOptions.length > 0 ? (
-              <>
-                <div className="space-y-2">
-                  {modelOptions.map((option, idx) => {
-                    const isSelected =
-                      selectedModel?.model === option.model && selectedModel?.baseUrl === option.baseUrl
-                    return (
-                      <button
-                        key={`${option.configId}-${option.model}-${idx}`}
-                        type="button"
-                        onClick={() => setSelectedModel(option)}
-                        className={`flex w-full items-center justify-between gap-3 rounded-xl border p-4 text-left shadow-sm transition-all ${
-                          isSelected
-                            ? 'border-rose-500 bg-rose-50/90 shadow-rose-100'
-                            : 'border-stone-200 bg-white hover:border-stone-300 hover:bg-stone-50/80'
-                        }`}
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-slate-800 truncate">{option.model}</div>
-                          <div className="text-xs text-slate-500 truncate mt-0.5">{option.displayName}</div>
-                        </div>
-                        <span
-                          className={`flex-shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
-                            isSelected ? 'bg-[#e11d48]' : 'bg-stone-200'
-                          }`}
-                        >
-                          {isSelected && (
-                            <svg className="w-3.5 h-3.5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                            </svg>
-                          )}
-                        </span>
-                      </button>
-                    )
-                  })}
-                </div>
-                <button
-                  type="button"
-                  onClick={handleCreateDefaultAgent}
-                  disabled={!selectedModel}
-                  className="mt-5 w-full rounded-xl bg-[#e11d48] px-4 py-3 font-medium text-white shadow-sm transition-colors hover:bg-[#be123c] disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  开始对话 →
-                </button>
-              </>
-            ) : (
-              <div className="rounded-xl border border-slate-200 bg-slate-50 p-6 text-center">
-                <p className="text-slate-600 mb-2">还没有配置模型</p>
-                <Link to="/settings/models" className="text-sm text-rose-600 hover:underline">前往模型管理</Link>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-    )
-  }
-
-  const modelLine =
-    currentAgent?.config.model_config.model &&
-    proxyHostFromBaseUrl(currentAgent.config.model_config.base_url)
-      ? `${currentAgent.config.model_config.model} · ${proxyHostFromBaseUrl(currentAgent.config.model_config.base_url)}`
-      : (currentAgent?.config.model_config.model ?? '—')
+  const mc = currentAgent?.config.model_config
+  const modelLine = !currentAgent
+    ? modelOptions.length === 0
+      ? '未配置模型 · 请前往模型管理'
+      : '正在准备对话…'
+    : mc?.model && proxyHostFromBaseUrl(mc.base_url ?? '')
+      ? `${mc.model} · ${proxyHostFromBaseUrl(mc.base_url ?? '')}`
+      : (mc?.model ?? '—')
 
   // OpenClaw 图二：双行顶栏 + 中间可滚消息区 + 底部固定输入条
   return (
@@ -249,7 +231,10 @@ export const AgentChatPage: React.FC = () => {
         <div className="relative flex-shrink-0" ref={agentMenuRef}>
           <button
             type="button"
-            onClick={() => setAgentMenuOpen((o) => !o)}
+            onClick={() => {
+              setModelMenuOpen(false)
+              setAgentMenuOpen((o) => !o)
+            }}
             className="flex items-center gap-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm font-medium text-stone-800 transition-colors hover:bg-stone-100"
             aria-expanded={agentMenuOpen}
             aria-haspopup="listbox"
@@ -261,35 +246,166 @@ export const AgentChatPage: React.FC = () => {
           </button>
           {agentMenuOpen && (
             <ul
-              className="absolute left-0 top-full z-50 mt-1 min-w-[180px] rounded-lg border border-stone-200 bg-white py-1 shadow-lg"
+              className="absolute left-0 top-full z-50 mt-1 min-w-[220px] rounded-lg border border-stone-200 bg-white py-1 shadow-lg"
               role="listbox"
             >
-              {agents.map((a) => (
+              {agentsOrdered.map(({ agent: a, depth }) => (
                 <li key={a.config.id} role="option" aria-selected={a.config.id === currentAgentId}>
                   <button
                     type="button"
-                    className={`w-full px-3 py-2 text-left text-sm hover:bg-stone-50 ${a.config.id === currentAgentId ? 'bg-rose-50 font-medium text-rose-700' : 'text-stone-700'}`}
+                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-stone-50 ${a.config.id === currentAgentId ? 'bg-rose-50 font-medium text-rose-700' : 'text-stone-700'}`}
+                    style={{ paddingLeft: `${12 + depth * 14}px` }}
                     onClick={() => {
-                      selectAgent(a.config.id)
+                      void selectAgent(a.config.id)
                       setAgentMenuOpen(false)
                     }}
                   >
-                    {a.config.name}
+                    {depth > 0 && (
+                      <span className="text-stone-300 select-none" aria-hidden>
+                        └
+                      </span>
+                    )}
+                    <span className="truncate">{a.config.name}</span>
+                    {a.config.type === 'sub' && (
+                      <span className="ml-auto flex-shrink-0 rounded bg-stone-100 px-1.5 py-0.5 text-[10px] font-medium text-stone-500">
+                        sub
+                      </span>
+                    )}
                   </button>
                 </li>
               ))}
+              <li className="my-1 border-t border-stone-100" role="separator" />
+              <li>
+                <button
+                  type="button"
+                  className="w-full px-3 py-2 text-left text-sm text-rose-700 hover:bg-rose-50"
+                  onClick={() => {
+                    setAgentMenuOpen(false)
+                    setShowSubAgentModal(true)
+                  }}
+                >
+                  + 创建子 Agent…
+                </button>
+              </li>
+              <li>
+                <Link
+                  to="/settings/agents"
+                  className="block w-full px-3 py-2 text-left text-sm text-stone-700 hover:bg-stone-50"
+                  onClick={() => setAgentMenuOpen(false)}
+                >
+                  Agent 管理…
+                </Link>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  className="w-full px-3 py-2 text-left text-sm text-stone-600 hover:bg-stone-50"
+                  onClick={async () => {
+                    if (window.confirm('确定清空当前 Agent 的持久化对话记忆？')) {
+                      await clearAgentMemory()
+                      setAgentMenuOpen(false)
+                    }
+                  }}
+                >
+                  清空对话记忆
+                </button>
+              </li>
             </ul>
           )}
         </div>
 
-        <div className="min-w-0 max-w-full flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-sm text-stone-700 sm:max-w-2xl">
-          <span className="block truncate font-mono text-[13px]" title={modelLine}>
-            {modelLine}
-          </span>
+        <div className="relative min-w-0 max-w-full flex-1 sm:max-w-2xl" ref={modelMenuRef}>
+          <button
+            type="button"
+            disabled={isLoading || !currentAgent}
+            title={currentAgent ? '切换模型' : '会话就绪后可切换模型'}
+            onClick={() => {
+              setAgentMenuOpen(false)
+              setModelMenuOpen((prev) => {
+                const next = !prev
+                if (next) {
+                  void modelManagementApi
+                    .getAllModelOptions()
+                    .then((opts) => setModelOptions(opts))
+                    .catch(() => {})
+                }
+                return next
+              })
+            }}
+            className="flex w-full items-center gap-2 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 text-left text-sm text-stone-700 transition-colors hover:border-stone-300 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-60"
+            aria-expanded={modelMenuOpen}
+            aria-haspopup="listbox"
+          >
+            <span className="min-w-0 flex-1 truncate font-mono text-[13px]" title={modelLine}>
+              {modelLine}
+            </span>
+            <svg
+              className={`h-3.5 w-3.5 flex-shrink-0 text-stone-400 transition-transform ${modelMenuOpen ? 'rotate-180' : ''}`}
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          </button>
+          {modelMenuOpen && (
+            <ul
+              className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-y-auto rounded-lg border border-stone-200 bg-white py-1 shadow-lg"
+              role="listbox"
+            >
+              {modelOptions.length === 0 ? (
+                <li className="px-3 py-2 text-sm text-stone-500">暂无已配置模型</li>
+              ) : (
+                modelOptions.map((opt, idx) => {
+                  const active = modelOptionMatchesAgent(opt, currentAgent)
+                  return (
+                    <li key={`${opt.configId}-${opt.model}-${idx}`} role="option" aria-selected={active}>
+                      <button
+                        type="button"
+                        disabled={isLoading}
+                        className={`w-full px-3 py-2 text-left text-sm hover:bg-stone-50 disabled:opacity-50 ${active ? 'bg-rose-50 font-medium text-rose-700' : 'text-stone-700'}`}
+                        onClick={async () => {
+                          if (!currentAgentId || !currentAgent) return
+                          try {
+                            await updateAgentModel(
+                              currentAgentId,
+                              modelConfigForOption(opt, currentAgent)
+                            )
+                            setModelMenuOpen(false)
+                          } catch {
+                            /* store 已设 error */
+                          }
+                        }}
+                      >
+                        <div className="truncate font-medium">{opt.model}</div>
+                        <div className="truncate text-xs text-stone-500">{opt.displayName}</div>
+                      </button>
+                    </li>
+                  )
+                })
+              )}
+              <li className="my-1 border-t border-stone-100" role="separator" />
+              <li>
+                <Link
+                  to="/settings/models"
+                  className="block px-3 py-2 text-sm text-rose-600 hover:bg-rose-50"
+                  onClick={() => setModelMenuOpen(false)}
+                >
+                  打开模型管理…
+                </Link>
+              </li>
+            </ul>
+          )}
         </div>
 
         <div className="flex w-full flex-shrink-0 flex-wrap items-center justify-end gap-0.5 sm:ml-auto sm:w-auto">
-          <button type="button" className="rounded-lg p-2 text-stone-500 hover:bg-stone-100" title="刷新">
+          <button
+            type="button"
+            className="rounded-lg p-2 text-stone-500 hover:bg-stone-100 disabled:cursor-not-allowed disabled:opacity-40"
+            title="从后端重新加载当前会话记忆"
+            disabled={!currentAgentId}
+            onClick={() => currentAgentId && void selectAgent(currentAgentId)}
+          >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
           </button>
           <button
@@ -303,9 +419,11 @@ export const AgentChatPage: React.FC = () => {
           <div className="mx-0.5 hidden h-5 w-px bg-stone-200 sm:block" aria-hidden />
           <button
             type="button"
-            className="rounded-lg p-2 text-rose-600 hover:bg-rose-50"
-            title="Agent"
-            aria-label="Agent"
+            className="rounded-lg p-2 text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40"
+            title="创建子 Agent"
+            aria-label="创建子 Agent"
+            disabled={!currentAgent}
+            onClick={() => currentAgent && setShowSubAgentModal(true)}
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
@@ -316,23 +434,63 @@ export const AgentChatPage: React.FC = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
             </svg>
           </button>
-          <button type="button" className="rounded-lg p-2 text-rose-600 hover:bg-rose-50" title="历史" aria-label="历史">
+          <button
+            type="button"
+            className="rounded-lg p-2 text-rose-600 hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-40"
+            title="清空持久化记忆"
+            aria-label="清空持久化记忆"
+            disabled={!currentAgent}
+            onClick={async () => {
+              if (window.confirm('清空当前 Agent 在后端的对话记忆？')) await clearAgentMemory()
+            }}
+          >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </button>
-          <button type="button" onClick={() => setShowWelcome(true)} className="rounded-lg p-2 text-stone-500 hover:bg-stone-100" title="切换模型 / 设置">
+          <Link
+            to="/settings/models"
+            className="rounded-lg p-2 text-stone-500 hover:bg-stone-100"
+            title="模型管理"
+            aria-label="模型管理"
+          >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-          </button>
+          </Link>
         </div>
       </div>
 
       <div className="agent-chat-messages">
-        <ChatMessages
-          messages={currentMessages}
-          isLoading={isLoading}
-          systemPrompt={currentAgent?.config.system_prompt}
-          agentName={currentAgent?.config.name}
-          modelName={currentAgent?.config.model_config.model}
-        />
+        {currentAgent ? (
+          <ChatMessages
+            messages={currentMessages}
+            isLoading={isLoading}
+            systemPrompt={currentAgent.config.system_prompt}
+            agentName={currentAgent.config.name}
+            modelName={currentAgent.config.model_config?.model ?? ''}
+          />
+        ) : (
+          <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 px-6 text-center text-sm text-stone-500">
+            {modelOptions.length === 0 ? (
+              <>
+                <p>尚未配置可用模型，无法开始对话。</p>
+                <Link to="/settings/models" className="font-medium text-rose-600 hover:underline">
+                  前往模型管理
+                </Link>
+              </>
+            ) : error ? (
+              <>
+                <p>无法创建会话：{error}</p>
+                <button
+                  type="button"
+                  className="font-medium text-rose-600 hover:underline"
+                  onClick={() => window.location.reload()}
+                >
+                  刷新页面重试
+                </button>
+              </>
+            ) : (
+              <p>正在准备对话…</p>
+            )}
+          </div>
+        )}
       </div>
 
       <footer className="agent-chat-composer">
@@ -340,7 +498,12 @@ export const AgentChatPage: React.FC = () => {
           <ChatInput
             onSend={(msg) => sendMessage(msg)}
             isLoading={isLoading}
-            placeholder={`Message ${currentAgent?.config.name ?? 'Agent'} (Enter to send)`}
+            disabled={!currentAgent}
+            placeholder={
+              currentAgent
+                ? `Message ${currentAgent.config.name} (Enter to send)`
+                : '请先配置模型或等待会话就绪'
+            }
           />
         </div>
       </footer>
@@ -350,6 +513,14 @@ export const AgentChatPage: React.FC = () => {
           <span>⚠️</span>
           <span>{error}</span>
         </div>
+      )}
+
+      {showSubAgentModal && currentAgent && (
+        <SubAgentModal
+          parentAgent={currentAgent}
+          onSubmit={handleCreateSubAgent}
+          onClose={() => setShowSubAgentModal(false)}
+        />
       )}
     </div>
   )

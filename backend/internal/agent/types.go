@@ -48,13 +48,33 @@ const (
 type AgentConfig struct {
 	ID           string                 `json:"id"`
 	Name         string                 `json:"name"`
+	Role         string                 `json:"role"` // 角色说明（展示与注入系统提示；空串也写入注册表）
 	Type         AgentType              `json:"type"`
 	ParentID     string                 `json:"parent_id,omitempty"`
 	ModelConfig  ModelConfig            `json:"model_config"`
-	Skills       []string               `json:"skills"`        // 启用的技能名称列表
-	MCPServers   []string               `json:"mcp_servers"`   // 启用的 MCP 服务器
+	Skills       []string               `json:"skills"`        // 启用的技能名称列表（从全局技能目录勾选）
+	MCPServers   []string               `json:"mcp_servers"`   // 启用的 MCP 预设 id 列表
 	SystemPrompt string                 `json:"system_prompt"` // 自定义系统提示
 	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+}
+
+// MCPServerPreset 全局可选 MCP 能力项（供 Agent 勾选；条目来自 ~/.devpilot/mcp.json）
+type MCPServerPreset struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// MCPServerDefinition MCP 服务配置（持久化于 ~/.devpilot/mcp.json）
+type MCPServerDefinition struct {
+	ID            string            `json:"id"`
+	Name          string            `json:"name"`
+	Description   string            `json:"description,omitempty"`
+	Enabled       bool              `json:"enabled"`
+	ServerCommand []string          `json:"server_command,omitempty"` // stdio：命令 + 参数，如 npx -y @scope/server ...
+	ServerURL     string            `json:"server_url,omitempty"`     // 可选：SSE 端点 URL
+	Env           map[string]string `json:"env,omitempty"`            // 子进程环境变量
+	ToolNames     []string          `json:"tool_names,omitempty"`     // 非空时仅暴露这些工具
 }
 
 // ModelConfig 模型配置
@@ -62,8 +82,8 @@ type ModelConfig struct {
 	BaseURL     string  `json:"base_url"`
 	APIKey      string  `json:"api_key"`
 	Model       string  `json:"model"`
-	MaxTokens   int     `json:"max_tokens,omitempty"`
-	Temperature float64 `json:"temperature,omitempty"`
+	MaxTokens   int     `json:"max_tokens"`   // 与注册表一致持久化（含 0）
+	Temperature float64 `json:"temperature"` // 与注册表一致持久化（含 0）
 }
 
 // AgentInfo 代理运行时信息
@@ -114,6 +134,9 @@ type MessageBus interface {
 
 // ProjectContext 项目上下文接口
 type ProjectContext interface {
+	// RootPath 项目根目录，用于 Agent 对话记忆等本地持久化
+	RootPath() string
+
 	// GetProjectInfo 获取项目基本信息
 	GetProjectInfo(ctx context.Context) (ProjectInfo, error)
 

@@ -26,6 +26,8 @@ const menuGroups: { group?: string; items: { path: string; label: string; end?: 
     group: "设置",
     items: [
       { path: "/skill-repo", label: "技能仓库" },
+      { path: "/settings/agents", label: "Agent 管理" },
+      { path: "/settings/mcp", label: "MCP 配置" },
       { path: "/settings/models", label: "模型管理" },
     ],
   },

@@ -3,10 +3,24 @@ package agent
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 
 	"github.com/rs/zerolog/log"
 )
+
+func agentListSortRank(t AgentType) int {
+	switch t {
+	case AgentTypeMain:
+		return 0
+	case AgentTypeSub:
+		return 1
+	case AgentTypeWorker:
+		return 2
+	default:
+		return 3
+	}
+}
 
 // Orchestrator 代理编排器
 type Orchestrator struct {
@@ -73,7 +87,7 @@ func (o *Orchestrator) GetAgent(agentID string) (Agent, error) {
 	return agent, nil
 }
 
-// ListAgents 列出所有代理
+// ListAgents 列出所有代理（顺序稳定：main → sub → worker，同类型按创建时间、id）
 func (o *Orchestrator) ListAgents() []AgentInfo {
 	o.mu.RLock()
 	defer o.mu.RUnlock()
@@ -82,6 +96,16 @@ func (o *Orchestrator) ListAgents() []AgentInfo {
 	for _, agent := range o.agents {
 		infos = append(infos, agent.Info())
 	}
+	sort.Slice(infos, func(i, j int) bool {
+		ri, rj := agentListSortRank(infos[i].Config.Type), agentListSortRank(infos[j].Config.Type)
+		if ri != rj {
+			return ri < rj
+		}
+		if !infos[i].CreatedAt.Equal(infos[j].CreatedAt) {
+			return infos[i].CreatedAt.Before(infos[j].CreatedAt)
+		}
+		return infos[i].Config.ID < infos[j].Config.ID
+	})
 	return infos
 }
 
@@ -95,9 +119,17 @@ func (o *Orchestrator) DestroyAgent(agentID string) error {
 		return fmt.Errorf("agent %s not found", agentID)
 	}
 
+	if agent.Config().Type == AgentTypeMain {
+		return fmt.Errorf("主 Agent 不可删除")
+	}
+
 	// 停止代理
 	if err := agent.Stop(); err != nil {
 		log.Warn().Err(err).Str("agent_id", agentID).Msg("failed to stop agent")
+	}
+
+	if impl, ok := agent.(*agentImpl); ok {
+		_ = impl.ClearChatHistory()
 	}
 
 	// 从父代理移除
@@ -140,6 +172,68 @@ func (o *Orchestrator) Chat(ctx context.Context, agentID string, userMessage str
 		return "", err
 	}
 	return agent.Process(ctx, userMessage)
+}
+
+// GetAgentChatHistory 返回代理的 user/assistant 对话记忆（与模型上下文一致）
+func (o *Orchestrator) GetAgentChatHistory(agentID string) ([]ChatHistoryEntry, error) {
+	agent, err := o.GetAgent(agentID)
+	if err != nil {
+		return nil, err
+	}
+	impl, ok := agent.(*agentImpl)
+	if !ok {
+		return nil, fmt.Errorf("unexpected agent implementation")
+	}
+	return impl.ChatHistory(), nil
+}
+
+// ClearAgentChatHistory 清空代理对话记忆并删除本地持久化文件
+func (o *Orchestrator) ClearAgentChatHistory(agentID string) error {
+	agent, err := o.GetAgent(agentID)
+	if err != nil {
+		return err
+	}
+	impl, ok := agent.(*agentImpl)
+	if !ok {
+		return fmt.Errorf("unexpected agent implementation")
+	}
+	return impl.ClearChatHistory()
+}
+
+// UpdateAgentModelConfig 更新代理的模型配置并重建 LLM 客户端
+func (o *Orchestrator) UpdateAgentModelConfig(ctx context.Context, agentID string, mc ModelConfig) error {
+	agent, err := o.GetAgent(agentID)
+	if err != nil {
+		return err
+	}
+	impl, ok := agent.(*agentImpl)
+	if !ok {
+		return fmt.Errorf("unexpected agent implementation")
+	}
+	return impl.SetModelConfig(ctx, mc)
+}
+
+// UpdateAgent 更新代理可编辑字段（id 须与内存中一致）
+func (o *Orchestrator) UpdateAgent(ctx context.Context, cfg AgentConfig) error {
+	agent, err := o.GetAgent(cfg.ID)
+	if err != nil {
+		return err
+	}
+	impl, ok := agent.(*agentImpl)
+	if !ok {
+		return fmt.Errorf("unexpected agent implementation")
+	}
+	// 禁止通过此接口改树结构
+	existing := impl.Config()
+	cfg.Type = existing.Type
+	cfg.ParentID = existing.ParentID
+	// metadata：请求未带该字段时为 nil，保留原值；显式传 {} 表示清空
+	if cfg.Metadata == nil {
+		cfg.Metadata = existing.Metadata
+	} else if len(cfg.Metadata) == 0 {
+		cfg.Metadata = nil
+	}
+	return impl.UpdateEditableConfig(ctx, cfg)
 }
 
 // GetAgentTree 获取代理树结构

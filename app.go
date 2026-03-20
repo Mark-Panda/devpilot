@@ -97,6 +97,66 @@ func (a *App) GetAgentTree(rootID string) (*backend.AgentTreeNode, error) {
 	return a.runtime.AgentWrapper().GetAgentTree(a.ctx, rootID)
 }
 
+// GetAgentChatHistory 获取代理对话记忆（user/assistant）
+func (a *App) GetAgentChatHistory(agentID string) ([]backend.ChatHistoryEntry, error) {
+	if a.runtime.AgentWrapper() == nil {
+		return []backend.ChatHistoryEntry{}, nil
+	}
+	return a.runtime.AgentWrapper().GetAgentChatHistory(a.ctx, agentID)
+}
+
+// ClearAgentChatHistory 清空代理对话记忆
+func (a *App) ClearAgentChatHistory(agentID string) error {
+	if a.runtime.AgentWrapper() == nil {
+		return nil
+	}
+	return a.runtime.AgentWrapper().ClearAgentChatHistory(a.ctx, agentID)
+}
+
+// UpdateAgentModelConfig 热切换当前代理使用的模型（保留会话记忆）
+func (a *App) UpdateAgentModelConfig(agentID string, mc backend.ModelConfig) (backend.AgentInfo, error) {
+	if a.runtime.AgentWrapper() == nil {
+		return backend.AgentInfo{}, nil
+	}
+	return a.runtime.AgentWrapper().UpdateAgentModelConfig(a.ctx, agentID, mc)
+}
+
+// UpdateAgent 更新 Agent 名称、角色、技能、MCP、系统提示与模型等
+func (a *App) UpdateAgent(config backend.AgentConfig) (backend.AgentInfo, error) {
+	if a.runtime.AgentWrapper() == nil {
+		return backend.AgentInfo{}, nil
+	}
+	return a.runtime.AgentWrapper().UpdateAgent(a.ctx, config)
+}
+
+// ListMCPServerPresets 全局可选 MCP 项（供 Agent 勾选）
+func (a *App) ListMCPServerPresets() []backend.MCPServerPreset {
+	if a.runtime.AgentWrapper() == nil {
+		return []backend.MCPServerPreset{}
+	}
+	p := a.runtime.AgentWrapper().ListMCPServerPresets()
+	if p == nil {
+		return []backend.MCPServerPreset{}
+	}
+	return p
+}
+
+// GetMCPServerDefinitions 获取全局 MCP 配置（设置页，~/.devpilot/mcp.json）
+func (a *App) GetMCPServerDefinitions() ([]backend.MCPServerDefinition, error) {
+	if a.runtime.AgentWrapper() == nil {
+		return nil, nil
+	}
+	return a.runtime.AgentWrapper().GetMCPServerDefinitions(a.ctx)
+}
+
+// SaveMCPServerDefinitions 保存 MCP 配置至 ~/.devpilot/mcp.json
+func (a *App) SaveMCPServerDefinitions(servers []backend.MCPServerDefinition) error {
+	if a.runtime.AgentWrapper() == nil {
+		return nil
+	}
+	return a.runtime.AgentWrapper().SaveMCPServerDefinitions(a.ctx, servers)
+}
+
 // GetProjectInfo 获取项目信息
 func (a *App) GetProjectInfo() (backend.ProjectInfo, error) {
 	if a.runtime.AgentWrapper() == nil {

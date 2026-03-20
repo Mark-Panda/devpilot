@@ -3,16 +3,23 @@ import React, { useState, useRef, useEffect } from 'react'
 interface ChatInputProps {
   onSend: (message: string) => void
   isLoading: boolean
+  /** 无可用会话时禁用输入 */
+  disabled?: boolean
   placeholder?: string
 }
 
-export function ChatInput({ onSend, isLoading, placeholder = 'Message (Enter 发送)' }: ChatInputProps) {
+export function ChatInput({
+  onSend,
+  isLoading,
+  disabled = false,
+  placeholder = 'Message (Enter 发送)',
+}: ChatInputProps) {
   const [message, setMessage] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    if (message.trim() && !isLoading) {
+    if (message.trim() && !isLoading && !disabled) {
       onSend(message.trim())
       setMessage('')
       if (textareaRef.current) textareaRef.current.style.height = '40px'
@@ -54,7 +61,7 @@ export function ChatInput({ onSend, isLoading, placeholder = 'Message (Enter 发
           onChange={(e) => setMessage(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
-          disabled={isLoading}
+          disabled={isLoading || disabled}
           rows={1}
           className="min-h-[44px] flex-1 resize-none border-0 bg-transparent px-2 py-2.5 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-0 disabled:opacity-60"
           style={{ minHeight: '40px', maxHeight: '160px' }}
@@ -70,7 +77,7 @@ export function ChatInput({ onSend, isLoading, placeholder = 'Message (Enter 发
           </button>
           <button
             type="submit"
-            disabled={!message.trim() || isLoading}
+            disabled={!message.trim() || isLoading || disabled}
             className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-[#e11d48] text-white shadow-sm transition-colors hover:bg-[#be123c] disabled:cursor-not-allowed disabled:opacity-40"
             title="发送"
           >

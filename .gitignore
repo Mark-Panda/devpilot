@@ -28,6 +28,11 @@ frontend/wailsjs/
 *.prof
 *.log
 
+# 旧版 Agent 数据（已迁移至 ~/.devpilot/projects/；若本地仍保留可忽略）
+.devpilot/agent-memory/
+.devpilot/agents.json
+.devpilot/mcp.json
+
 # SQLite / local data
 *.db
 *.sqlite
