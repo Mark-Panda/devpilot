@@ -5,6 +5,7 @@ go 1.24.4
 require (
 	github.com/cockroachdb/pebble v1.1.5
 	github.com/google/uuid v1.6.0
+	github.com/rs/zerolog v1.31.0
 	github.com/rulego/rulego v0.35.2
 	github.com/tmc/langchaingo v0.1.14
 	github.com/wailsapp/wails/v2 v2.11.0

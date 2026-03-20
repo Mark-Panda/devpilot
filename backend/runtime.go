@@ -4,7 +4,9 @@ import (
 	"context"
 	"io/fs"
 	"log"
+	"os"
 
+	"devpilot/backend/internal/agent"
 	"devpilot/backend/internal/services/curl_compare"
 	"devpilot/backend/internal/services/model_management"
 	"devpilot/backend/internal/services/route_rewrite"
@@ -36,10 +38,12 @@ type Runtime struct {
 	ruleGo        interface{}
 	skillRepo     interface{}
 	curlCompare   interface{}
+	agentService  *agent.Service
+	agentWrapper  *AgentServiceWrapper
 	close         func() error
 }
 
-// InitRuntime 初始化运行时。initSkillsFS 为嵌入的 initSkills 文件系统，用于启动时及列举技能时同步到 ~/.devpilot/skills/，可为 nil。
+// InitRuntime 初始化运行时。initSkillsFS 为嵌入的 initSkills 文件系统,用于启动时及列举技能时同步到 ~/.devpilot/skills/,可为 nil。
 func InitRuntime(dataDir string, initSkillsFS fs.FS) (*Runtime, error) {
 	db, err := pebble.Open(dataDir)
 	if err != nil {
@@ -54,12 +58,27 @@ func InitRuntime(dataDir string, initSkillsFS fs.FS) (*Runtime, error) {
 	ruleGoExecLogStore := rulego.NewExecutionLogStore(db)
 	ruleGoService := rulego.NewService(ruleGoStore, ruleGoExecLogStore, &ruleGoLLMConfigLister{s: modelService})
 	if n, err := ruleGoService.LoadAllEnabledRuleChains(); err != nil {
-		log.Printf("[rulego] 启动加载启用规则链: 已加载 %d 条，错误: %v", n, err)
+		log.Printf("[rulego] 启动加载启用规则链: 已加载 %d 条,错误: %v", n, err)
 	} else {
 		log.Printf("[rulego] 启动加载启用规则链: 共 %d 条", n)
 	}
 
 	EnsureSkillsFromInitFS(initSkillsFS, "initSkills")
+
+	// 初始化 Agent 服务 (使用当前工作目录作为项目路径)
+	cwd, err := os.Getwd()
+	if err != nil {
+		log.Printf("[agent] 获取当前目录失败: %v, 使用 /tmp", err)
+		cwd = "/tmp"
+	}
+	agentService, err := agent.NewService(cwd)
+	if err != nil {
+		log.Printf("[agent] 初始化 Agent 服务失败: %v", err)
+	} else {
+		log.Printf("[agent] Agent 服务已启动, 项目路径: %s", cwd)
+	}
+
+	agentWrapper := NewAgentServiceWrapper(agentService)
 
 	return &Runtime{
 		routeRewrite: routeRewriteService,
@@ -67,6 +86,8 @@ func InitRuntime(dataDir string, initSkillsFS fs.FS) (*Runtime, error) {
 		ruleGo:       ruleGoService,
 		skillRepo:    skill_repo.NewService(initSkillsFS),
 		curlCompare:  curl_compare.NewService(),
+		agentService: agentService,
+		agentWrapper: agentWrapper,
 		close:        db.Close,
 	}, nil
 }
@@ -91,9 +112,22 @@ func (r *Runtime) CurlCompareService() interface{} {
 	return r.curlCompare
 }
 
+func (r *Runtime) AgentService() *agent.Service {
+	return r.agentService
+}
+
+func (r *Runtime) AgentWrapper() *AgentServiceWrapper {
+	return r.agentWrapper
+}
+
 func (r *Runtime) Close() error {
 	if r == nil || r.close == nil {
 		return nil
+	}
+	if r.agentService != nil {
+		if err := r.agentService.Shutdown(); err != nil {
+			log.Printf("[agent] shutdown error: %v", err)
+		}
 	}
 	return r.close()
 }

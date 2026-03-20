@@ -6,13 +6,15 @@ import { ModelManagementPage } from "./modules/model-management";
 import { RuleGoPage, RuleGoScratchEditorPage, RuleGoLogsPage, RuleGoLogDetailPage } from "./modules/rulego";
 import { SkillRepoPage } from "./modules/skill-repo";
 import { PlaceholderPage } from "./modules/placeholder";
+import { AgentChatPage } from "./modules/agent/pages/AgentChatPage";
 
 export default function App() {
   return (
     <BrowserRouter>
       <Layout>
         <Routes>
-          <Route path="/" element={<Navigate to="/route-rewrite" replace />} />
+          <Route path="/" element={<Navigate to="/agent" replace />} />
+          <Route path="/agent" element={<AgentChatPage />} />
           <Route path="/route-rewrite" element={<RouteRewritePage />} />
           <Route path="/curl-compare" element={<CurlComparePage />} />
           <Route path="/terminal" element={<PlaceholderPage title="终端" />} />
