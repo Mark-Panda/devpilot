@@ -3,7 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import { studioApi, subscribeStudioProgress } from '../api'
 import { agentApi } from '../../agent/api'
 import { ChatMessages } from '../../agent/components/ChatMessages'
-import { ChatInput } from '../../agent/components/ChatInput'
+import { StudioTeamChatInput } from '../components/StudioTeamChatInput'
 import type { ChatMessage } from '../../agent/types'
 import type { StudioDetail, StudioProgressEvent } from '../types'
 
@@ -44,6 +44,11 @@ export const StudioWorkspacePage: React.FC = () => {
   const [loading, setLoading] = useState(true)
   const [sending, setSending] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [progressFilterAgentId, setProgressFilterAgentId] = useState('')
+  const [mentionAppend, setMentionAppend] = useState<{ nonce: number; text: string }>({
+    nonce: 0,
+    text: '',
+  })
 
   const mainId = detail?.studio.main_agent_id ?? ''
   const mainName = useMemo(() => {
@@ -103,13 +108,20 @@ export const StudioWorkspacePage: React.FC = () => {
     }
   }, [studioId, mergeProgress])
 
-  const onSend = async (text: string) => {
-    if (!studioId || !mainId || !text.trim()) return
-    const content = text.trim()
+  const filteredProgress = useMemo(() => {
+    if (!progressFilterAgentId) return progress
+    return progress.filter(
+      (ev) =>
+        ev.agent_id === progressFilterAgentId || ev.parent_agent_id === progressFilterAgentId
+    )
+  }, [progress, progressFilterAgentId])
+
+  const onSend = async (displayContent: string, textForMain: string) => {
+    if (!studioId || !mainId || !textForMain.trim()) return
     const userMsg: ChatMessage = {
       id: `u_${Date.now()}`,
       role: 'user',
-      content,
+      content: displayContent,
       timestamp: Date.now(),
       agentId: mainId,
     }
@@ -117,7 +129,7 @@ export const StudioWorkspacePage: React.FC = () => {
     setSending(true)
     setError(null)
     try {
-      const reply = await studioApi.chatInStudio(studioId, mainId, content)
+      const reply = await studioApi.chatInStudio(studioId, mainId, textForMain)
       setMessages((m) => [
         ...m,
         {
@@ -166,7 +178,9 @@ export const StudioWorkspacePage: React.FC = () => {
         </Link>
         <span className="text-stone-300">|</span>
         <h1 className="text-sm font-semibold text-stone-800">{detail.studio.name}</h1>
-        <span className="text-xs text-stone-400">仅与主 Agent「{mainName}」对话</span>
+        <span className="text-xs text-stone-400">
+          Team 视图：仅主 Agent「{mainName}」收消息；可用 @ 定向子 Agent
+        </span>
       </header>
 
       {error && (
@@ -178,15 +192,36 @@ export const StudioWorkspacePage: React.FC = () => {
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 lg:grid-cols-2 lg:divide-x lg:divide-stone-200">
         <section className="flex min-h-0 flex-col border-b border-stone-200 lg:border-b-0">
           <div className="flex-shrink-0 border-b border-stone-100 bg-white px-4 py-2">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-stone-500">任务进度</h2>
-            <p className="text-[11px] text-stone-400">委派与子 Agent 执行节点（含实时事件与定时同步）</p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h2 className="text-xs font-semibold uppercase tracking-wide text-stone-500">任务进度</h2>
+                <p className="text-[11px] text-stone-400">按成员筛选，聚焦单个子 Agent 的委派与产出摘要</p>
+              </div>
+              <label className="flex items-center gap-1.5 text-[11px] text-stone-600">
+                <span className="text-stone-400">成员</span>
+                <select
+                  className="max-w-[140px] rounded border border-stone-200 bg-white px-2 py-1 text-xs text-stone-800"
+                  value={progressFilterAgentId}
+                  onChange={(e) => setProgressFilterAgentId(e.target.value)}
+                >
+                  <option value="">全部</option>
+                  {detail.member_agents.map((a) => (
+                    <option key={a.config.id} value={a.config.id}>
+                      {a.config.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
           </div>
           <div className="studio-progress-scroll min-h-[200px] flex-1 overflow-y-auto bg-white px-3 py-3 lg:min-h-0">
             {progress.length === 0 ? (
               <p className="text-xs text-stone-400">暂无进度；主 Agent 使用委派工具后此处会更新。</p>
+            ) : filteredProgress.length === 0 ? (
+              <p className="text-xs text-stone-400">当前筛选下无事件，请换一名成员或选「全部」。</p>
             ) : (
               <ul className="space-y-3">
-                {progress.map((ev) => (
+                {filteredProgress.map((ev) => (
                   <li
                     key={ev.entry_id}
                     className="rounded-lg border border-stone-100 bg-stone-50 px-3 py-2 text-xs text-stone-700"
@@ -217,15 +252,30 @@ export const StudioWorkspacePage: React.FC = () => {
           </div>
           <div className="flex-shrink-0 border-t border-stone-100 bg-stone-50 px-4 py-2">
             <p className="text-[11px] font-medium text-stone-500">协作成员（当前树）</p>
-            <ul className="mt-1 max-h-24 overflow-y-auto text-[11px] text-stone-600">
-              {detail.member_agents.map((a) => (
-                <li key={a.config.id}>
-                  {a.config.name}{' '}
-                  <span className="text-stone-400">
-                    ({a.config.type}) {a.config.id}
-                  </span>
-                </li>
-              ))}
+            <ul className="mt-1 max-h-28 overflow-y-auto text-[11px] text-stone-600">
+              {detail.member_agents.map((a) => {
+                const isMain = a.config.id === mainId || a.config.type === 'main'
+                return (
+                  <li key={a.config.id}>
+                    <button
+                      type="button"
+                      disabled={isMain}
+                      title={isMain ? '主 Agent 为统一入口，无需 @' : '插入 @ 到输入框'}
+                      className={`text-left ${isMain ? 'cursor-default opacity-70' : 'cursor-pointer hover:text-rose-700 hover:underline'}`}
+                      onClick={() => {
+                        if (isMain) return
+                        const token = /\s/.test(a.config.name) ? a.config.id : a.config.name
+                        setMentionAppend((x) => ({ nonce: x.nonce + 1, text: `@${token} ` }))
+                      }}
+                    >
+                      {a.config.name}{' '}
+                      <span className="text-stone-400">
+                        ({a.config.type}) {a.config.id}
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
             </ul>
           </div>
         </section>
@@ -244,7 +294,14 @@ export const StudioWorkspacePage: React.FC = () => {
           </div>
           <footer className="agent-chat-composer border-t border-stone-200">
             <div className="agent-chat-composer-inner">
-              <ChatInput onSend={(msg) => void onSend(msg)} isLoading={sending} placeholder={`发送给 ${mainName}…`} />
+              <StudioTeamChatInput
+                onSend={(display, payload) => void onSend(display, payload)}
+                isLoading={sending}
+                placeholder={`发给 ${mainName}（@ 子 Agent 定向）…`}
+                members={detail.member_agents}
+                mainAgentId={mainId}
+                externalAppend={mentionAppend}
+              />
             </div>
           </footer>
         </section>

@@ -107,6 +107,9 @@ type AgentPeerSummary struct {
 // PeerAgentLookup 按 ID 查询其他 Agent；实现须并发安全（如对编排器读锁）
 type PeerAgentLookup func(agentID string) (AgentPeerSummary, bool)
 
+// CreateAgentToolFunc 主 Agent 通过工具创建新 Agent（由 Service 实现校验与 agents.json 落盘）
+type CreateAgentToolFunc func(ctx context.Context, callerID string, cfg AgentConfig) (AgentInfo, error)
+
 // Agent 代理接口
 type Agent interface {
 	// ID 返回代理唯一标识

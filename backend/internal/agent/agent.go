@@ -64,10 +64,12 @@ type agentImpl struct {
 	delegateWaiters map[string]chan delegateRPCResult // 委派 RPC：request_id -> 等待子 Agent Response
 
 	studioProgress func(StudioProgressEvent) // 工作室进度上报，可为 nil
+
+	createAgentTool CreateAgentToolFunc // 主 Agent 创建团队工具回调，可为 nil
 }
 
-// NewAgent 创建新代理；peerLookup 用于在系统提示中展示子代理等，可为 nil；studioProgress 用于工作室委派进度
-func NewAgent(ctx context.Context, config AgentConfig, messageBus MessageBus, projectCtx ProjectContext, peerLookup PeerAgentLookup, studioProgress func(StudioProgressEvent)) (Agent, error) {
+// NewAgent 创建新代理；peerLookup 用于在系统提示中展示子代理等，可为 nil；studioProgress 用于工作室委派进度；createAgentTool 仅对 type=main 生效
+func NewAgent(ctx context.Context, config AgentConfig, messageBus MessageBus, projectCtx ProjectContext, peerLookup PeerAgentLookup, studioProgress func(StudioProgressEvent), createAgentTool CreateAgentToolFunc) (Agent, error) {
 	// 构建 LLM 配置
 	llmCfg := llm.Config{
 		BaseURL:     config.ModelConfig.BaseURL,
@@ -140,6 +142,7 @@ func NewAgent(ctx context.Context, config AgentConfig, messageBus MessageBus, pr
 		projectCtx:     projectCtx,
 		peerLookup:     peerLookup,
 		studioProgress: studioProgress,
+		createAgentTool:   createAgentTool,
 		memory:            loadedMem,
 		memoryPath:        memPath,
 		memorySummary:     sumText,
@@ -299,6 +302,9 @@ func (a *agentImpl) Process(ctx context.Context, userMessage string) (string, er
 	if hasChildren {
 		tools = append(tools, delegateToSubAgentTool())
 	}
+	if agentType == AgentTypeMain && a.createAgentTool != nil {
+		tools = append(tools, createAgentTeamTool())
+	}
 
 	var skillEx llm.ToolExecutor
 	if len(enabledSkills) > 0 {
@@ -306,8 +312,9 @@ func (a *agentImpl) Process(ctx context.Context, userMessage string) (string, er
 	}
 	composite := newCompositeToolExecutor(skillEx, mcpRoute)
 
+	useToolRouter := hasChildren || (agentType == AgentTypeMain && a.createAgentTool != nil)
 	var executor llm.ToolExecutor
-	if hasChildren {
+	if useToolRouter {
 		executor = &agentToolRouter{agent: a, inner: composite}
 	} else {
 		executor = composite
@@ -634,11 +641,16 @@ func (a *agentImpl) buildSystemPrompt(ctx context.Context) string {
 	}
 
 	a.mu.RLock()
+	hasCreateTeamTool := a.config.Type == AgentTypeMain && a.createAgentTool != nil
 	childIDs := make([]string, 0, len(a.children))
 	for id := range a.children {
 		childIDs = append(childIDs, id)
 	}
 	a.mu.RUnlock()
+	if hasCreateTeamTool {
+		prompt += "\n\n【动态组建 Agent 团队】\n当用户需要为**新的项目或独立工作流**新增一套主从 Agent 时：先分析需求、拟定主 Agent 与若干子/worker 的 id（仅字母数字下划线连字符）、名称与分工，必要时与用户确认；然后调用工具 " + CreateAgentTeamToolName +
+			" 一次性创建新主 Agent（独立树根）及其下属。新 Agent 将继承你当前的模型配置与已勾选的技能、MCP 列表。创建完成后告知用户刷新侧栏 Agent 树，并可为**新主 Agent** 新建工作室以便后续委派。勿用此工具删除或修改已有 Agent。"
+	}
 	sort.Strings(childIDs)
 	if len(childIDs) > 0 && a.peerLookup != nil {
 		var lines []string

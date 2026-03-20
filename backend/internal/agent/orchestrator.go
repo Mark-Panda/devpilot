@@ -33,6 +33,9 @@ type Orchestrator struct {
 
 	studioMu       sync.RWMutex
 	studioProgress func(StudioProgressEvent) // 工作室委派/子 Agent 进度，可为 nil
+
+	createAgentToolMu sync.RWMutex
+	createAgentTool   CreateAgentToolFunc // 主 Agent 工具创建新 Agent，可为 nil
 }
 
 // NewOrchestrator 创建编排器
@@ -49,6 +52,19 @@ func (o *Orchestrator) SetStudioProgressHook(h func(StudioProgressEvent)) {
 	o.studioMu.Lock()
 	defer o.studioMu.Unlock()
 	o.studioProgress = h
+}
+
+// SetCreateAgentToolFunc 注册主 Agent 创建团队工具的后端实现（须在从注册表恢复 Agent 之前调用）
+func (o *Orchestrator) SetCreateAgentToolFunc(fn CreateAgentToolFunc) {
+	o.createAgentToolMu.Lock()
+	defer o.createAgentToolMu.Unlock()
+	o.createAgentTool = fn
+}
+
+func (o *Orchestrator) createAgentToolFn() CreateAgentToolFunc {
+	o.createAgentToolMu.RLock()
+	defer o.createAgentToolMu.RUnlock()
+	return o.createAgentTool
 }
 
 func (o *Orchestrator) studioProgressHook() func(StudioProgressEvent) {
@@ -88,7 +104,7 @@ func (o *Orchestrator) CreateAgent(ctx context.Context, config AgentConfig) (Age
 
 	lookup := o.peerAgentLookup()
 	hook := o.studioProgressHook()
-	agent, err := NewAgent(ctx, config, o.messageBus, o.projectCtx, lookup, hook)
+	agent, err := NewAgent(ctx, config, o.messageBus, o.projectCtx, lookup, hook, o.createAgentToolFn())
 	if err != nil {
 		return nil, fmt.Errorf("create agent: %w", err)
 	}

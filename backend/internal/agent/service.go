@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 
 	"github.com/rs/zerolog/log"
@@ -49,6 +50,8 @@ func NewService(projectPath string) (*Service, error) {
 		studioEmitter: nil,
 	}
 
+	orchestrator.SetCreateAgentToolFunc(s.createAgentViaTool)
+
 	if studioStore != nil {
 		orchestrator.SetStudioProgressHook(func(ev StudioProgressEvent) {
 			s.onStudioProgress(ev)
@@ -71,6 +74,33 @@ func NewService(projectPath string) (*Service, error) {
 	}
 
 	return s, nil
+}
+
+// createAgentViaTool 供主 Agent 工具 devpilot_create_agent_team 调用（校验调用方后写入 agents.json）
+func (s *Service) createAgentViaTool(ctx context.Context, callerID string, cfg AgentConfig) (AgentInfo, error) {
+	ag, err := s.orchestrator.GetAgent(callerID)
+	if err != nil {
+		return AgentInfo{}, fmt.Errorf("caller: %w", err)
+	}
+	if ag.Config().Type != AgentTypeMain {
+		return AgentInfo{}, fmt.Errorf("仅主 Agent 可通过工具创建 Agent")
+	}
+	if cfg.Type == AgentTypeMain && strings.TrimSpace(cfg.ParentID) != "" {
+		return AgentInfo{}, fmt.Errorf("新主 Agent 不得设置 parent_id")
+	}
+	if cfg.Type != AgentTypeMain {
+		if strings.TrimSpace(cfg.ParentID) == "" {
+			return AgentInfo{}, fmt.Errorf("子/worker Agent 必须指定 parent_id（所属主 Agent id）")
+		}
+		parent, perr := s.orchestrator.GetAgent(cfg.ParentID)
+		if perr != nil {
+			return AgentInfo{}, fmt.Errorf("parent 不存在: %w", perr)
+		}
+		if parent.Config().Type != AgentTypeMain {
+			return AgentInfo{}, fmt.Errorf("parent 必须是主 Agent")
+		}
+	}
+	return s.CreateAgent(ctx, cfg)
 }
 
 // CreateAgent 创建代理

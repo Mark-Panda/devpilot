@@ -40,6 +40,7 @@
   - 支持点对点消息和广播
   - 消息类型: `request`、`response`、`event`、`broadcast`
   - **自动委派**：凡在编排器中登记了子 Agent 的父/主 Agent，在工具循环中会多出一个 `devpilot_delegate_to_sub_agent`（参数 `sub_agent_id`、`task`），向子 Agent 发 `request` 并同步等待其 `response`。子 Agent 对 `request` 的处理在**独立 goroutine**中执行 `Process`，以便在等待子 Agent 回复时 messageLoop 仍能接收 `response`（避免死锁）。
+  - **动态建队**：所有 **`type == main` 的主 Agent** 在对话中还会获得 `devpilot_create_agent_team`：根据 JSON 参数一次性创建**新的**主 Agent（独立树根）及其下属 `sub`/`worker`，模型与技能/MCP 列表继承自调用方主 Agent；经 `Service.createAgentViaTool` 校验后写入 `agents.json`。子 Agent 无此工具。
 
 ### 2. 对话记忆（类 OpenClaw session）
 
@@ -56,7 +57,7 @@
 - 支持 OpenAI 兼容 API (可配置 base_url)
 - Skill 自动注入系统提示
 - MCP 工具循环执行
-- 有子 Agent 时额外注入委派工具，与技能、MCP 一并参与 `GenerateWithToolLoop`
+- 有子 Agent 时额外注入委派工具；**主 Agent** 另注入 `devpilot_create_agent_team`；与技能、MCP 一并参与 `GenerateWithToolLoop`
 - **ReAct 行为**：`buildSystemPrompt` 末尾统一注入「推理（Thought）→ 行动（工具调用）→ 观察（工具返回）」约束，与原生 function calling 同轮次兼容（assistant 可先输出短推理再带 `tool_calls`），主/子 Agent 及工作室对话均生效。
 
 ### 4. Skill 系统
@@ -80,6 +81,7 @@
 - **对话**：`ChatInStudio(studioID, agentID, message)` **仅允许** `agentID == 工作室.main_agent_id`；请求 `context` 会注入工作室 ID，主 Agent 系统提示进入「工作室协作模式」，并继续通过 `devpilot_delegate_to_sub_agent` 向子 Agent 派活。
 - **进度事件**：委派开始/结束/失败、子 Agent 接单/完成/失败等会写入 `studios.json` 并通过 Wails **`studio:progress`** 事件推送到前端（`backend.BindStudioProgressEvents`）；工作室页同时定时拉取 `GetStudioProgress` 兜底。
 - **前端**：侧栏「工作室」→ `/studios` 列表与创建；`/studios/:studioId` 为左右分栏（进度时间线 + 与主 Agent 对话）。
+- **Team 视图（档位 A）**：进度侧支持按成员筛选事件；输入框支持 `@` 补全子 Agent / worker，发送时在正文前附加「用户 @ 定向」说明（仍只调用 `ChatInStudio` 与主 Agent 对话，气泡中仅展示用户原文）。
 
 ### 7. 项目上下文 (`project_context.go`)
 

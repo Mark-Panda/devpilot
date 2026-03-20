@@ -60,10 +60,13 @@ func (r *agentToolRouter) Execute(ctx context.Context, name, arguments string) (
 	if name == DelegateToSubAgentToolName {
 		return r.agent.executeDelegateTool(ctx, arguments)
 	}
+	if name == CreateAgentTeamToolName {
+		return r.agent.executeCreateAgentTeamTool(ctx, arguments)
+	}
 	if r.inner != nil {
 		return r.inner.Execute(ctx, name, arguments)
 	}
-	return "", llm.ErrSkillNotFound
+	return "", fmt.Errorf("unknown tool %q", name)
 }
 
 func (a *agentImpl) executeDelegateTool(ctx context.Context, arguments string) (string, error) {
