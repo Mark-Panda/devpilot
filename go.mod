@@ -5,7 +5,7 @@ go 1.24.4
 require (
 	github.com/cockroachdb/pebble v1.1.5
 	github.com/google/uuid v1.6.0
-	github.com/mark3labs/mcp-go v0.41.1
+	github.com/mark3labs/mcp-go v0.45.0
 	github.com/pkoukk/tiktoken-go v0.1.6
 	github.com/rs/zerolog v1.31.0
 	github.com/rulego/rulego v0.35.2
