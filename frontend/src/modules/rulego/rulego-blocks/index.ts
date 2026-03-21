@@ -17,6 +17,7 @@ import "./blocks/delay";
 import "./blocks/switch";
 import "./blocks/startTrigger";
 import "./blocks/dbClient";
+import "./blocks/apiRouteTracer";
 
 import {
   getBlockDef,
@@ -91,6 +92,16 @@ export const toolbox = {
       name: "数据库",
       categorystyle: "rulego_db",
       contents: [{ kind: "block" as const, type: "rulego_dbClient" }],
+    },
+    {
+      kind: "category" as const,
+      name: "API 路由追踪",
+      categorystyle: "rulego_tracer",
+      contents: [
+        { kind: "block" as const, type: "rulego_sourcegraphSearch" },
+        { kind: "block" as const, type: "rulego_apiRouteTracer_gitPrepare" },
+        { kind: "block" as const, type: "rulego_apiRouteTracer_agentAnalyze" },
+      ],
     },
   ],
 };

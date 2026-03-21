@@ -6,7 +6,8 @@ export type BlockTypeCategory =
   | "rulego_condition"
   | "rulego_data"
   | "rulego_flow"
-  | "rulego_db";
+  | "rulego_db"
+  | "rulego_tracer";
 
 export interface ConnectionBranch {
   inputName: string;

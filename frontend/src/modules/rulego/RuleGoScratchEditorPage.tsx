@@ -54,6 +54,11 @@ const scratchTheme = new ScratchBlocks.Theme(
       colourSecondary: "#14b8a6",
       colourTertiary: "#5eead4",
     },
+    rulego_tracer: {
+      colourPrimary: "#0891b2",
+      colourSecondary: "#06b6d4",
+      colourTertiary: "#67e8f9",
+    },
   },
   {
     rulego_trigger: { colour: "#ef4444" },
@@ -62,6 +67,7 @@ const scratchTheme = new ScratchBlocks.Theme(
     rulego_data: { colour: "#f59e0b" },
     rulego_flow: { colour: "#8b5cf6" },
     rulego_db: { colour: "#0d9488" },
+    rulego_tracer: { colour: "#0891b2" },
   }
 );
 
@@ -179,6 +185,20 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline, sub
       next.REST_BODY = get("REST_BODY");
       next.REST_TIMEOUT = get("REST_TIMEOUT");
       next.REST_MAX_PARALLEL = get("REST_MAX_PARALLEL");
+    }
+    if (block.type === "rulego_apiRouteTracer_gitPrepare") {
+      next.WORK_DIR = get("WORK_DIR");
+    }
+    if (block.type === "rulego_apiRouteTracer_agentAnalyze") {
+      next.AGENT_CMD = get("AGENT_CMD") || "agent";
+      next.TIMEOUT_SEC = get("TIMEOUT_SEC") || "180";
+      next.MAX_RETRIES = get("MAX_RETRIES") || "2";
+    }
+    if (block.type === "rulego_sourcegraphSearch") {
+      next.SG_ENDPOINT = get("SG_ENDPOINT") || "https://sourcegraph.com";
+      next.SG_TOKEN = get("SG_TOKEN");
+      next.SG_TIMEOUT_SEC = get("SG_TIMEOUT_SEC") || "30";
+      next.SG_DEFAULT_QUERY = get("SG_DEFAULT_QUERY");
     }
     if (block.type === "rulego_dbClient") {
       next.DB_DRIVER_NAME = get("DB_DRIVER_NAME") || "mysql";
@@ -897,6 +917,108 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline, sub
             />
             <span>周期内覆盖 (overwrite)</span>
           </label>
+        </>
+      )}
+      {block.type === "rulego_apiRouteTracer_gitPrepare" && (
+        <>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>工作目录 (workDir)</span>
+            <input
+              value={String(form.WORK_DIR ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, WORK_DIR: e.target.value }))}
+              placeholder="克隆/更新服务的父目录"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
+            支持完整 Router JSON（按 data 下标取项，下标来自 metadata 的 api_route_tracer_service_index 或 for 注入的 _loopIndex）；也支持 for 遍历 msg.data 时传入的单条 service 对象。
+          </p>
+        </>
+      )}
+      {block.type === "rulego_apiRouteTracer_agentAnalyze" && (
+        <>
+          <label className="form-field">
+            <span>Agent 命令 (agentCommand)</span>
+            <input
+              value={String(form.AGENT_CMD ?? "agent")}
+              onChange={(e) => setForm((f) => ({ ...f, AGENT_CMD: e.target.value }))}
+              placeholder="agent"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>单次超时 (秒)</span>
+            <input
+              type="number"
+              value={String(form.TIMEOUT_SEC ?? "180")}
+              onChange={(e) => setForm((f) => ({ ...f, TIMEOUT_SEC: e.target.value }))}
+            />
+          </label>
+          <label className="form-field">
+            <span>最大重试次数 (maxRetries)</span>
+            <input
+              type="number"
+              value={String(form.MAX_RETRIES ?? "2")}
+              onChange={(e) => setForm((f) => ({ ...f, MAX_RETRIES: e.target.value }))}
+            />
+          </label>
+          <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
+            依赖前置节点写入的 metadata：api_route_tracer_service_path、trace_url、trace_method。首次完整提示词，重试时切换为简化提示词。
+          </p>
+        </>
+      )}
+      {block.type === "rulego_sourcegraphSearch" && (
+        <>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>实例地址 (endpoint)</span>
+            <input
+              value={String(form.SG_ENDPOINT ?? "https://sourcegraph.com")}
+              onChange={(e) => setForm((f) => ({ ...f, SG_ENDPOINT: e.target.value }))}
+              placeholder="https://sourcegraph.com 或自建域名"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>访问令牌 (accessToken，可选)</span>
+            <input
+              type="password"
+              value={String(form.SG_TOKEN ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, SG_TOKEN: e.target.value }))}
+              placeholder="Sourcegraph access token"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>超时 (秒)</span>
+            <input
+              type="number"
+              value={String(form.SG_TIMEOUT_SEC ?? "30")}
+              onChange={(e) => setForm((f) => ({ ...f, SG_TIMEOUT_SEC: e.target.value }))}
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>默认搜索词 (defaultSearchQuery，可选)</span>
+            <input
+              value={String(form.SG_DEFAULT_QUERY ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, SG_DEFAULT_QUERY: e.target.value }))}
+              placeholder="无消息 data 时使用；否则以 data 为准"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
+            调用 <code>/.api/graphql</code>，使用官方 search 查询；消息 data 可为纯文本或 JSON{" "}
+            <code>{"{\"query\":\"repo:foo/bar func\"}"}</code>。鉴权头为 <code>Authorization: token …</code>。
+          </p>
         </>
       )}
       {block.type === "rulego_restApiCall" && (

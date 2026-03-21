@@ -14,6 +14,7 @@ const CATEGORY_STYLES: Record<string, { bg: string; border: string }> = {
   rulego_data: { bg: "rgba(245, 158, 11, 0.2)", border: "#f59e0b" },
   rulego_flow: { bg: "rgba(139, 92, 246, 0.2)", border: "#8b5cf6" },
   rulego_db: { bg: "rgba(13, 148, 136, 0.2)", border: "#0d9488" },
+  rulego_tracer: { bg: "rgba(8, 145, 178, 0.2)", border: "#0891b2" },
 };
 
 const BLOCK_LABELS: Record<string, string> = {
@@ -32,6 +33,9 @@ const BLOCK_LABELS: Record<string, string> = {
   rulego_fork: "并行网关",
   rulego_break: "终止循环",
   rulego_dbClient: "数据库客户端",
+  rulego_apiRouteTracer_gitPrepare: "追踪·Git 工作区",
+  rulego_apiRouteTracer_agentAnalyze: "追踪·Agent 分析",
+  rulego_sourcegraphSearch: "Sourcegraph 搜索",
 };
 
 type CategoryItem = {
