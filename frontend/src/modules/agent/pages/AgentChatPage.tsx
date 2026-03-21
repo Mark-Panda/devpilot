@@ -130,6 +130,9 @@ export const AgentChatPage: React.FC = () => {
   const [agentMenuOpen, setAgentMenuOpen] = useState(false)
   const [modelMenuOpen, setModelMenuOpen] = useState(false)
   const [showSubAgentModal, setShowSubAgentModal] = useState(false)
+  /** Wails WebView 中 window.confirm 常无效，改用页内确认 */
+  const [clearMemoryModalOpen, setClearMemoryModalOpen] = useState(false)
+  const [clearingMemory, setClearingMemory] = useState(false)
   const agentMenuRef = useRef<HTMLDivElement>(null)
   const modelMenuRef = useRef<HTMLDivElement>(null)
 
@@ -197,6 +200,23 @@ export const AgentChatPage: React.FC = () => {
   const currentAgent = agents.find((a) => a.config.id === currentAgentId)
   const currentMessages = currentAgentId ? messages : []
   const agentsOrdered = orderedAgentsWithDepth(agents)
+
+  const openClearMemoryConfirm = () => {
+    if (!currentAgentId) return
+    setAgentMenuOpen(false)
+    setClearMemoryModalOpen(true)
+  }
+
+  const runClearAgentMemory = async () => {
+    if (!currentAgentId) return
+    setClearingMemory(true)
+    try {
+      await clearAgentMemory()
+      setClearMemoryModalOpen(false)
+    } finally {
+      setClearingMemory(false)
+    }
+  }
 
   const handleCreateSubAgent = async (cfg: AgentConfig) => {
     await createAgent(cfg)
@@ -304,13 +324,9 @@ export const AgentChatPage: React.FC = () => {
               <li>
                 <button
                   type="button"
-                  className="w-full px-3 py-2 text-left text-sm text-stone-600 hover:bg-stone-50"
-                  onClick={async () => {
-                    if (window.confirm('确定清空当前 Agent 的持久化对话记忆？')) {
-                      await clearAgentMemory()
-                      setAgentMenuOpen(false)
-                    }
-                  }}
+                  disabled={!currentAgentId}
+                  className="w-full px-3 py-2 text-left text-sm text-stone-600 hover:bg-stone-50 disabled:cursor-not-allowed disabled:opacity-50"
+                  onClick={() => openClearMemoryConfirm()}
                 >
                   清空对话记忆
                 </button>
@@ -445,9 +461,7 @@ export const AgentChatPage: React.FC = () => {
             title="清空持久化记忆"
             aria-label="清空持久化记忆"
             disabled={!currentAgent}
-            onClick={async () => {
-              if (window.confirm('清空当前 Agent 在后端的对话记忆？')) await clearAgentMemory()
-            }}
+            onClick={() => openClearMemoryConfirm()}
           >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
           </button>
@@ -517,6 +531,48 @@ export const AgentChatPage: React.FC = () => {
         <div className="fixed bottom-4 right-4 flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-3 text-sm text-white shadow-lg">
           <span>⚠️</span>
           <span>{error}</span>
+        </div>
+      )}
+
+      {clearMemoryModalOpen && (
+        <div
+          className="fixed inset-0 z-[130] flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="clear-memory-title"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl">
+            <h2 id="clear-memory-title" className="text-lg font-semibold text-stone-800">
+              清空对话记忆
+            </h2>
+            <p className="mt-2 text-sm text-stone-600">
+              确定清空当前 Agent
+              {currentAgent ? (
+                <>
+                  「<span className="font-medium">{currentAgent.config.name}</span>」
+                </>
+              ) : null }
+              在后端的持久化对话记忆？此操作不可恢复。
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={clearingMemory}
+                onClick={() => setClearMemoryModalOpen(false)}
+                className="rounded-lg border border-stone-200 px-4 py-2 text-sm text-stone-700 disabled:opacity-50"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                disabled={clearingMemory || !currentAgentId}
+                onClick={() => void runClearAgentMemory()}
+                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {clearingMemory ? '清空中…' : '确定清空'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
