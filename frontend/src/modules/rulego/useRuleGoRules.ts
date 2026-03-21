@@ -99,9 +99,10 @@ export function useRuleGoRules() {
     ruleId: string,
     baseURL: string,
     apiKey: string,
-    model: string
+    model: string,
+    fallbackModels?: string[]
   ): Promise<string> => {
-    return generateSkillFromRuleChain(ruleId, baseURL, apiKey, model);
+    return generateSkillFromRuleChain(ruleId, baseURL, apiKey, model, fallbackModels);
   };
 
   useEffect(() => {

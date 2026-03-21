@@ -29,6 +29,7 @@ const def: BlockTypeDef = {
         config.appendField(new (BlocklyF as any).FieldTextInput("https://ai.gitee.com/v1"), "LLM_URL");
         config.appendField(new (BlocklyF as any).FieldTextInput(""), "LLM_KEY");
         config.appendField(new (BlocklyF as any).FieldTextInput(""), "LLM_MODEL");
+        config.appendField(new (BlocklyF as any).FieldTextInput("[]"), "LLM_MODELS_JSON");
         config.appendField(new (BlocklyF as any).FieldTextInput(""), "LLM_SYSTEM_PROMPT");
         config.appendField(new (BlocklyF as any).FieldTextInput(defaultMessagesJson), "LLM_MESSAGES_JSON");
         config.appendField(new (BlocklyF as any).FieldTextInput(defaultParamsJson), "LLM_PARAMS_JSON");
@@ -46,6 +47,7 @@ const def: BlockTypeDef = {
     const url = helpers.getFieldValue(block, "LLM_URL") || "https://ai.gitee.com/v1";
     const key = helpers.getFieldValue(block, "LLM_KEY");
     const model = helpers.getFieldValue(block, "LLM_MODEL");
+    const modelsRaw = helpers.parseJsonValue(helpers.getFieldValue(block, "LLM_MODELS_JSON"), []) as unknown;
     const systemPrompt = helpers.getFieldValue(block, "LLM_SYSTEM_PROMPT");
     const messages = helpers.parseJsonValue(helpers.getFieldValue(block, "LLM_MESSAGES_JSON"), []) as Array<{ role?: string; content?: string }>;
     const paramsRaw = helpers.parseJsonValue(helpers.getFieldValue(block, "LLM_PARAMS_JSON"), {}) as Record<string, unknown>;
@@ -60,10 +62,18 @@ const def: BlockTypeDef = {
     };
     const enabledSkillNamesRaw = helpers.getFieldValue(block, "LLM_ENABLED_SKILLS_JSON") || "[]";
     const enabledSkillNames = helpers.parseJsonValue(enabledSkillNamesRaw, []) as string[];
+    let models: string[] = [];
+    if (Array.isArray(modelsRaw)) {
+      models = modelsRaw.map((x) => String(x ?? "").trim()).filter(Boolean);
+    }
+    if (models.length === 0 && model.trim()) {
+      models = [model.trim()];
+    }
     return {
       url: url.trim(),
       key: key.trim(),
-      model: model.trim(),
+      model: models.length > 0 ? models[0] : model.trim(),
+      models: models.length > 1 ? models.slice(1) : [],
       systemPrompt: systemPrompt.trim(),
       messages: Array.isArray(messages) ? messages.map((m) => ({ role: String(m?.role ?? "user"), content: String(m?.content ?? "") })) : [],
       params,
@@ -75,6 +85,19 @@ const def: BlockTypeDef = {
     block.setFieldValue(String(c.url ?? "https://ai.gitee.com/v1"), "LLM_URL");
     block.setFieldValue(String(c.key ?? ""), "LLM_KEY");
     block.setFieldValue(String(c.model ?? ""), "LLM_MODEL");
+    const primary = String(c.model ?? "").trim();
+    const rest = Array.isArray(c.models) ? (c.models as unknown[]).map((x) => String(x ?? "").trim()).filter(Boolean) : [];
+    const chain: string[] = [];
+    const seen = new Set<string>();
+    const add = (s: string) => {
+      if (!s || seen.has(s)) return;
+      seen.add(s);
+      chain.push(s);
+    };
+    add(primary);
+    for (const x of rest) add(x);
+    if (chain.length === 0 && primary) chain.push(primary);
+    block.setFieldValue(JSON.stringify(chain.length > 0 ? chain : []), "LLM_MODELS_JSON");
     block.setFieldValue(String(c.systemPrompt ?? ""), "LLM_SYSTEM_PROMPT");
     const messages = (c.messages as Array<{ role?: string; content?: string }>) ?? [];
     block.setFieldValue(JSON.stringify(messages, null, 2), "LLM_MESSAGES_JSON");

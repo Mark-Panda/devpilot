@@ -94,7 +94,20 @@ func (s *Service) DeleteStudio(ctx context.Context, studioID string) error {
 	if s.studioStore == nil {
 		return fmt.Errorf("工作室存储未初始化")
 	}
-	return s.studioStore.DeleteStudio(studioID)
+	studioID = strings.TrimSpace(studioID)
+	if studioID == "" {
+		return fmt.Errorf("工作室 ID 无效")
+	}
+	if err := s.studioStore.DeleteStudio(studioID); err != nil {
+		return err
+	}
+	studioProgressBriefLast.Delete(studioID)
+	if s.studioTodoStore != nil {
+		if err := s.studioTodoStore.DeleteRoom(studioID); err != nil {
+			log.Warn().Err(err).Str("studio_id", studioID).Msg("delete studio todos room failed")
+		}
+	}
+	return nil
 }
 
 // GetStudioDetail 工作室信息 + 主 Agent 树下全部成员

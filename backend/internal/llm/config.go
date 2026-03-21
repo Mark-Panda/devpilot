@@ -19,8 +19,10 @@ type Config struct {
 	BaseURL string `json:"base_url"`
 	// APIKey 认证密钥
 	APIKey string `json:"api_key"`
-	// Model 模型名称，如 gpt-4o、gpt-3.5-turbo、deepseek-chat 等
+	// Model 首选模型名称，如 gpt-4o、gpt-3.5-turbo、deepseek-chat 等
 	Model string `json:"model"`
+	// Models 备用模型（按顺序在当前模型请求失败时依次尝试）。可与 Model 合并为一条链，见 NormalizeModelChain。
+	Models []string `json:"models,omitempty"`
 
 	// SkillDir 技能目录路径。目录下可放置多个子目录，每个子目录包含 SKILL.md（参考 claude-code/openclaw 的 SKILL 格式）
 	// 加载后会在对话时按需或全部注入为系统上下文
@@ -57,7 +59,8 @@ type Params struct {
 type NodeConfig struct {
 	URL          string        `json:"url"`                    // 请求地址，默认 https://ai.gitee.com/v1
 	Key          string        `json:"key"`                    // API Key
-	Model        string        `json:"model"`                  // 模型名称
+	Model        string        `json:"model"`                  // 首选模型名称
+	Models       []string      `json:"models,omitempty"`       // 备用模型，按顺序故障转移
 	SystemPrompt string        `json:"systemPrompt"`          // 系统提示，支持 ${} 占位符
 	Messages     []ChatMessage `json:"messages"`               // 上下文/用户消息列表
 	Images       []string     `json:"images"`                  // 图片 URL 列表（可选，多模态）

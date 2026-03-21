@@ -40,6 +40,8 @@ export interface ModelConfig {
   base_url: string
   api_key: string
   model: string
+  /** 备用模型，按顺序在当前 model 失败时尝试；空则仅使用 model */
+  models?: string[]
   max_tokens?: number
   temperature?: number
 }

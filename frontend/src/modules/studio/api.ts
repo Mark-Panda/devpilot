@@ -8,6 +8,32 @@ import type {
   StudioTodoItem,
 } from './types'
 
+/** Wails/JSON 偶发字段差异时统一为前端 Studio 形状，避免 id 为空导致删除等操作无效 */
+function normalizeStudio(raw: unknown): Studio {
+  const r = raw as Record<string, unknown>
+  const id =
+    typeof r.id === 'string'
+      ? r.id
+      : typeof r.ID === 'string'
+        ? r.ID
+        : ''
+  const name = typeof r.name === 'string' ? r.name : typeof r.Name === 'string' ? r.Name : ''
+  const mainAgentId =
+    typeof r.main_agent_id === 'string'
+      ? r.main_agent_id
+      : typeof r.MainAgentID === 'string'
+        ? r.MainAgentID
+        : ''
+  let createdAt = ''
+  const ca = r.created_at ?? r.CreatedAt
+  if (typeof ca === 'string') {
+    createdAt = ca
+  } else if (ca && typeof ca === 'object' && ca !== null && 'toString' in ca) {
+    createdAt = String(ca)
+  }
+  return { id, name, main_agent_id: mainAgentId, created_at: createdAt }
+}
+
 function wailsRuntime(): { EventsOn?: (name: string, cb: (data: unknown) => void) => () => void } | undefined {
   return (window as unknown as { runtime?: { EventsOn?: (n: string, cb: (d: unknown) => void) => () => void } })
     .runtime
@@ -50,7 +76,8 @@ export function subscribeStudioAssistant(
 export const studioApi = {
   listStudios: async (): Promise<Studio[]> => {
     const v = await window.go.main.App.ListStudios()
-    return Array.isArray(v) ? v : []
+    if (!Array.isArray(v)) return []
+    return v.map((row) => normalizeStudio(row))
   },
 
   createStudio: async (name: string, mainAgentID: string): Promise<Studio> => {
@@ -58,7 +85,15 @@ export const studioApi = {
   },
 
   deleteStudio: async (studioID: string): Promise<void> => {
-    await window.go.main.App.DeleteStudio(studioID)
+    const id = typeof studioID === 'string' ? studioID.trim() : ''
+    if (!id) {
+      throw new Error('工作室 ID 无效')
+    }
+    const del = window.go?.main?.App?.DeleteStudio
+    if (typeof del !== 'function') {
+      throw new Error('DeleteStudio 未绑定，请使用 wails build 重新编译桌面端')
+    }
+    await del(id)
   },
 
   getStudioDetail: async (studioID: string): Promise<StudioDetail> => {

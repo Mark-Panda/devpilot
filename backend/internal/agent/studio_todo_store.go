@@ -128,6 +128,28 @@ func normalizeTodoItems(items []StudioTodoItem) ([]StudioTodoItem, error) {
 	return out, nil
 }
 
+// DeleteRoom 删除某工作室在 studio-todos.json 中的全部条目（工作室删除时调用）
+func (s *StudioTodoStore) DeleteRoom(studioID string) error {
+	studioID = strings.TrimSpace(studioID)
+	if studioID == "" {
+		return nil
+	}
+	if s.path == "" {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	doc, err := s.loadUnlocked()
+	if err != nil {
+		return err
+	}
+	if doc.Studios == nil || doc.Studios[studioID] == nil {
+		return nil
+	}
+	delete(doc.Studios, studioID)
+	return s.saveUnlocked(doc)
+}
+
 // Get 返回工作室某 Agent 的 TODO 副本
 func (s *StudioTodoStore) Get(studioID, agentID string) []StudioTodoItem {
 	studioID, agentID = strings.TrimSpace(studioID), strings.TrimSpace(agentID)

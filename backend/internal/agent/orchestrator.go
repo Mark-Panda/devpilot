@@ -194,21 +194,32 @@ func (o *Orchestrator) ListAgents() []AgentInfo {
 	return infos
 }
 
-// DestroyAgent 销毁代理
+// DestroyAgent 销毁代理及其子树。允许多个 main 时删除其中任意一个，但须至少保留一个 main。
 func (o *Orchestrator) DestroyAgent(agentID string) error {
 	o.mu.Lock()
 	defer o.mu.Unlock()
+	return o.destroyAgentUnlocked(agentID)
+}
 
+// destroyAgentUnlocked 在已持有 o.mu 的前提下销毁代理（可递归子节点，避免 DestroyAgent 嵌套加锁死锁）
+func (o *Orchestrator) destroyAgentUnlocked(agentID string) error {
 	agent, exists := o.agents[agentID]
 	if !exists {
 		return fmt.Errorf("agent %s not found", agentID)
 	}
 
 	if agent.Config().Type == AgentTypeMain {
-		return fmt.Errorf("主 Agent 不可删除")
+		mainCount := 0
+		for _, ag := range o.agents {
+			if ag.Config().Type == AgentTypeMain {
+				mainCount++
+			}
+		}
+		if mainCount <= 1 {
+			return fmt.Errorf("须至少保留一个主 Agent（main）")
+		}
 	}
 
-	// 停止代理
 	if err := agent.Stop(); err != nil {
 		log.Warn().Err(err).Str("agent_id", agentID).Msg("failed to stop agent")
 	}
@@ -218,20 +229,18 @@ func (o *Orchestrator) DestroyAgent(agentID string) error {
 	}
 	DeleteAllSessionMemoryFilesForAgent(agentID)
 
-	// 从父代理移除
 	config := agent.Config()
 	if config.ParentID != "" {
-		if parent, exists := o.agents[config.ParentID]; exists {
+		if parent, ok := o.agents[config.ParentID]; ok {
 			if impl, ok := parent.(*agentImpl); ok {
 				impl.RemoveChild(agentID)
 			}
 		}
 	}
 
-	// 销毁所有子代理
 	info := agent.Info()
 	for _, childID := range info.Children {
-		if err := o.DestroyAgent(childID); err != nil {
+		if err := o.destroyAgentUnlocked(childID); err != nil {
 			log.Warn().Err(err).Str("child_id", childID).Msg("failed to destroy child agent")
 		}
 	}

@@ -147,7 +147,16 @@ export default function RuleGoPage() {
                             if (!model) {
                               throw new Error("该模型配置下没有可用模型");
                             }
-                            await generateSkill(rule.id, c.base_url || "", c.api_key || "", model);
+                            const fallback = (c.models ?? [])
+                              .map((m) => String(m).trim())
+                              .filter((m) => m && m !== model);
+                            await generateSkill(
+                              rule.id,
+                              c.base_url || "",
+                              c.api_key || "",
+                              model,
+                              fallback
+                            );
                             await refresh();
                           } finally {
                             setGeneratingSkillRuleId(null);

@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"log"
 	"strings"
+
+	"devpilot/backend/internal/llm"
 )
 
 // LLMConfigEntry 用于从「模型管理」解析 ai/llm 节点 API Key 的条目，与 store 解耦。
@@ -35,6 +37,19 @@ func findAPIKeyByBaseURLAndModel(configs []LLMConfigEntry, baseURL, model string
 		}
 	}
 	return ""
+}
+
+func modelChainFromConfiguration(configuration map[string]interface{}) []string {
+	model, _ := configuration["model"].(string)
+	var extras []string
+	if raw, ok := configuration["models"].([]interface{}); ok {
+		for _, v := range raw {
+			if s, ok := v.(string); ok {
+				extras = append(extras, s)
+			}
+		}
+	}
+	return llm.NormalizeModelChain(model, extras)
 }
 
 // PatchDefinitionWithLLMKeys 将 definition JSON 中所有 ai/llm 节点的 configuration.key
@@ -81,8 +96,14 @@ func PatchDefinitionWithLLMKeys(ctx context.Context, definition string, lister L
 			continue
 		}
 		url, _ := configuration["url"].(string)
-		model, _ := configuration["model"].(string)
-		key := findAPIKeyByBaseURLAndModel(configs, url, model)
+		chain := modelChainFromConfiguration(configuration)
+		var key string
+		for _, m := range chain {
+			if k := findAPIKeyByBaseURLAndModel(configs, url, m); k != "" {
+				key = k
+				break
+			}
+		}
 		if key == "" {
 			continue
 		}

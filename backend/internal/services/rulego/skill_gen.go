@@ -18,17 +18,24 @@ import (
 const createSkillToolName = "skill-creator"
 
 // GenerateSkillFromRuleChain 使用大模型调用 skill-creator 技能，生成 SKILL.md 并写入 ~/.devpilot/skills/{dirName}，
-// 同时更新规则的 SkillDirName。baseURL、apiKey、model 为调用大模型所需；若为空则返回错误。
+// 同时更新规则的 SkillDirName。baseURL、apiKey、model 为调用大模型所需；models 为可选备用模型（按顺序故障转移）。
 // 注意：供 Wails 绑定时由前端调用，不要将 context.Context 作为首参，否则 JSON 参数会绑定错误。
-func (s *Service) GenerateSkillFromRuleChain(ruleID string, baseURL, apiKey, model string) (skillDirName string, err error) {
-	log.Printf("[rulego] GenerateSkillFromRuleChain 开始 ruleID=%s baseURL=%s model=%s", ruleID, baseURL, model)
+func (s *Service) GenerateSkillFromRuleChain(ruleID string, baseURL, apiKey, model string, models []string) (skillDirName string, err error) {
 	ctx := context.Background()
 	baseURL = strings.TrimSpace(baseURL)
 	apiKey = strings.TrimSpace(apiKey)
 	model = strings.TrimSpace(model)
-	if baseURL == "" || apiKey == "" || model == "" {
-		log.Printf("[rulego] GenerateSkillFromRuleChain 参数无效: baseURL/apiKey/model 为空")
-		return "", fmt.Errorf("base_url、api_key、model 为必填")
+	var modelsTrimmed []string
+	for _, m := range models {
+		if t := strings.TrimSpace(m); t != "" {
+			modelsTrimmed = append(modelsTrimmed, t)
+		}
+	}
+	chain := llm.NormalizeModelChain(model, modelsTrimmed)
+	log.Printf("[rulego] GenerateSkillFromRuleChain 开始 ruleID=%s baseURL=%s models=%v", ruleID, baseURL, chain)
+	if baseURL == "" || apiKey == "" || len(chain) == 0 {
+		log.Printf("[rulego] GenerateSkillFromRuleChain 参数无效: baseURL/apiKey 或模型链为空")
+		return "", fmt.Errorf("base_url、api_key 与至少一个模型为必填")
 	}
 
 	rule, err := s.store.GetByID(ctx, ruleID)
@@ -52,7 +59,7 @@ func (s *Service) GenerateSkillFromRuleChain(ruleID string, baseURL, apiKey, mod
 		return "", fmt.Errorf("skill-creator 未找到，请确保已初始化（启动时会从 initSkills 同步到 ~/.devpilot/skills/）")
 	}
 
-	cfg := llm.Config{BaseURL: baseURL, APIKey: apiKey, Model: model}
+	cfg := llm.Config{BaseURL: baseURL, APIKey: apiKey, Model: model, Models: modelsTrimmed}
 	client, err := llm.NewClientWithSkills(ctx, cfg, []llm.Skill{*createSkill})
 	if err != nil {
 		log.Printf("[rulego] GenerateSkillFromRuleChain 创建 LLM 客户端失败 err=%v", err)

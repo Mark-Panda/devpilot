@@ -79,11 +79,12 @@ type MCPServerDefinition struct {
 
 // ModelConfig 模型配置
 type ModelConfig struct {
-	BaseURL     string  `json:"base_url"`
-	APIKey      string  `json:"api_key"`
-	Model       string  `json:"model"`
-	MaxTokens   int     `json:"max_tokens"`   // 与注册表一致持久化（含 0）
-	Temperature float64 `json:"temperature"` // 与注册表一致持久化（含 0）
+	BaseURL     string   `json:"base_url"`
+	APIKey      string   `json:"api_key"`
+	Model       string   `json:"model"`
+	Models      []string `json:"models,omitempty"` // 按顺序故障转移；空则仅使用 Model
+	MaxTokens   int      `json:"max_tokens"`       // 与注册表一致持久化（含 0）
+	Temperature float64  `json:"temperature"`      // 与注册表一致持久化（含 0）
 }
 
 // AgentInfo 代理运行时信息

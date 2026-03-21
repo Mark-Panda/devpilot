@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/rs/zerolog/log"
@@ -87,6 +88,23 @@ func (s *StudioStore) ListStudios() []Studio {
 	defer s.mu.Unlock()
 	out := make([]Studio, len(s.doc.Studios))
 	copy(out, s.doc.Studios)
+	return out
+}
+
+// StudiosUsingMainAgent 返回绑定到指定主 Agent 的工作室（拷贝，供删除主 Agent 前校验）
+func (s *StudioStore) StudiosUsingMainAgent(mainAgentID string) []Studio {
+	mainAgentID = strings.TrimSpace(mainAgentID)
+	if mainAgentID == "" {
+		return nil
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var out []Studio
+	for _, st := range s.doc.Studios {
+		if st.MainAgentID == mainAgentID {
+			out = append(out, st)
+		}
+	}
 	return out
 }
 

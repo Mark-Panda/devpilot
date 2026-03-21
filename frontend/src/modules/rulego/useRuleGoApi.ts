@@ -129,14 +129,15 @@ export async function listAvailableSkills(): Promise<AvailableSkillItem[]> {
   return ListAvailableSkills();
 }
 
-/** 使用大模型根据规则链 DSL 生成技能并写入 ~/.devpilot/skills/，需传入模型 baseURL、apiKey、model */
+/** 使用大模型根据规则链 DSL 生成技能并写入 ~/.devpilot/skills/，需传入模型 baseURL、apiKey、model；models 为可选备用模型链 */
 export async function generateSkillFromRuleChain(
   ruleId: string,
   baseURL: string,
   apiKey: string,
-  model: string
+  model: string,
+  fallbackModels?: string[]
 ): Promise<string> {
-  return GenerateSkillFromRuleChain(ruleId, baseURL, apiKey, model);
+  return GenerateSkillFromRuleChain(ruleId, baseURL, apiKey, model, fallbackModels ?? []);
 }
 
 /** 删除规则链关联的技能目录（禁用/删除规则链时由后端自动调用，也可前端主动调用） */

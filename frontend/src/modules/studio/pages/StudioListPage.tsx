@@ -15,6 +15,9 @@ export const StudioListPage: React.FC = () => {
   const [name, setName] = useState('')
   const [mainId, setMainId] = useState('')
   const [saving, setSaving] = useState(false)
+  /** 页内确认（Wails WebView 下 window.confirm 可能不弹出或始终 false） */
+  const [confirmDelete, setConfirmDelete] = useState<Studio | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     setError(null)
@@ -52,13 +55,23 @@ export const StudioListPage: React.FC = () => {
     }
   }
 
-  const handleDelete = async (id: string) => {
-    if (!window.confirm('确定删除该工作室？进度记录将一并删除。')) return
+  const runDelete = async (st: Studio) => {
+    const id = st.id?.trim()
+    if (!id) {
+      setError('工作室 ID 无效，请刷新列表后重试')
+      setConfirmDelete(null)
+      return
+    }
+    setDeletingId(id)
+    setError(null)
     try {
       await studioApi.deleteStudio(id)
+      setConfirmDelete(null)
       await refresh()
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -112,8 +125,9 @@ export const StudioListPage: React.FC = () => {
                   </Link>
                   <button
                     type="button"
-                    onClick={() => void handleDelete(s.id)}
-                    className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm text-stone-500 hover:border-rose-200 hover:text-rose-600"
+                    onClick={() => setConfirmDelete(s)}
+                    disabled={deletingId !== null}
+                    className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm text-stone-500 hover:border-rose-200 hover:text-rose-600 disabled:opacity-50"
                   >
                     删除
                   </button>
@@ -123,6 +137,42 @@ export const StudioListPage: React.FC = () => {
           </ul>
         )}
       </div>
+
+      {confirmDelete && (
+        <div
+          className="fixed inset-0 z-[130] flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="studio-delete-title"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl">
+            <h2 id="studio-delete-title" className="text-lg font-semibold text-stone-800">
+              删除工作室
+            </h2>
+            <p className="mt-2 text-sm text-stone-600">
+              确定删除「{confirmDelete.name || confirmDelete.id}」？进度记录与工作室 TODO 将一并清理。
+            </p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={deletingId !== null}
+                onClick={() => setConfirmDelete(null)}
+                className="rounded-lg border border-stone-200 px-4 py-2 text-sm text-stone-700 disabled:opacity-50"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                disabled={deletingId !== null}
+                onClick={() => void runDelete(confirmDelete)}
+                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {deletingId ? '删除中…' : '确定删除'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {modalOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">

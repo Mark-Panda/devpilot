@@ -16,6 +16,8 @@ export interface ModelOption {
   apiKey: string
   model: string
   displayName: string
+  /** 同站点下故障转移顺序：当前选项的 model 优先，其余按模型管理中的列出顺序 */
+  failoverModels: string[]
 }
 
 // 导入 Wails 生成的绑定
@@ -34,12 +36,14 @@ export const modelManagementApi = {
     
     configs.forEach((config) => {
       config.models.forEach((model) => {
+        const failoverModels = [model, ...config.models.filter((m) => m !== model)]
         options.push({
           configId: config.id,
           baseUrl: config.base_url,
           apiKey: config.api_key ?? '',
           model: model,
           displayName: `${config.site_description} - ${model}`,
+          failoverModels,
         })
       })
     })

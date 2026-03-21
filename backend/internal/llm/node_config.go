@@ -22,6 +22,7 @@ func NodeConfigToConfig(nc *NodeConfig) Config {
 		BaseURL:  url,
 		APIKey:   strings.TrimSpace(nc.Key),
 		Model:    strings.TrimSpace(nc.Model),
+		Models:   append([]string(nil), nc.Models...),
 		SkillDir: skillDir,
 		MCP:      nc.MCP,
 	}

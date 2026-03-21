@@ -5,6 +5,7 @@ import { useAgentStore } from '../store'
 import { modelManagementApi, type ModelOption } from '../modelApi'
 import { listAvailableSkills, type AvailableSkillItem } from '../../rulego/useRuleGoApi'
 import type { AgentConfig, AgentInfo, AgentType, MCPServerPreset } from '../types'
+import { mergeFailoverModelsFromCatalog } from '../mergeModelCatalog'
 
 function emptyForm(model: ModelOption | null): AgentConfig {
   const mc = model
@@ -12,6 +13,7 @@ function emptyForm(model: ModelOption | null): AgentConfig {
         base_url: model.baseUrl,
         api_key: model.apiKey,
         model: model.model,
+        models: model.failoverModels.filter((m) => m !== model.model),
         max_tokens: 4096,
         temperature: 0.7,
       }
@@ -63,6 +65,9 @@ export const AgentManagementPage: React.FC = () => {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<AgentConfig>(() => emptyForm(null))
   const [saving, setSaving] = useState(false)
+  /** 页内确认删除（Wails WebView 下 window.confirm 常不弹出，导致「点了没反应」） */
+  const [confirmDeleteAgent, setConfirmDeleteAgent] = useState<AgentInfo | null>(null)
+  const [deletingAgentId, setDeletingAgentId] = useState<string | null>(null)
 
   const refresh = useCallback(async () => {
     setError(null)
@@ -96,7 +101,11 @@ export const AgentManagementPage: React.FC = () => {
 
   const openEdit = (info: AgentInfo) => {
     setEditingId(info.config.id)
-    setForm(configFromAgent(info))
+    const base = configFromAgent(info)
+    setForm({
+      ...base,
+      model_config: mergeFailoverModelsFromCatalog(base.model_config, modelOptions),
+    })
     setModalOpen(true)
   }
 
@@ -126,20 +135,23 @@ export const AgentManagementPage: React.FC = () => {
       setError('请选择或填写完整模型配置')
       return
     }
-    if (form.type === 'sub' && !form.parent_id?.trim()) {
-      setError('子 Agent 需要选择父 Agent')
+    if ((form.type === 'sub' || form.type === 'worker') && !form.parent_id?.trim()) {
+      setError('子 Agent / 工作 Agent 需要选择所属主 Agent')
       return
     }
     setSaving(true)
     setError(null)
     try {
-      const parent_id = form.type === 'sub' ? form.parent_id : undefined
+      const parent_id =
+        form.type === 'sub' || form.type === 'worker' ? form.parent_id : undefined
+      const model_config = mergeFailoverModelsFromCatalog(form.model_config, modelOptions)
       if (editingId) {
         await updateAgent({
           ...form,
           id: editingId,
           parent_id: parent_id ?? '',
           metadata: form.metadata ?? {},
+          model_config,
         })
       } else {
         const id = `agent_${Date.now()}`
@@ -148,6 +160,7 @@ export const AgentManagementPage: React.FC = () => {
           id,
           parent_id: parent_id ?? '',
           metadata: form.metadata ?? {},
+          model_config,
         })
       }
       setModalOpen(false)
@@ -159,17 +172,34 @@ export const AgentManagementPage: React.FC = () => {
     }
   }
 
-  const handleDelete = async (info: AgentInfo) => {
-    if (info.config.type === 'main') {
-      setError('主 Agent 不可删除')
+  const deleteConfirmDescription = (info: AgentInfo): string => {
+    const isMain = info.config.type === 'main'
+    const childHint =
+      (info.children?.length ?? 0) > 0 ? '其下属子 Agent / worker 将一并删除。' : ''
+    const mainHint = isMain
+      ? '删除主 Agent 后须至少还剩一个 main；若其仍被工作室使用将无法删除。'
+      : ''
+    const tail = '该 Agent 的对话记忆也会被删除。'
+    return [childHint, mainHint, tail].filter(Boolean).join(' ')
+  }
+
+  const runDestroyAgent = async (info: AgentInfo) => {
+    const id = info.config.id?.trim()
+    if (!id) {
+      setError('Agent ID 无效')
+      setConfirmDeleteAgent(null)
       return
     }
-    if (!window.confirm(`确定删除 Agent「${info.config.name}」？其子 Agent 与对话记忆也会被删除。`)) return
+    setDeletingAgentId(id)
+    setError(null)
     try {
-      await destroyAgent(info.config.id)
+      await destroyAgent(id)
+      setConfirmDeleteAgent(null)
       await loadAgents()
     } catch (err) {
       setError(err instanceof Error ? err.message : '删除失败')
+    } finally {
+      setDeletingAgentId(null)
     }
   }
 
@@ -187,6 +217,10 @@ export const AgentManagementPage: React.FC = () => {
                 MCP 配置
               </Link>
               中已启用的服务里勾选子集（<strong>主 Agent</strong> 会自动加载全部已启用 MCP）。聊天页顶部可切换 Agent。
+              <span className="mt-1 block text-stone-400">
+                子 Agent（sub）、工作 Agent（worker）及<strong>额外的</strong>主 Agent（main）均可删除；须至少保留一个
+                main；若某 main 仍被工作室绑定，请先删除或调整工作室。删除父节点时其下属子树会一并销毁。
+              </span>
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -258,17 +292,14 @@ export const AgentManagementPage: React.FC = () => {
                       >
                         编辑
                       </button>
-                      {a.config.type !== 'main' ? (
-                        <button
-                          type="button"
-                          onClick={() => void handleDelete(a)}
-                          className="text-stone-500 hover:text-rose-600"
-                        >
-                          删除
-                        </button>
-                      ) : (
-                        <span className="text-xs text-stone-400">—</span>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDeleteAgent(a)}
+                        disabled={deletingAgentId !== null}
+                        className="text-stone-500 hover:text-rose-600 disabled:opacity-50"
+                      >
+                        删除
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -280,6 +311,46 @@ export const AgentManagementPage: React.FC = () => {
           </div>
         )}
       </div>
+
+      {confirmDeleteAgent && (
+        <div
+          className="fixed inset-0 z-[130] flex items-center justify-center bg-black/40 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="agent-delete-title"
+        >
+          <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl">
+            <h2 id="agent-delete-title" className="text-lg font-semibold text-stone-800">
+              删除 Agent
+            </h2>
+            <p className="mt-2 text-sm text-stone-600">
+              确定删除「{confirmDeleteAgent.config.name}」
+              <span className="text-stone-400">（{confirmDeleteAgent.config.type} · </span>
+              <code className="text-xs text-stone-500">{confirmDeleteAgent.config.id}</code>
+              <span className="text-stone-400">）</span>？
+            </p>
+            <p className="mt-2 text-sm text-stone-600">{deleteConfirmDescription(confirmDeleteAgent)}</p>
+            <div className="mt-6 flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={deletingAgentId !== null}
+                onClick={() => setConfirmDeleteAgent(null)}
+                className="rounded-lg border border-stone-200 px-4 py-2 text-sm text-stone-700 disabled:opacity-50"
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                disabled={deletingAgentId !== null}
+                onClick={() => void runDestroyAgent(confirmDeleteAgent)}
+                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+              >
+                {deletingAgentId ? '删除中…' : '确定删除'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {modalOpen && (
         <div
@@ -319,11 +390,17 @@ export const AgentManagementPage: React.FC = () => {
                       <select
                         value={form.type}
                         onChange={(e) =>
-                          setForm((f) => ({
-                            ...f,
-                            type: e.target.value as AgentType,
-                            parent_id: e.target.value === 'sub' ? f.parent_id : '',
-                          }))
+                          setForm((f) => {
+                            const next = e.target.value as AgentType
+                            return {
+                              ...f,
+                              type: next,
+                              parent_id:
+                                next === 'sub' || next === 'worker'
+                                  ? f.parent_id
+                                  : '',
+                            }
+                          })
                         }
                         className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm"
                       >
@@ -332,16 +409,18 @@ export const AgentManagementPage: React.FC = () => {
                         <option value="worker">工作 Agent</option>
                       </select>
                     </div>
-                    {form.type === 'sub' && (
+                    {(form.type === 'sub' || form.type === 'worker') && (
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-stone-700">父 Agent</label>
+                        <label className="mb-1 block text-sm font-medium text-stone-700">
+                          所属主 Agent
+                        </label>
                         <select
                           value={form.parent_id}
                           onChange={(e) => setForm((f) => ({ ...f, parent_id: e.target.value }))}
                           className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm"
                           required
                         >
-                          <option value="">请选择</option>
+                          <option value="">请选择 main 类型 Agent</option>
                           {mainAgents.map((m) => (
                             <option key={m.config.id} value={m.config.id}>
                               {m.config.name}
@@ -381,6 +460,7 @@ export const AgentManagementPage: React.FC = () => {
                             base_url: opt.baseUrl,
                             api_key: opt.apiKey,
                             model: opt.model,
+                            models: opt.failoverModels.filter((m) => m !== opt.model),
                             max_tokens: f.model_config.max_tokens ?? 4096,
                             temperature: f.model_config.temperature ?? 0.7,
                           },

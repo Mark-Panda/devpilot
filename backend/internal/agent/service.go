@@ -145,6 +145,28 @@ func (s *Service) ListAgents(ctx context.Context) []AgentInfo {
 
 // DestroyAgent 销毁代理
 func (s *Service) DestroyAgent(ctx context.Context, agentID string) error {
+	_ = ctx
+	agentID = strings.TrimSpace(agentID)
+	if agentID == "" {
+		return fmt.Errorf("agent id empty")
+	}
+	ag, err := s.orchestrator.GetAgent(agentID)
+	if err != nil {
+		return err
+	}
+	if ag.Config().Type == AgentTypeMain && s.studioStore != nil {
+		bound := s.studioStore.StudiosUsingMainAgent(agentID)
+		if len(bound) > 0 {
+			n := bound[0].Name
+			if strings.TrimSpace(n) == "" {
+				n = bound[0].ID
+			}
+			if len(bound) > 1 {
+				return fmt.Errorf("该主 Agent 仍被 %d 个工作室使用（例如「%s」），请先在工作室列表中删除或更换绑定", len(bound), n)
+			}
+			return fmt.Errorf("该主 Agent 仍被工作室「%s」使用，请先在工作室列表中删除该工作室", n)
+		}
+	}
 	if err := s.orchestrator.DestroyAgent(agentID); err != nil {
 		return err
 	}

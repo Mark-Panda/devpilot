@@ -32,7 +32,7 @@
 
 - **生命周期管理**:
   - 创建 Agent: `CreateAgent(config)` 
-  - 销毁 Agent: `DestroyAgent(agentID)` 自动清理子代理；**`type == main` 的主 Agent 不可删除**（后端拒绝，前端隐藏删除入口）
+  - 销毁 Agent: `DestroyAgent(agentID)` 自动清理子树；**至少保留一个 `type == main` 的主 Agent**；若某 main 仍被工作室绑定则不可删；`sub`/`worker`/多余的 main 均可删（前端始终展示删除，由后端返回具体错误）
   - Agent 状态: `idle`、`busy`、`stopped`
 
 - **消息总线** (`message_bus.go`):

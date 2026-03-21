@@ -14,8 +14,19 @@ import (
 )
 
 func modelConfigEqual(a, b ModelConfig) bool {
-	return a.BaseURL == b.BaseURL && a.APIKey == b.APIKey && a.Model == b.Model &&
-		a.MaxTokens == b.MaxTokens && a.Temperature == b.Temperature
+	if a.BaseURL != b.BaseURL || a.APIKey != b.APIKey || a.Model != b.Model ||
+		a.MaxTokens != b.MaxTokens || a.Temperature != b.Temperature {
+		return false
+	}
+	if len(a.Models) != len(b.Models) {
+		return false
+	}
+	for i := range a.Models {
+		if a.Models[i] != b.Models[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func cloneMetadataMap(m map[string]interface{}) map[string]interface{} {
@@ -79,6 +90,7 @@ func NewAgent(ctx context.Context, config AgentConfig, messageBus MessageBus, pr
 		BaseURL:     config.ModelConfig.BaseURL,
 		APIKey:      config.ModelConfig.APIKey,
 		Model:       config.ModelConfig.Model,
+		Models:      append([]string(nil), config.ModelConfig.Models...),
 		MaxTokens:   config.ModelConfig.MaxTokens,
 		Temperature: config.ModelConfig.Temperature,
 	}
@@ -436,6 +448,7 @@ func (a *agentImpl) SetModelConfig(ctx context.Context, mc ModelConfig) error {
 		BaseURL:     mc.BaseURL,
 		APIKey:      mc.APIKey,
 		Model:       mc.Model,
+		Models:      append([]string(nil), mc.Models...),
 		MaxTokens:   mc.MaxTokens,
 		Temperature: mc.Temperature,
 	}

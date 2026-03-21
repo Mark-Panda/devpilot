@@ -41,10 +41,12 @@ function modelOptionMatchesAgent(opt: ModelOption, agent: AgentInfo | undefined)
 
 function modelConfigForOption(opt: ModelOption, agent: AgentInfo | undefined): ModelConfig {
   const cur = agent?.config.model_config
+  const extras = opt.failoverModels.filter((m) => m !== opt.model)
   return {
     base_url: opt.baseUrl,
     api_key: opt.apiKey,
     model: opt.model,
+    models: extras.length > 0 ? extras : undefined,
     max_tokens: cur?.max_tokens ?? 4096,
     temperature: cur?.temperature ?? 0.7,
   }
@@ -153,6 +155,7 @@ export const AgentChatPage: React.FC = () => {
               base_url: first.baseUrl,
               api_key: first.apiKey,
               model: first.model,
+              models: first.failoverModels.filter((m) => m !== first.model),
               max_tokens: 4096,
               temperature: 0.7,
             },
@@ -214,12 +217,14 @@ export const AgentChatPage: React.FC = () => {
   }
 
   const mc = currentAgent?.config.model_config
+  const failoverCount =
+    mc?.models && mc.models.length > 0 ? mc.models.length + 1 : mc?.model ? 1 : 0
   const modelLine = !currentAgent
     ? modelOptions.length === 0
       ? '未配置模型 · 请前往模型管理'
       : '正在准备对话…'
     : mc?.model && proxyHostFromBaseUrl(mc.base_url ?? '')
-      ? `${mc.model} · ${proxyHostFromBaseUrl(mc.base_url ?? '')}`
+      ? `${mc.model}${failoverCount > 1 ? ` +${failoverCount - 1}备用` : ''} · ${proxyHostFromBaseUrl(mc.base_url ?? '')}`
       : (mc?.model ?? '—')
 
   // OpenClaw 图二：双行顶栏 + 中间可滚消息区 + 底部固定输入条

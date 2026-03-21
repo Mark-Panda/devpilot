@@ -38,8 +38,10 @@ func (n *LLMNode) Init(ruleConfig types.Config, configuration types.Configuratio
 		nc.URL = llm.DefaultLLMURL
 	}
 	nc.Key = strings.TrimSpace(nc.Key)
-	nc.Model = strings.TrimSpace(nc.Model)
-	if nc.Key == "" || nc.Model == "" {
+	if nc.Key == "" {
+		return llm.ErrInvalidConfig
+	}
+	if len(llm.NormalizeModelChain(nc.Model, nc.Models)) == 0 {
 		return llm.ErrInvalidConfig
 	}
 	cfg := llm.NodeConfigToConfig(&nc)

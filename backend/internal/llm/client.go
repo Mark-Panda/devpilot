@@ -2,6 +2,7 @@ package llm
 
 import (
 	"context"
+	"errors"
 	"log"
 	"strings"
 
@@ -21,19 +22,20 @@ func truncateForLog(s string, maxLen int) string {
 
 // Client 基于 langchaingo 的自定义 LLM 客户端，支持 baseUrl/apiKey/model、Skill 与 MCP 配置。
 type Client struct {
-	model  llms.Model
-	config Config
-	skills []Skill
+	model      llms.Model
+	config     Config
+	modelChain []string
+	skills     []Skill
 }
 
-// NewClient 根据 config 创建 LLM 客户端。会校验 BaseURL/APIKey/Model，并可选加载 SkillDir 下的技能。
-func NewClient(ctx context.Context, config Config) (*Client, error) {
+func newClientCore(config Config, skills []Skill, loadSkillDir bool) (*Client, error) {
 	config.BaseURL = strings.TrimSpace(config.BaseURL)
 	config.APIKey = strings.TrimSpace(config.APIKey)
-	config.Model = strings.TrimSpace(config.Model)
-	if config.BaseURL == "" || config.APIKey == "" || config.Model == "" {
+	chain := NormalizeModelChain(config.Model, config.Models)
+	if config.BaseURL == "" || config.APIKey == "" || len(chain) == 0 {
 		return nil, ErrInvalidConfig
 	}
+	config.Model = chain[0]
 
 	opts := []openai.Option{
 		openai.WithToken(config.APIKey),
@@ -45,43 +47,29 @@ func NewClient(ctx context.Context, config Config) (*Client, error) {
 		return nil, err
 	}
 
-	// 默认使用 ~/.devpilot/skills/ 作为技能目录（与 Claude Code / OpenClaw 一致）
 	if config.SkillDir == "" {
 		config.SkillDir = DefaultSkillDir()
 	}
-	c := &Client{model: model, config: config}
-	if config.SkillDir != "" {
-		skills, err := LoadSkills(config.SkillDir)
+	c := &Client{model: model, config: config, modelChain: chain, skills: skills}
+	if loadSkillDir && config.SkillDir != "" {
+		loaded, err := LoadSkills(config.SkillDir)
 		if err != nil {
 			return nil, err
 		}
-		c.skills = skills
+		c.skills = loaded
 	}
 	return c, nil
+}
+
+// NewClient 根据 config 创建 LLM 客户端。会校验 BaseURL/APIKey 与至少一个模型，并可选加载 SkillDir 下的技能。
+func NewClient(ctx context.Context, config Config) (*Client, error) {
+	return newClientCore(config, nil, true)
 }
 
 // NewClientWithSkills 根据 config 创建 LLM 客户端，并仅使用指定的 skills（不从 SkillDir 加载）。
 // 用于“仅暴露 skill-creator 等技能”的流程。
 func NewClientWithSkills(ctx context.Context, config Config, skills []Skill) (*Client, error) {
-	config.BaseURL = strings.TrimSpace(config.BaseURL)
-	config.APIKey = strings.TrimSpace(config.APIKey)
-	config.Model = strings.TrimSpace(config.Model)
-	if config.BaseURL == "" || config.APIKey == "" || config.Model == "" {
-		return nil, ErrInvalidConfig
-	}
-
-	opts := []openai.Option{
-		openai.WithToken(config.APIKey),
-		openai.WithBaseURL(config.BaseURL),
-		openai.WithModel(config.Model),
-	}
-	model, err := openai.New(opts...)
-	if err != nil {
-		return nil, err
-	}
-
-	c := &Client{model: model, config: config, skills: skills}
-	return c, nil
+	return newClientCore(config, skills, false)
 }
 
 // Chat 使用当前模型进行单轮对话。若配置了 SkillDir 且加载到技能，会将技能描述注入为系统提示（仅 description，节省 token）。
@@ -101,7 +89,6 @@ func (c *Client) ChatWithSkillPrompt(ctx context.Context, userMessage string, on
 
 // ChatWithSystem 使用自定义 systemPrompt 与 userMessage 进行单轮对话。
 func (c *Client) ChatWithSystem(ctx context.Context, systemPrompt, userMessage string) (string, error) {
-	opts := c.callOptions()
 	var messages []llms.MessageContent
 	if systemPrompt != "" {
 		messages = append(messages, llms.MessageContent{
@@ -113,14 +100,7 @@ func (c *Client) ChatWithSystem(ctx context.Context, systemPrompt, userMessage s
 		Role:  llms.ChatMessageTypeHuman,
 		Parts: []llms.ContentPart{llms.TextContent{Text: userMessage}},
 	})
-	resp, err := c.model.GenerateContent(ctx, messages, opts...)
-	if err != nil {
-		return "", err
-	}
-	if len(resp.Choices) == 0 {
-		return "", ErrEmptyResponse
-	}
-	return resp.Choices[0].Content, nil
+	return c.generateSingleRoundWithFailover(ctx, messages, nil)
 }
 
 // GenerateFromMessages 使用已有消息列表调用模型（可用于多轮或带 MCP 工具结果的对话）。
@@ -130,19 +110,7 @@ func (c *Client) GenerateFromMessages(ctx context.Context, messages []llms.Messa
 
 // GenerateFromMessagesWithOptions 使用指定 CallOption 调用模型，便于 RuleGo 节点按 Params 传入参数。
 func (c *Client) GenerateFromMessagesWithOptions(ctx context.Context, messages []llms.MessageContent, opts []llms.CallOption) (string, error) {
-	if len(opts) == 0 {
-		opts = c.callOptions()
-	}
-	resp, err := c.model.GenerateContent(ctx, messages, opts...)
-	if err != nil {
-		return "", err
-	}
-	if len(resp.Choices) == 0 {
-		return "", ErrEmptyResponse
-	}
-	content := resp.Choices[0].Content
-	log.Printf("[llm] 大模型响应 contentLen=%d preview=%s", len(content), truncateForLog(content, 200))
-	return content, nil
+	return c.generateSingleRoundWithFailover(ctx, messages, opts)
 }
 
 // DefaultToolLoopMaxRounds 工具调用循环最大轮数，避免无限递归。
@@ -151,19 +119,88 @@ const DefaultToolLoopMaxRounds = 16
 // GenerateWithToolLoop 带工具调用的生成：传入 tools 与 ToolExecutor，当模型返回 tool_calls 时执行并继续，
 // 直到模型返回纯文本或达到 maxRounds。与 Claude Code / OpenClaw 的 MCP 调用流程一致。
 // 若 tools 为空或 executor 为 nil，行为等价于 GenerateFromMessagesWithOptions（不传 WithTools）。
+// 配置多个模型时，任一轮 API 失败或空响应会换下一个模型并从初始 messages 整段重试。
 func (c *Client) GenerateWithToolLoop(ctx context.Context, messages []llms.MessageContent, tools []llms.Tool, opts []llms.CallOption, executor ToolExecutor, maxRounds int) (string, error) {
-	if len(opts) == 0 {
-		opts = c.callOptions()
-	}
 	if maxRounds <= 0 {
 		maxRounds = DefaultToolLoopMaxRounds
 	}
-	callOpts := make([]llms.CallOption, len(opts), len(opts)+1)
-	copy(callOpts, opts)
-	if len(tools) > 0 {
-		callOpts = append(callOpts, llms.WithTools(tools))
+	baseOpts := opts
+	if len(baseOpts) == 0 {
+		baseOpts = c.callOptions()
 	}
 
+	var lastErr error
+	chainLen := len(c.modelChain)
+	for mi, mName := range c.modelChain {
+		msgs := CloneMessageContents(messages)
+		callOpts := c.callOptionsForModel(mName, baseOpts)
+		if len(tools) > 0 {
+			callOpts = append(callOpts, llms.WithTools(tools))
+		}
+		out, err := c.generateWithToolLoopOneModel(ctx, msgs, callOpts, executor, maxRounds)
+		if err == nil {
+			if mi > 0 {
+				log.Printf("[llm] 多模型故障转移成功，使用模型 %q（链上下标 %d/%d）", mName, mi+1, chainLen)
+			}
+			return out, nil
+		}
+		if errors.Is(err, context.Canceled) {
+			return "", err
+		}
+		lastErr = err
+		if mi < chainLen-1 {
+			log.Printf("[llm] 模型 %q 调用失败（%d/%d），尝试下一模型: %v", mName, mi+1, chainLen, err)
+		} else {
+			log.Printf("[llm] 模型 %q 调用失败（%d/%d，已是最后一个模型）: %v", mName, mi+1, chainLen, err)
+		}
+	}
+	if lastErr == nil {
+		lastErr = ErrEmptyResponse
+	}
+	return "", lastErr
+}
+
+func (c *Client) generateSingleRoundWithFailover(ctx context.Context, messages []llms.MessageContent, extra []llms.CallOption) (string, error) {
+	var lastErr error
+	chainLen := len(c.modelChain)
+	for mi, mName := range c.modelChain {
+		callOpts := c.callOptionsForModel(mName, extra)
+		resp, err := c.model.GenerateContent(ctx, messages, callOpts...)
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return "", err
+			}
+			lastErr = err
+			if mi < chainLen-1 {
+				log.Printf("[llm] 模型 %q 请求失败（%d/%d），尝试下一模型: %v", mName, mi+1, chainLen, err)
+			} else {
+				log.Printf("[llm] 模型 %q 请求失败（%d/%d，已是最后一个模型）: %v", mName, mi+1, chainLen, err)
+			}
+			continue
+		}
+		if len(resp.Choices) == 0 {
+			lastErr = ErrEmptyResponse
+			if mi < chainLen-1 {
+				log.Printf("[llm] 模型 %q 返回空 choices（%d/%d），尝试下一模型", mName, mi+1, chainLen)
+			} else {
+				log.Printf("[llm] 模型 %q 返回空 choices（%d/%d，已是最后一个模型）", mName, mi+1, chainLen)
+			}
+			continue
+		}
+		if mi > 0 {
+			log.Printf("[llm] 多模型故障转移成功，使用模型 %q（链上下标 %d/%d）", mName, mi+1, chainLen)
+		}
+		content := resp.Choices[0].Content
+		log.Printf("[llm] 大模型响应 contentLen=%d preview=%s", len(content), truncateForLog(content, 200))
+		return content, nil
+	}
+	if lastErr == nil {
+		lastErr = ErrEmptyResponse
+	}
+	return "", lastErr
+}
+
+func (c *Client) generateWithToolLoopOneModel(ctx context.Context, messages []llms.MessageContent, callOpts []llms.CallOption, executor ToolExecutor, maxRounds int) (string, error) {
 	for round := 0; round < maxRounds; round++ {
 		resp, err := c.model.GenerateContent(ctx, messages, callOpts...)
 		if err != nil {
@@ -188,7 +225,6 @@ func (c *Client) GenerateWithToolLoop(ctx context.Context, messages []llms.Messa
 		if len(choice.ToolCalls) == 0 || executor == nil {
 			return choice.Content, nil
 		}
-		// 追加 assistant 消息（含 tool_calls）
 		parts := make([]llms.ContentPart, 0, len(choice.ToolCalls)+1)
 		if choice.Content != "" {
 			parts = append(parts, llms.TextContent{Text: choice.Content})
@@ -200,7 +236,6 @@ func (c *Client) GenerateWithToolLoop(ctx context.Context, messages []llms.Messa
 			Role:  llms.ChatMessageTypeAI,
 			Parts: parts,
 		})
-		// 执行每个 tool call 并追加 tool 结果消息
 		for _, tc := range choice.ToolCalls {
 			if tc.FunctionCall == nil {
 				continue
@@ -226,6 +261,19 @@ func (c *Client) GenerateWithToolLoop(ctx context.Context, messages []llms.Messa
 		}
 	}
 	return "", ErrToolLoopMaxRounds
+}
+
+func (c *Client) callOptionsForModel(modelName string, extra []llms.CallOption) []llms.CallOption {
+	var base []llms.CallOption
+	if len(extra) == 0 {
+		base = c.callOptions()
+	} else {
+		base = extra
+	}
+	out := make([]llms.CallOption, 0, len(base)+1)
+	out = append(out, llms.WithModel(modelName))
+	out = append(out, base...)
+	return out
 }
 
 func (c *Client) callOptions() []llms.CallOption {

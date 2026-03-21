@@ -67,6 +67,44 @@ const scratchTheme = new ScratchBlocks.Theme(
 
 (ScratchBlocks as { ScratchMsgs?: { setLocale?: (locale: string) => void } }).ScratchMsgs?.setLocale?.("zh-cn");
 
+function parseLlmModelsChainJson(raw: string, fallbackPrimary: string): string[] {
+  const s = String(raw ?? "").trim() || "[]";
+  try {
+    const p = JSON.parse(s);
+    if (Array.isArray(p)) {
+      const ch = p.map((x) => String(x ?? "").trim()).filter(Boolean);
+      if (ch.length > 0) return ch;
+    }
+  } catch {
+    /* ignore */
+  }
+  const f = String(fallbackPrimary ?? "").trim();
+  return f ? [f] : [];
+}
+
+function toggleLlmModelInChain(
+  siteOrder: string[],
+  chain: string[],
+  primary: string,
+  model: string,
+  on: boolean
+): string[] {
+  const sel = new Set(chain);
+  if (on) sel.add(model);
+  else if (model !== primary) sel.delete(model);
+  return siteOrder.filter((x) => sel.has(x));
+}
+
+function llmChainWithNewPrimary(siteOrder: string[], chain: string[], newPrimary: string): string[] {
+  const p = newPrimary.trim();
+  if (!p) return [];
+  const sel = new Set(chain);
+  sel.add(p);
+  const ordered = siteOrder.filter((x) => sel.has(x));
+  if (!ordered.includes(p)) return [p];
+  return [p, ...ordered.filter((x) => x !== p)];
+}
+
 type SubRuleChainOption = { id: string; name: string };
 
 type BlockConfigModalProps = {
@@ -176,6 +214,10 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline, sub
       next.LLM_URL = get("LLM_URL") || "https://ai.gitee.com/v1";
       next.LLM_KEY = get("LLM_KEY");
       next.LLM_MODEL = get("LLM_MODEL");
+      const modelsJsonRaw = String(block.getFieldValue("LLM_MODELS_JSON") ?? "").trim() || "[]";
+      const chain = parseLlmModelsChainJson(modelsJsonRaw, get("LLM_MODEL"));
+      next.LLM_MODELS_JSON = JSON.stringify(chain);
+      if (chain.length > 0) next.LLM_MODEL = chain[0];
       next.LLM_SYSTEM_PROMPT = get("LLM_SYSTEM_PROMPT");
       next.LLM_MESSAGES_JSON = get("LLM_MESSAGES_JSON") || "[]";
       const paramsJson = get("LLM_PARAMS_JSON") || "{}";
@@ -353,6 +395,9 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline, sub
         responseFormat: String(form.LLM_RESPONSE_FORMAT ?? llmParamDefaults.responseFormat),
       }, null, 2);
       block.setFieldValue(paramsJson, "LLM_PARAMS_JSON");
+      const mChain = parseLlmModelsChainJson(String(form.LLM_MODELS_JSON ?? ""), String(form.LLM_MODEL ?? ""));
+      block.setFieldValue(JSON.stringify(mChain.length > 0 ? mChain : []), "LLM_MODELS_JSON");
+      if (mChain.length > 0) block.setFieldValue(mChain[0], "LLM_MODEL");
     }
     if (block.type === "rulego_switch") {
       const casesJson = JSON.stringify(switchCases, null, 2);
@@ -1055,11 +1100,15 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline, sub
                       if (!config) return;
                       const currentModel = String(form.LLM_MODEL ?? "").trim();
                       const firstModel = config.models[0] ?? "";
+                      const pick =
+                        currentModel && config.models.includes(currentModel) ? currentModel : firstModel;
+                      const chain = pick ? [pick, ...config.models.filter((x) => x !== pick)] : [];
                       setForm((f) => ({
                         ...f,
                         LLM_URL: config.baseUrl,
                         LLM_KEY: config.apiKey,
-                        LLM_MODEL: currentModel && config.models.includes(currentModel) ? currentModel : firstModel,
+                        LLM_MODEL: pick,
+                        LLM_MODELS_JSON: JSON.stringify(chain),
                       }));
                     }}
                     style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #e2e8f0" }}
@@ -1097,7 +1146,21 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline, sub
                       <span>模型 (model)</span>
                       <select
                         value={String(form.LLM_MODEL ?? "")}
-                        onChange={(e) => setForm((f) => ({ ...f, LLM_MODEL: e.target.value }))}
+                        onChange={(e) => {
+                          const newP = e.target.value;
+                          setForm((f) => {
+                            const ch = parseLlmModelsChainJson(
+                              String(f.LLM_MODELS_JSON ?? ""),
+                              String(f.LLM_MODEL ?? "")
+                            );
+                            const next = llmChainWithNewPrimary(llmModelOptions, ch, newP);
+                            return {
+                              ...f,
+                              LLM_MODEL: newP,
+                              LLM_MODELS_JSON: JSON.stringify(next),
+                            };
+                          });
+                        }}
                         style={{ width: "100%", padding: "8px 12px", borderRadius: 6, border: "1px solid #e2e8f0" }}
                       >
                         {llmModelOptions.map((m) => (
@@ -1107,6 +1170,61 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline, sub
                         ))}
                       </select>
                     </label>
+                    {llmModelOptions.length > 1 ? (
+                      <div className="form-field" style={{ margin: 0 }}>
+                        <span>故障转移（勾选参与；顺序与模型管理一致）</span>
+                        <small className="form-hint" style={{ display: "block", marginBottom: 8 }}>
+                          主模型不可取消；当前模型请求失败时会依次尝试其他已勾选的模型。
+                        </small>
+                        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                          {llmModelOptions.map((m) => {
+                            const primary = String(form.LLM_MODEL ?? "").trim();
+                            const chain = parseLlmModelsChainJson(
+                              String(form.LLM_MODELS_JSON ?? ""),
+                              primary
+                            );
+                            const checked = chain.includes(m);
+                            return (
+                              <label
+                                key={m}
+                                style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={checked}
+                                  disabled={m === primary}
+                                  onChange={(e) =>
+                                    setForm((f) => {
+                                      const prim = String(f.LLM_MODEL ?? "").trim();
+                                      const ch = parseLlmModelsChainJson(
+                                        String(f.LLM_MODELS_JSON ?? ""),
+                                        prim
+                                      );
+                                      const next = toggleLlmModelInChain(
+                                        llmModelOptions,
+                                        ch,
+                                        prim,
+                                        m,
+                                        e.target.checked
+                                      );
+                                      return {
+                                        ...f,
+                                        LLM_MODELS_JSON: JSON.stringify(next),
+                                        LLM_MODEL: next[0] ?? prim,
+                                      };
+                                    })
+                                  }
+                                />
+                                <span>
+                                  {m}
+                                  {m === primary ? "（主模型）" : ""}
+                                </span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ) : null}
                   </>
                 )}
               </>

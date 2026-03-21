@@ -27,6 +27,7 @@ function normalizeModelConfig(mc: ModelConfig | null | undefined): ModelConfig {
     base_url: typeof mc.base_url === 'string' ? mc.base_url : '',
     api_key: typeof mc.api_key === 'string' ? mc.api_key : '',
     model: typeof mc.model === 'string' ? mc.model : '',
+    models: Array.isArray(mc.models) ? mc.models.filter((x) => typeof x === 'string') : undefined,
     max_tokens: typeof mc.max_tokens === 'number' ? mc.max_tokens : 4096,
     temperature: typeof mc.temperature === 'number' ? mc.temperature : 0.7,
   }
