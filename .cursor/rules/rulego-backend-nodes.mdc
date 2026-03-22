@@ -49,5 +49,9 @@ alwaysApply: false
 - switch
 - text/template
 - while
+- x/fileDelete
+- x/fileList
+- x/fileRead
+- x/fileWrite
 
 自定义节点实现见 `backend/internal/services/rulego/node_*.go`，通过 `rulego.Registry.Register` 在 init 中注册。

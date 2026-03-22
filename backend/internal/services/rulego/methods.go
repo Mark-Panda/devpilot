@@ -13,8 +13,8 @@ import (
 )
 
 type Service struct {
-	store          *Store
-	execLogStore   *ExecutionLogStore
+	store           *Store
+	execLogStore    *ExecutionLogStore
 	llmConfigLister LLMConfigLister // 可选：用于执行时用模型管理中的 API Key 覆盖 ai/llm 节点 key
 }
 
@@ -176,7 +176,7 @@ func (s *Service) ListExecutionLogs(limit, offset int) (ListExecutionLogsResult,
 
 // GetExecutionLogResponse 单条执行日志及其节点步骤
 type GetExecutionLogResponse struct {
-	Log   models.RuleGoExecutionLog    `json:"log"`
+	Log   models.RuleGoExecutionLog       `json:"log"`
 	Nodes []models.RuleGoExecutionNodeLog `json:"nodes"`
 }
 

@@ -44,7 +44,9 @@ export const toolbox = {
       kind: "category" as const,
       name: "触发器",
       categorystyle: "rulego_trigger",
-      contents: [{ kind: "block" as const, type: "rulego_startTrigger" }],
+      contents: [
+        { kind: "block" as const, type: "rulego_startTrigger" },
+      ],
     },
     {
       kind: "category" as const,
