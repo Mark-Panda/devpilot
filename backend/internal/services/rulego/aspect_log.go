@@ -21,6 +21,11 @@ var (
 
 const executionIDKey = "_execution_id"
 
+// chainExecIDCachePrefix 用 RuleMsg.Id 在 ChainCache 中关联「本次进入链的根消息」与执行日志 ID。
+// 原因：根上下文 TellNext 首节点前会对消息 Copy()，Before 里写入的 _execution_id 只在子副本上，
+// 根 ctx.GetOut() 仍是进入链时的原始消息，Completed 无法从 metadata 取到 execution_id。
+const chainExecIDCachePrefix = "devpilot:exec:"
+
 // LogAspect 规则链节点执行日志切面：在节点 OnMsg 前后打日志，并可选写入数据库。
 // 参考：https://rulego.cc/pages/aop-overview/
 type LogAspect struct{}
@@ -102,6 +107,9 @@ func (a *LogAspect) Before(ctx types.RuleContext, msg types.RuleMsg, relationTyp
 				msg.Metadata = types.NewMetadata()
 			}
 			msg.Metadata.PutValue(executionIDKey, row.ID)
+			if ctx.ChainCache() != nil && msg.GetId() != "" {
+				_ = ctx.ChainCache().Set(chainExecIDCachePrefix+msg.GetId(), row.ID, "")
+			}
 		}
 	}
 
@@ -173,21 +181,49 @@ func (a *LogAspect) After(ctx types.RuleContext, msg types.RuleMsg, err error, r
 
 // Completed 全部分支结束后更新父执行记录（与 ExecuteRule 末尾的 UpdateExecutionLog 对齐）。
 // 对已由 ExecuteRule 更新过的记录再次写入相同字段，结果仍一致。
+//
+// execution_id 解析顺序：参数 msg（手动执行一开始就带 id）→ GetOut()（部分场景）→ ChainCache（端点触发：
+// 根消息与首节点副本 metadata 分离，见 chainExecIDCachePrefix 注释）。
 func (a *LogAspect) Completed(ctx types.RuleContext, msg types.RuleMsg) types.RuleMsg {
-	if globalExecutionLogStore == nil {
+	if globalExecutionLogStore == nil || ctx == nil {
 		return msg
 	}
 	execID := executionIDFromMsg(msg)
 	if execID == "" {
+		execID = executionIDFromMsg(ctx.GetOut())
+	}
+	if execID == "" && msg.GetId() != "" && ctx.ChainCache() != nil {
+		if v := ctx.ChainCache().Get(chainExecIDCachePrefix + msg.GetId()); v != nil {
+			if s, ok := v.(string); ok {
+				execID = s
+			}
+		}
+	}
+	if execID == "" {
 		return msg
 	}
-	finishAt := time.Now().UTC().Format(time.RFC3339)
-	outData := msg.GetData()
-	outMeta := "{}"
-	if msg.Metadata != nil {
-		outMeta = MetadataToJSON(msg.Metadata.GetReadOnlyValues())
+	if msg.GetId() != "" && ctx.ChainCache() != nil {
+		_ = ctx.ChainCache().Delete(chainExecIDCachePrefix + msg.GetId())
 	}
-	_ = globalExecutionLogStore.UpdateExecutionLog(context.Background(), execID, outData, outMeta, "", finishAt, true)
+	outMsg := ctx.GetOut()
+	if outMsg.Metadata == nil || executionIDFromMsg(outMsg) == "" {
+		if executionIDFromMsg(msg) != "" {
+			outMsg = msg
+		}
+	}
+	finishAt := time.Now().UTC().Format(time.RFC3339)
+	outData := outMsg.GetData()
+	outMeta := "{}"
+	if outMsg.Metadata != nil {
+		outMeta = MetadataToJSON(outMsg.Metadata.GetReadOnlyValues())
+	}
+	runErr := ctx.GetErr()
+	success := runErr == nil
+	errStr := ""
+	if runErr != nil {
+		errStr = runErr.Error()
+	}
+	_ = globalExecutionLogStore.UpdateExecutionLog(context.Background(), execID, outData, outMeta, errStr, finishAt, success)
 	return msg
 }
 
