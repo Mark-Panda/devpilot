@@ -12,10 +12,11 @@ import (
 	"devpilot/backend/internal/store/models"
 )
 
-// 编译期检查：确保 LogAspect 实现 BeforeAspect、AfterAspect
+// 编译期检查：确保 LogAspect 实现 BeforeAspect、AfterAspect、CompletedAspect
 var (
-	_ types.BeforeAspect = (*LogAspect)(nil)
-	_ types.AfterAspect  = (*LogAspect)(nil)
+	_ types.BeforeAspect     = (*LogAspect)(nil)
+	_ types.AfterAspect      = (*LogAspect)(nil)
+	_ types.CompletedAspect  = (*LogAspect)(nil)
 )
 
 const executionIDKey = "_execution_id"
@@ -74,6 +75,36 @@ func (a *LogAspect) Before(ctx types.RuleContext, msg types.RuleMsg, relationTyp
 	if ctx.RuleChain() != nil {
 		chainId = ctx.RuleChain().GetNodeId().Id
 	}
+	// 定时 / HTTP 等 Endpoint 触发的链不会在消息里带 _execution_id（只有 ExecuteRule / 测试会注入），
+	// 日志管理依赖父记录 + 节点步骤，因此在首次进入节点时补建一条执行记录并写回 metadata。
+	if globalExecutionLogStore != nil && executionIDFromMsg(msg) == "" && chainId != "" {
+		ruleName := ""
+		if rc := ctx.RuleChain(); rc != nil {
+			if chainCtx, ok := rc.(types.ChainCtx); ok {
+				if def := chainCtx.Definition(); def != nil {
+					ruleName = def.RuleChain.Name
+				}
+			}
+		}
+		inputMeta := "{}"
+		if msg.Metadata != nil {
+			inputMeta = MetadataToJSON(msg.Metadata.GetReadOnlyValues())
+		}
+		row, err := globalExecutionLogStore.CreateExecutionLog(context.Background(), models.RuleGoExecutionLog{
+			RuleID:        chainId,
+			RuleName:      ruleName,
+			TriggerType:   "endpoint",
+			InputData:     msg.GetData(),
+			InputMetadata: inputMeta,
+		})
+		if err == nil && row.ID != "" {
+			if msg.Metadata == nil {
+				msg.Metadata = types.NewMetadata()
+			}
+			msg.Metadata.PutValue(executionIDKey, row.ID)
+		}
+	}
+
 	nodeId := ""
 	nodeName := nodeNameFromCtx(ctx)
 	if ctx.Self() != nil {
@@ -137,6 +168,26 @@ func (a *LogAspect) After(ctx types.RuleContext, msg types.RuleMsg, err error, r
 			_ = globalExecutionLogStore.UpdateNodeLogByExecutionAndNode(context.Background(), execID, nodeId, msg.GetData(), outputMeta, errMsg, time.Now().UTC().Format(time.RFC3339))
 		}
 	}
+	return msg
+}
+
+// Completed 全部分支结束后更新父执行记录（与 ExecuteRule 末尾的 UpdateExecutionLog 对齐）。
+// 对已由 ExecuteRule 更新过的记录再次写入相同字段，结果仍一致。
+func (a *LogAspect) Completed(ctx types.RuleContext, msg types.RuleMsg) types.RuleMsg {
+	if globalExecutionLogStore == nil {
+		return msg
+	}
+	execID := executionIDFromMsg(msg)
+	if execID == "" {
+		return msg
+	}
+	finishAt := time.Now().UTC().Format(time.RFC3339)
+	outData := msg.GetData()
+	outMeta := "{}"
+	if msg.Metadata != nil {
+		outMeta = MetadataToJSON(msg.Metadata.GetReadOnlyValues())
+	}
+	_ = globalExecutionLogStore.UpdateExecutionLog(context.Background(), execID, outData, outMeta, "", finishAt, true)
 	return msg
 }
 

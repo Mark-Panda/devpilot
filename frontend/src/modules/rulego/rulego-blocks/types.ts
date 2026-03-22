@@ -40,6 +40,11 @@ export interface BlockTypeDef {
   getWalkInputs(block: Block): string[] | null;
   /** 使用 nextStatement 时的默认连接类型 */
   defaultConnectionType?: string;
+
+  /** 为 true 时写入 metadata.endpoints，不参与 metadata.nodes */
+  metadataEndpoint?: boolean;
+  getEndpointDsl?(block: Block, helpers: BlockHelpers): Record<string, unknown>;
+  setEndpointDsl?(block: Block, endpoint: Record<string, unknown>, helpers: BlockHelpers): void;
 }
 
 export interface RuleGoNode {

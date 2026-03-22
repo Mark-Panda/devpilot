@@ -53,6 +53,7 @@ func (s *Service) ExecuteRule(ruleID string, input ExecuteRuleInput) (ExecuteRul
 			def = patched
 		}
 	}
+	def = AlignDefinitionRuleChainID(def, ruleID)
 	defBytes := []byte(def)
 	var engine types.RuleEngine
 	if existing, ok := rulego.Get(ruleID); ok && existing.Initialized() {
@@ -158,6 +159,7 @@ func (s *Service) ExecuteRuleDefinition(definition string, input ExecuteRuleInpu
 		}
 	}
 	const testRuleID = "_test_"
+	def = AlignDefinitionRuleChainID(def, testRuleID)
 	engine, createErr := rulego.New(testRuleID, []byte(def), types.WithAspects(&LogAspect{}))
 	if createErr != nil {
 		return ExecuteRuleOutput{Success: false, Error: createErr.Error()}, createErr
@@ -245,6 +247,7 @@ func (s *Service) ValidateRuleDefinition(definition string) error {
 	if err := json.Unmarshal([]byte(definition), &map[string]interface{}{}); err != nil {
 		return err
 	}
+	definition = AlignDefinitionRuleChainID(definition, "_validate_")
 	eng, err := rulego.New("_validate_", []byte(definition))
 	if err != nil {
 		return err

@@ -3,7 +3,7 @@
  * 文档：https://rulego.cc/pages/delay/
  * - delayMs：延迟时间（毫秒），支持数字或动态表达式如 ${metadata.delay}，默认 60000
  * - overwrite：周期内是否覆盖为单条消息，默认 false
- * - Success：延迟结束后转发；执行失败：队列超限时转发
+ * - Success：延迟结束后转发；执行异常：队列超限时转发
  */
 import type { Block } from "blockly/core";
 import type { BlockTypeDef, BlockHelpers } from "../types";

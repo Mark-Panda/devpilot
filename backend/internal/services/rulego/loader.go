@@ -62,6 +62,7 @@ func (s *Service) LoadRuleChain(ruleID string) error {
 			defStr = patched
 		}
 	}
+	defStr = AlignDefinitionRuleChainID(defStr, ruleID)
 	def := []byte(defStr)
 	if eng, ok := rulego.Get(ruleID); ok && eng.Initialized() {
 		if err := eng.ReloadSelf(def, types.WithAspects(&LogAspect{})); err != nil {
@@ -111,6 +112,7 @@ func (s *Service) LoadAllEnabledRuleChains() (loaded int, err error) {
 				defStr = patched
 			}
 		}
+		defStr = AlignDefinitionRuleChainID(defStr, rule.ID)
 		engine, createErr := rulego.New(rule.ID, []byte(defStr), types.WithAspects(&LogAspect{}))
 		if createErr != nil {
 			log.Printf("[rulego] 启动加载规则链失败 id=%s name=%s: %v", rule.ID, rule.Name, createErr)

@@ -14,13 +14,12 @@ const def: BlockTypeDef = {
     const blocks = (ScratchBlocks as { Blocks: Record<string, object> }).Blocks;
     blocks[blockType] = {
       init: function (this: Block) {
-        (this as Block)
-          .appendDummyInput("HEAD")
-          .appendField(new (BlocklyF as any).FieldTextInput("开始"), "NODE_NAME");
+        (this as Block).appendDummyInput("HEAD").appendField("开始");
         const config = (this as Block).appendDummyInput("CONFIG");
         config.appendField(new (BlocklyF as any).FieldTextInput("start1"), "NODE_ID");
+        config.appendField(new (BlocklyF as any).FieldTextInput("开始"), "NODE_NAME");
         if (config.setVisible) config.setVisible(false);
-        (this as Block).setPreviousStatement(true);
+        (this as Block).setPreviousStatement(false);
         (this as Block).setNextStatement(true);
         if (typeof (this as Block).setStyle === "function") (this as Block).setStyle(category);
       },

@@ -20,6 +20,11 @@ const CATEGORY_STYLES: Record<string, { bg: string; border: string }> = {
 
 const BLOCK_LABELS: Record<string, string> = {
   rulego_startTrigger: "开始",
+  rulego_endpoint_http: "触发·HTTP",
+  rulego_endpoint_ws: "触发·WebSocket",
+  rulego_endpoint_mqtt: "触发·MQTT",
+  rulego_endpoint_schedule: "触发·定时",
+  rulego_endpoint_net: "触发·TCP/UDP",
   rulego_restApiCall: "HTTP客户端",
   rulego_llm: "大模型 LLM",
   rulego_delay: "延迟",

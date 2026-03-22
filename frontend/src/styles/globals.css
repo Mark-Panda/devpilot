@@ -983,6 +983,14 @@ body {
   background: #1e293b;
 }
 
+.rulego-editor-layout-constraint.form-error {
+  margin: 0 16px 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: rgba(220, 38, 38, 0.08);
+  border: 1px solid rgba(220, 38, 38, 0.25);
+}
+
 .rulego-editor-header-bar {
   display: flex;
   align-items: center;

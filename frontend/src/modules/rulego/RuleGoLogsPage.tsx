@@ -27,6 +27,7 @@ function triggerLabel(t: string) {
     manual: "手动执行",
     test: "测试运行",
     api: "API",
+    endpoint: "端点触发",
   };
   return map[t] ?? t;
 }

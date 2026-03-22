@@ -17,6 +17,7 @@ import "./blocks/llm";
 import "./blocks/delay";
 import "./blocks/switch";
 import "./blocks/startTrigger";
+import "./blocks/endpointTriggers";
 import "./blocks/dbClient";
 import "./blocks/apiRouteTracer";
 
@@ -27,6 +28,7 @@ import {
   getAllBlockTypes,
 } from "./registry";
 
+export { getBlockTypeForEndpointDslType } from "./blocks/endpointTriggers";
 export { getBlockDef, getNodeType, getBlockTypeFromNodeType, getAllBlockTypes };
 export type { BlockTypeDef, BlockHelpers, ConnectionBranch, RuleGoNode } from "./types";
 
@@ -47,6 +49,11 @@ export const toolbox = {
       categorystyle: "rulego_trigger",
       contents: [
         { kind: "block" as const, type: "rulego_startTrigger" },
+        { kind: "block" as const, type: "rulego_endpoint_http" },
+        { kind: "block" as const, type: "rulego_endpoint_ws" },
+        { kind: "block" as const, type: "rulego_endpoint_mqtt" },
+        { kind: "block" as const, type: "rulego_endpoint_schedule" },
+        { kind: "block" as const, type: "rulego_endpoint_net" },
       ],
     },
     {

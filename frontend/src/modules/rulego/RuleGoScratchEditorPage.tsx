@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import * as ScratchBlocks from "scratch-blocks";
 import type { WorkspaceSvg, Block, BlockSvg } from "blockly/core";
 import { getEnabledFromDefinition, isSubRuleChain } from "./dslUtils";
+import { isRuleGoTriggerBlockType, validateRuleGoTriggerLayout } from "./rulegoWorkspaceValidation";
 import { useRuleGoRules } from "./useRuleGoRules";
 import {
   executeRuleGoRuleByDefinition,
@@ -15,6 +16,7 @@ import {
   toolbox as rulegoToolbox,
   getBlockDef,
   getBlockTypeFromNodeType,
+  getBlockTypeForEndpointDslType,
 } from "./rulego-blocks";
 import { JsEditor, JsonEditor, SqlEditor } from "../../shared/components";
 import { BlockLibraryPanel, DRAG_TYPE_BLOCK } from "./BlockLibraryPanel";
@@ -280,6 +282,51 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline, sub
     if (block.type === "rulego_delay") {
       next.DELAY_MS = get("DELAY_MS") || "60000";
       next.DELAY_OVERWRITE = getBool("DELAY_OVERWRITE");
+    }
+    if (block.type === "rulego_endpoint_http") {
+      next.EP_SERVER = get("EP_SERVER") || ":9090";
+      next.EP_ALLOW_CORS = getBool("EP_ALLOW_CORS");
+      next.RT_METHOD = get("RT_METHOD") || "POST";
+      next.RT_PATH = get("RT_PATH") || "/api/v1/hook";
+      next.RT_TO = get("RT_TO") || "chain:default";
+      next.RT_WAIT = getBool("RT_WAIT");
+      next.RT_TO_PROCESSORS = get("RT_TO_PROCESSORS");
+      next.RT_ID = get("RT_ID");
+      next.EP_EXTRA_ROUTERS_JSON = String(block.getFieldValue("EP_EXTRA_ROUTERS_JSON") ?? "").trim();
+    }
+    if (block.type === "rulego_endpoint_ws") {
+      next.EP_SERVER = get("EP_SERVER") || ":9090";
+      next.RT_METHOD = get("RT_METHOD") || "GET";
+      next.RT_PATH = get("RT_PATH") || "/ws";
+      next.RT_TO = get("RT_TO") || "chain:default";
+      next.RT_WAIT = getBool("RT_WAIT");
+      next.RT_ID = get("RT_ID");
+      next.EP_EXTRA_ROUTERS_JSON = String(block.getFieldValue("EP_EXTRA_ROUTERS_JSON") ?? "").trim();
+    }
+    if (block.type === "rulego_endpoint_mqtt") {
+      next.EP_SERVER = get("EP_SERVER") || "127.0.0.1:1883";
+      next.EP_USER = get("EP_USER");
+      next.EP_PASS = String(block.getFieldValue("EP_PASS") ?? "");
+      next.EP_QOS = get("EP_QOS") || "1";
+      next.EP_CLIENT_ID = get("EP_CLIENT_ID") || "rulego_mqtt";
+      next.RT_PATH = get("RT_PATH") || "sensors/+/data";
+      next.RT_FROM_PROCESSORS = get("RT_FROM_PROCESSORS");
+      next.RT_TO = get("RT_TO") || "chain:default";
+      next.RT_ID = get("RT_ID");
+      next.EP_EXTRA_ROUTERS_JSON = String(block.getFieldValue("EP_EXTRA_ROUTERS_JSON") ?? "").trim();
+    }
+    if (block.type === "rulego_endpoint_schedule") {
+      next.RT_PATH = get("RT_PATH") || "*/1 * * * * *";
+      next.EP_PROCESSORS = get("EP_PROCESSORS");
+      next.RT_TO = get("RT_TO");
+      next.EP_EXTRA_ROUTERS_JSON = String(block.getFieldValue("EP_EXTRA_ROUTERS_JSON") ?? "").trim();
+    }
+    if (block.type === "rulego_endpoint_net") {
+      next.EP_PROTOCOL = get("EP_PROTOCOL") || "tcp";
+      next.EP_SERVER = get("EP_SERVER") || ":8888";
+      next.RT_PATH = get("RT_PATH") || ".*";
+      next.RT_TO = get("RT_TO") || "chain:default";
+      next.EP_EXTRA_ROUTERS_JSON = String(block.getFieldValue("EP_EXTRA_ROUTERS_JSON") ?? "").trim();
     }
     if (block.type === "rulego_fileRead") {
       next.FILE_PATH = get("FILE_PATH") || "/tmp/data.txt";
@@ -942,6 +989,393 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline, sub
               onChange={(e) => setForm((f) => ({ ...f, DELAY_OVERWRITE: e.target.checked }))}
             />
             <span>周期内覆盖 (overwrite)</span>
+          </label>
+        </>
+      )}
+      {block.type === "rulego_startTrigger" && (
+        <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
+          规则链入口；无额外配置。须放在链首且全画布仅一个触发器。
+        </p>
+      )}
+      {block.type === "rulego_endpoint_http" && (
+        <>
+          <label className="form-field">
+            <span>监听地址 (configuration.server)</span>
+            <input
+              value={String(form.EP_SERVER ?? ":9090")}
+              onChange={(e) => setForm((f) => ({ ...f, EP_SERVER: e.target.value }))}
+              placeholder=":9090"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={Boolean(form.EP_ALLOW_CORS)}
+              onChange={(e) => setForm((f) => ({ ...f, EP_ALLOW_CORS: e.target.checked }))}
+            />
+            <span>允许 CORS (allowCors)</span>
+          </label>
+          <label className="form-field">
+            <span>HTTP 方法 (router.params)</span>
+            <input
+              value={String(form.RT_METHOD ?? "POST")}
+              onChange={(e) => setForm((f) => ({ ...f, RT_METHOD: e.target.value }))}
+              placeholder="POST"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>路径 (from.path)</span>
+            <input
+              value={String(form.RT_PATH ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RT_PATH: e.target.value }))}
+              placeholder="/api/v1/hook"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>转发目标 (to.path)</span>
+            <input
+              value={String(form.RT_TO ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RT_TO: e.target.value }))}
+              placeholder="chain:default 或 chainId:nodeId"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={Boolean(form.RT_WAIT)}
+              onChange={(e) => setForm((f) => ({ ...f, RT_WAIT: e.target.checked }))}
+            />
+            <span>同步等待链结果 (to.wait)</span>
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>To.processors（逗号分隔）</span>
+            <input
+              value={String(form.RT_TO_PROCESSORS ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RT_TO_PROCESSORS: e.target.value }))}
+              placeholder="如 responseToBody"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>路由 ID (router.id，可选)</span>
+            <input
+              value={String(form.RT_ID ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RT_ID: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>额外 routers（JSON 数组，可选）</span>
+            <textarea
+              rows={5}
+              value={String(form.EP_EXTRA_ROUTERS_JSON ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, EP_EXTRA_ROUTERS_JSON: e.target.value }))}
+              placeholder='[ { "id": "r2", "from": {...}, "to": {...} } ]'
+              style={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }}
+              spellCheck={false}
+            />
+            <small className="form-hint">除主路由外追加的 metadata.endpoints[].routers 元素，须为合法 JSON 数组。</small>
+          </label>
+        </>
+      )}
+      {block.type === "rulego_endpoint_ws" && (
+        <>
+          <label className="form-field">
+            <span>监听地址 (configuration.server)</span>
+            <input
+              value={String(form.EP_SERVER ?? ":9090")}
+              onChange={(e) => setForm((f) => ({ ...f, EP_SERVER: e.target.value }))}
+              placeholder=":9090"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>子协议 / Param（如 GET）</span>
+            <input
+              value={String(form.RT_METHOD ?? "GET")}
+              onChange={(e) => setForm((f) => ({ ...f, RT_METHOD: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>路径 (from.path)</span>
+            <input
+              value={String(form.RT_PATH ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RT_PATH: e.target.value }))}
+              placeholder="/ws"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>转发目标 (to.path)</span>
+            <input
+              value={String(form.RT_TO ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RT_TO: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={Boolean(form.RT_WAIT)}
+              onChange={(e) => setForm((f) => ({ ...f, RT_WAIT: e.target.checked }))}
+            />
+            <span>同步等待 (to.wait)</span>
+          </label>
+          <label className="form-field">
+            <span>路由 ID (router.id，可选)</span>
+            <input
+              value={String(form.RT_ID ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RT_ID: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>额外 routers（JSON 数组，可选）</span>
+            <textarea
+              rows={5}
+              value={String(form.EP_EXTRA_ROUTERS_JSON ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, EP_EXTRA_ROUTERS_JSON: e.target.value }))}
+              style={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }}
+              spellCheck={false}
+            />
+          </label>
+        </>
+      )}
+      {block.type === "rulego_endpoint_mqtt" && (
+        <>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>Broker (server)</span>
+            <input
+              value={String(form.EP_SERVER ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, EP_SERVER: e.target.value }))}
+              placeholder="127.0.0.1:1883"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>用户名</span>
+            <input
+              value={String(form.EP_USER ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, EP_USER: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>密码</span>
+            <input
+              type="password"
+              value={String(form.EP_PASS ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, EP_PASS: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>QoS</span>
+            <input
+              type="number"
+              min={0}
+              max={2}
+              value={String(form.EP_QOS ?? "1")}
+              onChange={(e) => setForm((f) => ({ ...f, EP_QOS: e.target.value }))}
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>clientId</span>
+            <input
+              value={String(form.EP_CLIENT_ID ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, EP_CLIENT_ID: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>订阅主题 (from.path)</span>
+            <input
+              value={String(form.RT_PATH ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RT_PATH: e.target.value }))}
+              placeholder="sensors/+/data"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>From.processors（逗号分隔）</span>
+            <input
+              value={String(form.RT_FROM_PROCESSORS ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RT_FROM_PROCESSORS: e.target.value }))}
+              placeholder="setJsonDataType"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>转发目标 (to.path)</span>
+            <input
+              value={String(form.RT_TO ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RT_TO: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>路由 ID (router.id，可选)</span>
+            <input
+              value={String(form.RT_ID ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RT_ID: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>额外 routers（JSON 数组，可选）</span>
+            <textarea
+              rows={5}
+              value={String(form.EP_EXTRA_ROUTERS_JSON ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, EP_EXTRA_ROUTERS_JSON: e.target.value }))}
+              style={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }}
+              spellCheck={false}
+            />
+          </label>
+        </>
+      )}
+      {block.type === "rulego_endpoint_schedule" && (
+        <>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>Cron 表达式 (from.path)</span>
+            <input
+              value={String(form.RT_PATH ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RT_PATH: e.target.value }))}
+              placeholder="*/1 * * * * *"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>端点 processors（逗号分隔）</span>
+            <input
+              value={String(form.EP_PROCESSORS ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, EP_PROCESSORS: e.target.value }))}
+              placeholder="如 testPrint"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>转发目标 (to.path，可选)</span>
+            <input
+              value={String(form.RT_TO ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RT_TO: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>额外 routers（JSON 数组，可选）</span>
+            <textarea
+              rows={5}
+              value={String(form.EP_EXTRA_ROUTERS_JSON ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, EP_EXTRA_ROUTERS_JSON: e.target.value }))}
+              style={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }}
+              spellCheck={false}
+            />
+          </label>
+        </>
+      )}
+      {block.type === "rulego_endpoint_net" && (
+        <>
+          <label className="form-field">
+            <span>协议 (protocol)</span>
+            <input
+              value={String(form.EP_PROTOCOL ?? "tcp")}
+              onChange={(e) => setForm((f) => ({ ...f, EP_PROTOCOL: e.target.value }))}
+              placeholder="tcp / udp"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>监听 (server)</span>
+            <input
+              value={String(form.EP_SERVER ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, EP_SERVER: e.target.value }))}
+              placeholder=":8888"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>匹配 (from.path，正则)</span>
+            <input
+              value={String(form.RT_PATH ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RT_PATH: e.target.value }))}
+              placeholder=".*"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>转发目标 (to.path)</span>
+            <input
+              value={String(form.RT_TO ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RT_TO: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>额外 routers（JSON 数组，可选）</span>
+            <textarea
+              rows={5}
+              value={String(form.EP_EXTRA_ROUTERS_JSON ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, EP_EXTRA_ROUTERS_JSON: e.target.value }))}
+              style={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }}
+              spellCheck={false}
+            />
           </label>
         </>
       )}
@@ -1881,6 +2315,9 @@ export default function RuleGoScratchEditorPage() {
   const [json, setJson] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [triggerLayoutError, setTriggerLayoutError] = useState<string | null>(null);
+  const setTriggerLayoutErrorRef = useRef(setTriggerLayoutError);
+  setTriggerLayoutErrorRef.current = setTriggerLayoutError;
   const [nameModalOpen, setNameModalOpen] = useState(false);
   const [nameDraft, setNameDraft] = useState("");
   const [descriptionDraft, setDescriptionDraft] = useState("");
@@ -1953,6 +2390,13 @@ export default function RuleGoScratchEditorPage() {
     const viewTop = metrics?.viewTop ?? 0;
     const wsX = viewLeft + (e.clientX - rect.left) / scale;
     const wsY = viewTop + (e.clientY - rect.top) / scale;
+    if (isRuleGoTriggerBlockType(blockType)) {
+      const hasTrigger = (workspace.getAllBlocks(false) as Block[]).some((b) => isRuleGoTriggerBlockType(b.type));
+      if (hasTrigger) {
+        setError("只能有一个触发器，请先删除画布上已有触发器后再从积木库拖入。");
+        return;
+      }
+    }
     const block = workspace.newBlock(blockType) as BlockSvg;
     block.initSvg();
     block.render();
@@ -2017,6 +2461,7 @@ export default function RuleGoScratchEditorPage() {
         enabledRef.current
       );
       setDsl(nextDsl);
+      setTriggerLayoutErrorRef.current(validateRuleGoTriggerLayout(workspace));
       const topBlocks = workspace.getTopBlocks(true);
       setBlockCount(topBlocks.length);
       // 不在 handleChange 里用 getSelected() 覆盖 selectedBlockId，否则焦点移到属性面板时会被清空
@@ -2167,6 +2612,14 @@ export default function RuleGoScratchEditorPage() {
     const useEnabled = overrides?.enabled ?? enabled;
     const useDebugMode = overrides?.debugMode ?? debugMode;
     const useRoot = overrides?.root ?? root;
+    if (workspaceRef.current) {
+      const te = validateRuleGoTriggerLayout(workspaceRef.current);
+      if (te) {
+        setError(te);
+        setSaveFeedback({ type: "error", message: te });
+        return;
+      }
+    }
     const nextDsl =
       workspaceRef.current
         ? buildRuleGoDsl(workspaceRef.current, trimmedName, useDebugMode, useRoot, useEnabled)
@@ -2270,6 +2723,13 @@ export default function RuleGoScratchEditorPage() {
   };
 
   const handleTestClick = () => {
+    if (workspaceRef.current) {
+      const te = validateRuleGoTriggerLayout(workspaceRef.current);
+      if (te) {
+        setError(te);
+        return;
+      }
+    }
     const currentDsl =
       workspaceRef.current ? buildRuleGoDsl(workspaceRef.current, name, debugMode, root) : dsl;
     if (!currentDsl.trim()) {
@@ -2284,6 +2744,13 @@ export default function RuleGoScratchEditorPage() {
   };
 
   const handleTestRun = async () => {
+    if (workspaceRef.current) {
+      const te = validateRuleGoTriggerLayout(workspaceRef.current);
+      if (te) {
+        setTestResult({ success: false, data: "", error: te, elapsed: 0 });
+        return;
+      }
+    }
     const currentDsl =
       workspaceRef.current ? buildRuleGoDsl(workspaceRef.current, name, debugMode, root) : dsl;
     if (!currentDsl.trim()) {
@@ -2339,7 +2806,7 @@ export default function RuleGoScratchEditorPage() {
       setTestResult({
         success: false,
         data: "",
-        error: (err as Error).message || "执行失败",
+        error: (err as Error).message || "执行异常",
         elapsed: 0,
       });
     } finally {
@@ -2391,7 +2858,7 @@ export default function RuleGoScratchEditorPage() {
 
   const buildRuleGoNode = (block: Block) => {
     const def = getBlockDef(block.type);
-    if (!def) return null;
+    if (!def || def.metadataEndpoint) return null;
     const nodeId = getFieldValue(block, "NODE_ID") || block.id;
     const nodeName = getFieldValue(block, "NODE_NAME") || def.nodeType;
     const debugMode = block.getField("DEBUG") ? getBooleanField(block, "DEBUG") : false;
@@ -2441,12 +2908,28 @@ export default function RuleGoScratchEditorPage() {
   };
 
   const loadWorkspaceFromRuleGoDsl = (ruleDsl: any, workspace: WorkspaceSvg) => {
-    if (!ruleDsl?.metadata?.nodes) return;
+    if (!ruleDsl?.metadata) return;
 
-    const nodes = ruleDsl.metadata.nodes as Array<any>;
+    const nodes = Array.isArray(ruleDsl.metadata.nodes) ? (ruleDsl.metadata.nodes as Array<any>) : [];
     const connections = (ruleDsl.metadata.connections ?? []) as Array<any>;
+    const endpoints = Array.isArray(ruleDsl.metadata.endpoints) ? (ruleDsl.metadata.endpoints as Array<Record<string, unknown>>) : [];
 
     workspace.clear();
+
+    endpoints.forEach((ep) => {
+      const bt = getBlockTypeForEndpointDslType(String(ep.type ?? ""));
+      if (!bt) return;
+      const def = getBlockDef(bt);
+      if (!def?.setEndpointDsl) return;
+      const epBlock = workspace.newBlock(bt) as BlockSvg;
+      def.setEndpointDsl(epBlock, ep, blockHelpers);
+      const pos = (ep.additionalInfo as { position?: { x: number; y: number } } | undefined)?.position;
+      if (pos && typeof pos.x === "number" && typeof pos.y === "number") {
+        epBlock.moveBy(pos.x, pos.y);
+      }
+      epBlock.initSvg();
+      epBlock.render();
+    });
 
     const nodeMap = new Map<string, BlockSvg>();
 
@@ -2606,11 +3089,22 @@ export default function RuleGoScratchEditorPage() {
       seen.add(block.id);
     };
 
+    /** 触发器类 endpoint 块只进 metadata.endpoints，连线在 DSL 中需跳过它们，接到后续第一个真实节点 */
+    const skipMetadataEndpointBlocks = (b: Block | null): Block | null => {
+      let x = b;
+      while (x && getBlockDef(x.type)?.metadataEndpoint) {
+        x = x.getNextBlock();
+      }
+      return x;
+    };
+
     const addConnectionsFromBlock = (fromBlock: Block) => {
+      if (getBlockDef(fromBlock.type)?.metadataEndpoint) return;
       const fromId = getFieldValue(fromBlock, "NODE_ID") || fromBlock.id;
       const addConn = (toBlock: Block | null, type: string, label?: string) => {
-        if (!toBlock) return;
-        const toId = getFieldValue(toBlock, "NODE_ID") || toBlock.id;
+        const resolved = skipMetadataEndpointBlocks(toBlock);
+        if (!resolved) return;
+        const toId = getFieldValue(resolved, "NODE_ID") || resolved.id;
         connections.push(label ? { fromId, toId, type, label } : { fromId, toId, type });
       };
       const def = getBlockDef(fromBlock.type);
@@ -2695,6 +3189,23 @@ export default function RuleGoScratchEditorPage() {
     const ruleChainRoot = typeof rootParam === "boolean" ? rootParam : root;
     const ruleChainEnabled = enabledParam !== undefined ? enabledParam : enabled;
 
+    const endpoints: Record<string, unknown>[] = [];
+    workspace.getAllBlocks(false).forEach((b: Block) => {
+      const d = getBlockDef(b.type);
+      if (d?.metadataEndpoint && d.getEndpointDsl) {
+        endpoints.push(d.getEndpointDsl(b, blockHelpers));
+      }
+    });
+    endpoints.sort((a, b) => String(a.id ?? "").localeCompare(String(b.id ?? "")));
+
+    const metadata: Record<string, unknown> = {
+      firstNodeIndex: 0,
+      nodes,
+      connections,
+      ruleChainConnections: [],
+    };
+    if (endpoints.length > 0) metadata.endpoints = endpoints;
+
     return JSON.stringify(
       {
         ruleChain: {
@@ -2706,12 +3217,7 @@ export default function RuleGoScratchEditorPage() {
           configuration: {},
           additionalInfo: {},
         },
-        metadata: {
-          firstNodeIndex: 0,
-          nodes,
-          connections,
-          ruleChainConnections: [],
-        },
+        metadata,
       },
       null,
       2
@@ -2738,12 +3244,24 @@ export default function RuleGoScratchEditorPage() {
             className={`rulego-toolbar-btn ${isDirty ? "primary" : "save-unchanged"}`}
             type="button"
             onClick={handleSave}
-            disabled={saving || !isDirty}
-            title={isDirty ? "保存规则" : "无变更，无需保存"}
+            disabled={saving || !isDirty || Boolean(triggerLayoutError)}
+            title={
+              triggerLayoutError
+                ? triggerLayoutError
+                : isDirty
+                  ? "保存规则"
+                  : "无变更，无需保存"
+            }
           >
             保存
           </button>
-          <button className="rulego-toolbar-btn" type="button" title="测试" onClick={handleTestClick}>
+          <button
+            className="rulego-toolbar-btn"
+            type="button"
+            title={triggerLayoutError ? triggerLayoutError : "测试"}
+            onClick={handleTestClick}
+            disabled={Boolean(triggerLayoutError)}
+          >
             测试
           </button>
         </div>
@@ -2791,6 +3309,11 @@ export default function RuleGoScratchEditorPage() {
             title="弹出 RuleGo DSL"
             onClick={() => {
               if (workspaceRef.current) {
+                const te = validateRuleGoTriggerLayout(workspaceRef.current);
+                if (te) {
+                  setError(te);
+                  return;
+                }
                 ensureRuleGoNodeIdsAreUuid(workspaceRef.current);
                 setDsl(buildRuleGoDsl(workspaceRef.current, name, debugMode, root));
               }
@@ -2813,6 +3336,12 @@ export default function RuleGoScratchEditorPage() {
           </button>
         </div>
       </header>
+
+      {triggerLayoutError ? (
+        <div className="rulego-editor-layout-constraint form-error" role="status">
+          {triggerLayoutError}
+        </div>
+      ) : null}
 
       <div
         className={`rulego-editor-layout rulego-editor-three-col ${selectedBlockId ? "" : "rulego-editor-side-hidden"}`}
