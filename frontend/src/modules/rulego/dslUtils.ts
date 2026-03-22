@@ -30,6 +30,24 @@ export function isSubRuleChain(definition: string): boolean {
   }
 }
 
+/** 从规则链 definition JSON 中解析 metadata.nodes，供 ref 节点 targetId 下拉（跨链 `chainId:nodeId`）等使用 */
+export function extractNodesFromRuleDefinition(definition: string): Array<{ id: string; name: string }> {
+  if (!definition?.trim()) return [];
+  try {
+    const parsed = JSON.parse(definition);
+    const nodes = parsed?.metadata?.nodes;
+    if (!Array.isArray(nodes)) return [];
+    return nodes
+      .map((n: { id?: string; name?: string }) => ({
+        id: String(n?.id ?? "").trim(),
+        name: String(n?.name ?? n?.id ?? "").trim(),
+      }))
+      .filter((n) => n.id.length > 0);
+  } catch {
+    return [];
+  }
+}
+
 /**
  * 将 definition 中的 ruleChain.disabled 设为指定值，用于列表「开启/关闭」持久化。
  */

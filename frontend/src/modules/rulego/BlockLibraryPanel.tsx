@@ -36,6 +36,7 @@ const BLOCK_LABELS: Record<string, string> = {
   rulego_join: "汇聚",
   rulego_groupAction: "节点组",
   rulego_flow: "子规则链",
+  rulego_ref: "节点引用",
   rulego_fork: "并行网关",
   rulego_break: "终止循环",
   rulego_dbClient: "数据库客户端",

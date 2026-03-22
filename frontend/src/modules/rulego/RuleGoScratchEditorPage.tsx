@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import * as ScratchBlocks from "scratch-blocks";
 import type { WorkspaceSvg, Block, BlockSvg } from "blockly/core";
-import { getEnabledFromDefinition, isSubRuleChain } from "./dslUtils";
+import { extractNodesFromRuleDefinition, getEnabledFromDefinition, isSubRuleChain } from "./dslUtils";
+import type { RuleGoRule } from "./types";
 import { isRuleGoTriggerBlockType, validateRuleGoTriggerLayout } from "./rulegoWorkspaceValidation";
 import { useRuleGoRules } from "./useRuleGoRules";
 import {
@@ -131,11 +132,26 @@ type BlockConfigModalProps = {
   inline?: boolean;
   /** 子规则链列表（DSL 中 root 为 false 的规则链），用于 flow 块的 targetId 下拉 */
   subRuleChains?: SubRuleChainOption[];
+  /** 全部规则（含 definition），用于 ref 块跨链 targetId 下拉；与 currentRuleId 配合排除当前链 */
+  refContextRules?: RuleGoRule[];
+  currentRuleId?: string;
+  /** 工作区 DSL 变更时刷新 ref 下拉中的「当前链」节点列表 */
+  workspaceDslRevision?: string;
 };
 
 type CaseItem = { case: string; then: string };
 
-function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline, subRuleChains = [] }: BlockConfigModalProps) {
+function BlockConfigModal({
+  blockId,
+  workspaceRef,
+  onClose,
+  onSaved,
+  inline,
+  subRuleChains = [],
+  refContextRules = [],
+  currentRuleId = "",
+  workspaceDslRevision = "",
+}: BlockConfigModalProps) {
   const block = blockId && workspaceRef.current ? workspaceRef.current.getBlockById(blockId) : null;
   const [form, setForm] = useState<Record<string, string | boolean>>({});
   const [switchCases, setSwitchCases] = useState<CaseItem[]>([{ case: "true", then: "Case1" }]);
@@ -162,6 +178,39 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline, sub
   const [dbClientParams, setDbClientParams] = useState<Array<{ type: "string" | "number"; value: string }>>([]);
   /** 汇聚：额外汇聚的节点 ID 列表（除上方已接线外的分支） */
   const [joinExtraIncomings, setJoinExtraIncomings] = useState<string[]>([]);
+
+  const refTargetSelectOptions = useMemo(() => {
+    if (!block || block.type !== "rulego_ref" || !workspaceRef.current) {
+      return { local: [] as Array<{ value: string; label: string }>, remote: [] as Array<{ value: string; label: string }> };
+    }
+    const ws = workspaceRef.current;
+    const all = ws.getAllBlocks(false) as Block[];
+    const selfNodeId = String(block.getFieldValue?.("NODE_ID") ?? "").trim();
+    const seenLocal = new Set<string>();
+    const local: Array<{ value: string; label: string }> = [];
+    for (const b of all) {
+      if (!b.type?.startsWith("rulego_")) continue;
+      const nid = String(b.getFieldValue?.("NODE_ID") ?? b.id ?? "").trim();
+      if (!nid || nid === selfNodeId || seenLocal.has(nid)) continue;
+      seenLocal.add(nid);
+      const nm = String(b.getFieldValue?.("NODE_NAME") ?? "").trim();
+      local.push({ value: nid, label: nm ? `${nm} (${nid})` : nid });
+    }
+    local.sort((a, b) => a.label.localeCompare(b.label, "zh-Hans"));
+    const remote: Array<{ value: string; label: string }> = [];
+    for (const r of refContextRules) {
+      if (!r.id || r.id === currentRuleId) continue;
+      const nodes = extractNodesFromRuleDefinition(r.definition ?? "");
+      for (const n of nodes) {
+        remote.push({
+          value: `${r.id}:${n.id}`,
+          label: `${r.name} / ${n.name || n.id} (${n.id})`,
+        });
+      }
+    }
+    remote.sort((a, b) => a.label.localeCompare(b.label, "zh-Hans"));
+    return { local, remote };
+  }, [block, blockId, refContextRules, currentRuleId, workspaceRef, workspaceDslRevision]);
 
   useEffect(() => {
     if (!block) {
@@ -369,6 +418,10 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline, sub
       next.FLOW_TARGET_ID = get("FLOW_TARGET_ID") ?? "";
       next.FLOW_EXTEND = getBool("FLOW_EXTEND");
     }
+    if (block.type === "rulego_ref") {
+      next.REF_TARGET_ID = get("REF_TARGET_ID") ?? "";
+      next.REF_TELL_CHAIN = getBool("REF_TELL_CHAIN");
+    }
     if (block.type === "rulego_join") {
       const raw = get("JOIN_EXTRA_INCOMINGS") || "";
       const extra = raw ? raw.split(",").map((s) => s.trim()).filter(Boolean) : [];
@@ -516,6 +569,10 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline, sub
     if (block.type === "rulego_flow") {
       block.setFieldValue(String(form.FLOW_TARGET_ID ?? ""), "FLOW_TARGET_ID");
       block.setFieldValue(form.FLOW_EXTEND ? "TRUE" : "FALSE", "FLOW_EXTEND");
+    }
+    if (block.type === "rulego_ref") {
+      block.setFieldValue(String(form.REF_TARGET_ID ?? ""), "REF_TARGET_ID");
+      block.setFieldValue(form.REF_TELL_CHAIN ? "TRUE" : "FALSE", "REF_TELL_CHAIN");
     }
     if (block.type === "rulego_dbClient") {
       const sql = String(form.DB_SQL ?? "");
@@ -969,6 +1026,84 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline, sub
             <small className="form-hint">
               true 时子规则链每个输出作为下一节点输入；false 时合并为 Success / {UI_RELATION_FAILURE}
             </small>
+          </label>
+        </>
+      )}
+      {block.type === "rulego_ref" && (
+        <>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>引用目标 (targetId)</span>
+            <select
+              value={(() => {
+                const v = String(form.REF_TARGET_ID ?? "").trim();
+                const known = new Set([
+                  ...refTargetSelectOptions.local.map((o) => o.value),
+                  ...refTargetSelectOptions.remote.map((o) => o.value),
+                ]);
+                return v && !known.has(v) ? "__custom_preserved__" : v;
+              })()}
+              onChange={(e) => {
+                const raw = e.target.value;
+                if (raw === "__custom_preserved__") return;
+                setForm((f) => ({ ...f, REF_TARGET_ID: raw }));
+              }}
+              aria-label="选择引用节点"
+            >
+              <option value="">请选择节点或规则链中的节点</option>
+              {(() => {
+                const v = String(form.REF_TARGET_ID ?? "").trim();
+                const known = new Set([
+                  ...refTargetSelectOptions.local.map((o) => o.value),
+                  ...refTargetSelectOptions.remote.map((o) => o.value),
+                ]);
+                if (v && !known.has(v)) {
+                  return <option value="__custom_preserved__">{`${v}（当前值，可改下方输入）`}</option>;
+                }
+                return null;
+              })()}
+              {refTargetSelectOptions.local.length > 0 && (
+                <optgroup label="当前规则链（仅 nodeId）">
+                  {refTargetSelectOptions.local.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {refTargetSelectOptions.remote.length > 0 && (
+                <optgroup label="其它规则链（chainId:nodeId）">
+                  {refTargetSelectOptions.remote.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+            <input
+              type="text"
+              value={String(form.REF_TARGET_ID ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, REF_TARGET_ID: e.target.value }))}
+              placeholder="node_1 或 ynlLYSAgCy2J:node_2"
+              style={{ marginTop: 8 }}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+            <small className="form-hint">
+              本链填节点 ID；跨链为「规则链 ID:节点 ID」。也可直接在下框编辑。详见{" "}
+              <a href="https://rulego.cc/pages/ref/#%E9%85%8D%E7%BD%AE" target="_blank" rel="noopener noreferrer">
+                RuleGo 节点引用
+              </a>
+            </small>
+          </label>
+          <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={Boolean(form.REF_TELL_CHAIN)}
+              onChange={(e) => setForm((f) => ({ ...f, REF_TELL_CHAIN: e.target.checked }))}
+            />
+            <span>从目标起执行整条子链 (tellChain)</span>
           </label>
         </>
       )}
@@ -3396,6 +3531,9 @@ export default function RuleGoScratchEditorPage() {
               }}
               inline
               subRuleChains={subRuleChains}
+              refContextRules={rules}
+              currentRuleId={id ?? ""}
+              workspaceDslRevision={dsl}
             />
           </div>
         ) : null}

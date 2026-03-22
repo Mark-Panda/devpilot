@@ -8,6 +8,7 @@ import "./blocks/jsSwitch";
 import "./blocks/break";
 import "./blocks/join";
 import "./blocks/flow";
+import "./blocks/ref";
 import "./blocks/fork";
 import "./blocks/for";
 import "./blocks/groupAction";
@@ -93,6 +94,7 @@ export const toolbox = {
       categorystyle: "rulego_flow",
       contents: [
         { kind: "block" as const, type: "rulego_flow" },
+        { kind: "block" as const, type: "rulego_ref" },
         { kind: "block" as const, type: "rulego_fork" },
         { kind: "block" as const, type: "rulego_break" },
       ],
