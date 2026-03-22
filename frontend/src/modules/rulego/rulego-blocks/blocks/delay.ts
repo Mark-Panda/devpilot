@@ -3,11 +3,12 @@
  * 文档：https://rulego.cc/pages/delay/
  * - delayMs：延迟时间（毫秒），支持数字或动态表达式如 ${metadata.delay}，默认 60000
  * - overwrite：周期内是否覆盖为单条消息，默认 false
- * - Success：延迟结束后转发；Failure：队列超限时转发
+ * - Success：延迟结束后转发；执行失败：队列超限时转发
  */
 import type { Block } from "blockly/core";
 import type { BlockTypeDef, BlockHelpers } from "../types";
 import { registerBlockType } from "../registry";
+import { UI_RELATION_FAILURE } from "../../relationLabels";
 
 const blockType = "rulego_delay";
 const nodeType = "delay";
@@ -28,7 +29,7 @@ const def: BlockTypeDef = {
         config.appendField(new (BlocklyF as any).FieldTextInput("delay1"), "NODE_ID");
         config.appendField(new (BlocklyF as any).FieldTextInput("60000"), "DELAY_MS");
         config.appendField(new (BlocklyF as any).FieldCheckbox(false), "DELAY_OVERWRITE");
-        (this as Block).appendStatementInput("branch_failure").appendField("Failure");
+        (this as Block).appendStatementInput("branch_failure").appendField(UI_RELATION_FAILURE);
         const configInput = (this as Block).getInput("CONFIG");
         if (configInput?.setVisible) configInput.setVisible(false);
         (this as Block).setPreviousStatement(true);

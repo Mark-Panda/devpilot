@@ -4,6 +4,7 @@
 import type { Block } from "blockly/core";
 import type { BlockTypeDef, BlockHelpers } from "../types";
 import { registerBlockType } from "../registry";
+import { UI_RELATION_FAILURE } from "../../relationLabels";
 
 const category = "rulego_tracer" as const;
 
@@ -22,7 +23,7 @@ const sourcegraphDef: BlockTypeDef = {
         config.appendField(new (BlocklyF as any).FieldTextInput(""), "SG_TOKEN");
         config.appendField(new (BlocklyF as any).FieldTextInput("30"), "SG_TIMEOUT_SEC");
         config.appendField(new (BlocklyF as any).FieldTextInput(""), "SG_DEFAULT_QUERY");
-        (this as Block).appendStatementInput("branch_failure").appendField("Failure");
+        (this as Block).appendStatementInput("branch_failure").appendField(UI_RELATION_FAILURE);
         const configInput = (this as Block).getInput("CONFIG");
         if (configInput?.setVisible) configInput.setVisible(false);
         (this as Block).setPreviousStatement(true);
@@ -73,7 +74,7 @@ const gitDef: BlockTypeDef = {
         const config = (this as Block).appendDummyInput("CONFIG");
         config.appendField(new (BlocklyF as any).FieldTextInput("trace_git1"), "NODE_ID");
         config.appendField(new (BlocklyF as any).FieldTextInput(""), "WORK_DIR");
-        (this as Block).appendStatementInput("branch_failure").appendField("Failure");
+        (this as Block).appendStatementInput("branch_failure").appendField(UI_RELATION_FAILURE);
         const configInput = (this as Block).getInput("CONFIG");
         if (configInput?.setVisible) configInput.setVisible(false);
         (this as Block).setPreviousStatement(true);
@@ -120,7 +121,7 @@ const agentDef: BlockTypeDef = {
         config.appendField(new (BlocklyF as any).FieldTextInput("agent"), "AGENT_CMD");
         config.appendField(new (BlocklyF as any).FieldTextInput("180"), "TIMEOUT_SEC");
         config.appendField(new (BlocklyF as any).FieldTextInput("2"), "MAX_RETRIES");
-        (this as Block).appendStatementInput("branch_failure").appendField("Failure");
+        (this as Block).appendStatementInput("branch_failure").appendField(UI_RELATION_FAILURE);
         const configInput = (this as Block).getInput("CONFIG");
         if (configInput?.setVisible) configInput.setVisible(false);
         (this as Block).setPreviousStatement(true);

@@ -1,5 +1,6 @@
 import type { Block } from "blockly/core";
 import type { BlockTypeCategory } from "../types";
+import { UI_RELATION_FAILURE } from "../../relationLabels";
 
 export interface MinimalNodeOptions {
   defaultId: string;
@@ -25,7 +26,12 @@ export function buildMinimalNodeInit(
       });
     }
     config.appendField(
-      new BlocklyF.FieldDropdown([["Success", "Success"], ["Failure", "Failure"], ["True", "True"], ["False", "False"]]) as never,
+      new BlocklyF.FieldDropdown([
+        ["Success", "Success"],
+        [UI_RELATION_FAILURE, "Failure"],
+        ["True", "True"],
+        [UI_RELATION_FAILURE, "False"],
+      ]) as never,
       "LINK_TYPE"
     );
     config.appendField(new BlocklyF.FieldTextInput("") as never, "LINK_LABEL");

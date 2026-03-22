@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getExecutionLog } from "./useRuleGoApi";
 import type { RuleGoExecutionLog, RuleGoExecutionNodeLog } from "./useRuleGoApi";
+import { formatRelationTypeForDisplay } from "./relationLabels";
 
 function formatTime(iso: string) {
   if (!iso) return "-";
@@ -74,7 +75,7 @@ function NodeStepCard({ node, index }: { node: RuleGoExecutionNodeLog; index: nu
           <span className="rulego-log-node-id-secondary">{node.node_id}</span>
         ) : null}
         {node.relation_type ? (
-          <span className="rulego-log-node-relation">{node.relation_type}</span>
+          <span className="rulego-log-node-relation">{formatRelationTypeForDisplay(node.relation_type)}</span>
         ) : null}
         {hasError ? (
           <span className="rulego-log-node-error-badge">错误</span>

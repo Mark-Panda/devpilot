@@ -1,6 +1,7 @@
 import type { Block } from "blockly/core";
 import type { BlockTypeDef, BlockHelpers } from "../types";
 import { registerBlockType } from "../registry";
+import { UI_RELATION_FAILURE } from "../../relationLabels";
 
 const blockType = "rulego_switch";
 const nodeType = "switch";
@@ -66,7 +67,7 @@ const def: BlockTypeDef = {
         for (let i = 0; i < n; i++) {
           (this as Block).appendStatementInput(`branch_case_${i}`).appendField(`Case${i + 1}`);
         }
-        (this as Block).appendStatementInput("branch_failure").appendField("Failure");
+        (this as Block).appendStatementInput("branch_failure").appendField(UI_RELATION_FAILURE);
         (this as Block).setPreviousStatement(true);
         (this as Block).setNextStatement(true);
         if (typeof (this as Block).setStyle === "function") (this as Block).setStyle(category);

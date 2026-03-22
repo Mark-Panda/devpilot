@@ -1,6 +1,7 @@
 import type { Block } from "blockly/core";
 import type { BlockTypeDef, BlockHelpers } from "../types";
 import { registerBlockType } from "../registry";
+import { UI_RELATION_FAILURE } from "../../relationLabels";
 
 const blockType = "rulego_join";
 const nodeType = "join";
@@ -24,7 +25,7 @@ const def: BlockTypeDef = {
         config.appendField(new (BlocklyF as any).FieldNumber("0", 0, 3600, 1), "JOIN_TIMEOUT");
         config.appendField(new (BlocklyF as any).FieldCheckbox(false), "JOIN_MERGE_TO_MAP");
         config.appendField(new (BlocklyF as any).FieldTextInput(""), "JOIN_EXTRA_INCOMINGS");
-        (this as Block).appendStatementInput("branch_failure").appendField("Failure");
+        (this as Block).appendStatementInput("branch_failure").appendField(UI_RELATION_FAILURE);
         const configInput = (this as Block).getInput("CONFIG");
         if (configInput?.setVisible) configInput.setVisible(false);
         (this as Block).setPreviousStatement(true);

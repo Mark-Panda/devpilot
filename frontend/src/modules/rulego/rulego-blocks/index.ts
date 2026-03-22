@@ -12,6 +12,7 @@ import "./blocks/fork";
 import "./blocks/for";
 import "./blocks/groupAction";
 import "./blocks/restApiCall";
+import "./blocks/fileNodes";
 import "./blocks/llm";
 import "./blocks/delay";
 import "./blocks/switch";
@@ -94,6 +95,17 @@ export const toolbox = {
       name: "数据库",
       categorystyle: "rulego_db",
       contents: [{ kind: "block" as const, type: "rulego_dbClient" }],
+    },
+    {
+      kind: "category" as const,
+      name: "文件",
+      categorystyle: "rulego_file",
+      contents: [
+        { kind: "block" as const, type: "rulego_fileRead" },
+        { kind: "block" as const, type: "rulego_fileWrite" },
+        { kind: "block" as const, type: "rulego_fileDelete" },
+        { kind: "block" as const, type: "rulego_fileList" },
+      ],
     },
     {
       kind: "category" as const,

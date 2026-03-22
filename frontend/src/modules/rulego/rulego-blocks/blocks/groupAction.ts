@@ -1,6 +1,7 @@
 import type { Block } from "blockly/core";
 import type { BlockTypeDef, BlockHelpers } from "../types";
 import { registerBlockType } from "../registry";
+import { UI_RELATION_FAILURE } from "../../relationLabels";
 
 const blockType = "rulego_groupAction";
 const nodeType = "groupAction";
@@ -46,7 +47,7 @@ const def: BlockTypeDef = {
         const configInput = (this as Block).appendDummyInput("CONFIG");
         configInput.appendField(new (BlocklyF as any).FieldTextInput(nodeId), "NODE_ID");
         configInput.appendField(
-          new (BlocklyF as any).FieldDropdown([["Success", "Success"], ["Failure", "Failure"]]),
+          new (BlocklyF as any).FieldDropdown([["Success", "Success"], [UI_RELATION_FAILURE, "Failure"]]),
           "MATCH_RELATION_TYPE"
         );
         configInput.appendField(new (BlocklyF as any).FieldNumber("0", 0, 99, 1), "MATCH_NUM");
@@ -56,7 +57,7 @@ const def: BlockTypeDef = {
         for (let i = 0; i < n; i++) {
           (this as Block).appendStatementInput(`branch_${i}`).appendField(`组内节点${i + 1}`);
         }
-        (this as Block).appendStatementInput("branch_failure").appendField("Failure");
+        (this as Block).appendStatementInput("branch_failure").appendField(UI_RELATION_FAILURE);
         (this as Block).setPreviousStatement(true);
         (this as Block).setNextStatement(true);
         this.setFieldValue(matchRel, "MATCH_RELATION_TYPE");

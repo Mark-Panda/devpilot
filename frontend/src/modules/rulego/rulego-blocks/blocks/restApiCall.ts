@@ -1,6 +1,7 @@
 import type { Block } from "blockly/core";
 import type { BlockTypeDef, BlockHelpers } from "../types";
 import { registerBlockType } from "../registry";
+import { UI_RELATION_FAILURE } from "../../relationLabels";
 
 const blockType = "rulego_restApiCall";
 const nodeType = "restApiCall";
@@ -27,7 +28,7 @@ const def: BlockTypeDef = {
         config.appendField(new (BlocklyF as any).FieldTextInput(""), "REST_BODY");
         config.appendField(new (BlocklyF as any).FieldTextInput("30000"), "REST_TIMEOUT");
         config.appendField(new (BlocklyF as any).FieldTextInput("200"), "REST_MAX_PARALLEL");
-        (this as Block).appendStatementInput("branch_failure").appendField("Failure");
+        (this as Block).appendStatementInput("branch_failure").appendField(UI_RELATION_FAILURE);
         const configInput = (this as Block).getInput("CONFIG");
         if (configInput?.setVisible) configInput.setVisible(false);
         (this as Block).setPreviousStatement(true);

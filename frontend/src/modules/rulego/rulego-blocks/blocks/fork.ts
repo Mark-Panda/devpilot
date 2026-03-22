@@ -1,6 +1,7 @@
 import type { Block } from "blockly/core";
 import type { BlockTypeDef, BlockHelpers } from "../types";
 import { registerBlockType } from "../registry";
+import { UI_RELATION_FAILURE } from "../../relationLabels";
 
 const blockType = "rulego_fork";
 const nodeType = "fork";
@@ -45,7 +46,7 @@ const def: BlockTypeDef = {
         for (let i = 0; i < n; i++) {
           (this as Block).appendStatementInput(`branch_${i}`).appendField(`并行分支 ${i + 1}`);
         }
-        (this as Block).appendStatementInput("branch_failure").appendField("Failure");
+        (this as Block).appendStatementInput("branch_failure").appendField(UI_RELATION_FAILURE);
         (this as Block).setPreviousStatement(true);
         (this as Block).setNextStatement(false);
         if (typeof (this as Block).setStyle === "function") (this as Block).setStyle(category);

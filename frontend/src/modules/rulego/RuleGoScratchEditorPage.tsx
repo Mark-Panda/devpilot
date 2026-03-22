@@ -18,6 +18,7 @@ import {
 } from "./rulego-blocks";
 import { JsEditor, JsonEditor, SqlEditor } from "../../shared/components";
 import { BlockLibraryPanel, DRAG_TYPE_BLOCK } from "./BlockLibraryPanel";
+import { UI_RELATION_FAILURE } from "./relationLabels";
 import { listModelConfigs } from "../model-management/useModelConfigApi";
 import type { ModelConfig } from "../model-management/types";
 
@@ -54,6 +55,11 @@ const scratchTheme = new ScratchBlocks.Theme(
       colourSecondary: "#14b8a6",
       colourTertiary: "#5eead4",
     },
+    rulego_file: {
+      colourPrimary: "#b45309",
+      colourSecondary: "#d97706",
+      colourTertiary: "#fbbf24",
+    },
     rulego_tracer: {
       colourPrimary: "#0891b2",
       colourSecondary: "#06b6d4",
@@ -67,6 +73,7 @@ const scratchTheme = new ScratchBlocks.Theme(
     rulego_data: { colour: "#f59e0b" },
     rulego_flow: { colour: "#8b5cf6" },
     rulego_db: { colour: "#0d9488" },
+    rulego_file: { colour: "#b45309" },
     rulego_tracer: { colour: "#0891b2" },
   }
 );
@@ -273,6 +280,23 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline, sub
     if (block.type === "rulego_delay") {
       next.DELAY_MS = get("DELAY_MS") || "60000";
       next.DELAY_OVERWRITE = getBool("DELAY_OVERWRITE");
+    }
+    if (block.type === "rulego_fileRead") {
+      next.FILE_PATH = get("FILE_PATH") || "/tmp/data.txt";
+      next.FILE_DATA_TYPE = get("FILE_DATA_TYPE") || "text";
+      next.FILE_RECURSIVE = getBool("FILE_RECURSIVE");
+    }
+    if (block.type === "rulego_fileWrite") {
+      next.FILE_PATH = get("FILE_PATH") || "/tmp/out.txt";
+      next.FILE_CONTENT = get("FILE_CONTENT") || "${data}";
+      next.FILE_APPEND = getBool("FILE_APPEND");
+    }
+    if (block.type === "rulego_fileDelete") {
+      next.FILE_PATH = get("FILE_PATH") || "/tmp/data.txt";
+    }
+    if (block.type === "rulego_fileList") {
+      next.FILE_PATH = get("FILE_PATH") || "/tmp/*.txt";
+      next.FILE_RECURSIVE = getBool("FILE_RECURSIVE");
     }
     if (block.type === "rulego_for") {
       next.FOR_RANGE = get("FOR_RANGE") || "1..3";
@@ -556,7 +580,7 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline, sub
             </button>
           </div>
           <small className="form-hint">
-            画布上会同步显示对应数量的 Case 槽位；Default / Failure 为固定槽位。最多 6 个 case。参考{" "}
+            画布上会同步显示对应数量的 Case 槽位；Default / {UI_RELATION_FAILURE} 为固定槽位。最多 6 个 case。参考{" "}
             <a href="https://rulego.cc/pages/switch/#%E9%85%8D%E7%BD%AE%E7%A4%BA%E4%BE%8B" target="_blank" rel="noopener noreferrer">
               RuleGo 条件分支
             </a>
@@ -737,7 +761,7 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline, sub
               onChange={(e) => setForm((f) => ({ ...f, MATCH_RELATION_TYPE: e.target.value }))}
             >
               <option value="Success">Success</option>
-              <option value="Failure">Failure</option>
+              <option value="Failure">{UI_RELATION_FAILURE}</option>
             </select>
           </label>
           <label className="form-field">
@@ -895,7 +919,9 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline, sub
               checked={Boolean(form.FLOW_EXTEND)}
               onChange={(e) => setForm((f) => ({ ...f, FLOW_EXTEND: e.target.checked }))}
             />
-            <small className="form-hint">true 时子规则链每个输出作为下一节点输入；false 时合并为 Success/Failure</small>
+            <small className="form-hint">
+              true 时子规则链每个输出作为下一节点输入；false 时合并为 Success / {UI_RELATION_FAILURE}
+            </small>
           </label>
         </>
       )}
@@ -1082,6 +1108,120 @@ function BlockConfigModal({ blockId, workspaceRef, onClose, onSaved, inline, sub
               autoCorrect="off"
               autoComplete="off"
             />
+          </label>
+          <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
+            后端 <code>restApiCall</code> 使用 FastHTTP 实现；配置与 RuleGo 标准一致。
+          </p>
+        </>
+      )}
+      {block.type === "rulego_fileRead" && (
+        <>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>路径 path（支持 glob、模板变量）</span>
+            <input
+              value={String(form.FILE_PATH ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, FILE_PATH: e.target.value }))}
+              placeholder="/tmp/data.txt 或 /tmp/*.txt"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>数据格式 dataType</span>
+            <select
+              value={String(form.FILE_DATA_TYPE ?? "text")}
+              onChange={(e) => setForm((f) => ({ ...f, FILE_DATA_TYPE: e.target.value }))}
+            >
+              <option value="text">text</option>
+              <option value="base64">base64</option>
+            </select>
+          </label>
+          <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={Boolean(form.FILE_RECURSIVE)}
+              onChange={(e) => setForm((f) => ({ ...f, FILE_RECURSIVE: e.target.checked }))}
+            />
+            <span>递归匹配 recursive</span>
+          </label>
+          <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
+            相对路径相对规则链 context 的 workDir；白名单由引擎 properties <code>filePathWhitelist</code> 控制。
+          </p>
+        </>
+      )}
+      {block.type === "rulego_fileWrite" && (
+        <>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>路径 path</span>
+            <input
+              value={String(form.FILE_PATH ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, FILE_PATH: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>内容 content（模板；空则使用消息 data）</span>
+            <textarea
+              rows={4}
+              value={String(form.FILE_CONTENT ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, FILE_CONTENT: e.target.value }))}
+              placeholder="${data}"
+              style={{ width: "100%", minHeight: 80, resize: "vertical" }}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={Boolean(form.FILE_APPEND)}
+              onChange={(e) => setForm((f) => ({ ...f, FILE_APPEND: e.target.checked }))}
+            />
+            <span>追加写入 append</span>
+          </label>
+        </>
+      )}
+      {block.type === "rulego_fileDelete" && (
+        <>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>路径 path（支持 glob）</span>
+            <input
+              value={String(form.FILE_PATH ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, FILE_PATH: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
+            删除成功时 metadata <code>deletedCount</code> 为删除数量。
+          </p>
+        </>
+      )}
+      {block.type === "rulego_fileList" && (
+        <>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>路径模式 path（glob）</span>
+            <input
+              value={String(form.FILE_PATH ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, FILE_PATH: e.target.value }))}
+              placeholder="/tmp/*.txt"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={Boolean(form.FILE_RECURSIVE)}
+              onChange={(e) => setForm((f) => ({ ...f, FILE_RECURSIVE: e.target.checked }))}
+            />
+            <span>递归 recursive</span>
           </label>
         </>
       )}

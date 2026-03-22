@@ -5,6 +5,7 @@
 import type { Block } from "blockly/core";
 import type { BlockTypeDef, BlockHelpers } from "../types";
 import { registerBlockType } from "../registry";
+import { UI_RELATION_FAILURE } from "../../relationLabels";
 
 const category = "rulego_file" as const;
 
@@ -43,7 +44,7 @@ const fileRead: BlockTypeDef = {
         config.appendField(new F.FieldTextInput("/tmp/data.txt"), "FILE_PATH");
         config.appendField(new F.FieldDropdown([["文本", "text"], ["Base64", "base64"]]), "FILE_DATA_TYPE");
         config.appendField(new F.FieldCheckbox(false), "FILE_RECURSIVE");
-        (this as Block).appendStatementInput("branch_failure").appendField("Failure");
+        (this as Block).appendStatementInput("branch_failure").appendField(UI_RELATION_FAILURE);
         const configInput = (this as Block).getInput("CONFIG");
         if (configInput?.setVisible) configInput.setVisible(false);
         (this as Block).setPreviousStatement(true);
@@ -86,7 +87,7 @@ const fileWrite: BlockTypeDef = {
         config.appendField(new F.FieldTextInput("/tmp/out.txt"), "FILE_PATH");
         config.appendField(new F.FieldTextInput("${data}"), "FILE_CONTENT");
         config.appendField(new F.FieldCheckbox(false), "FILE_APPEND");
-        (this as Block).appendStatementInput("branch_failure").appendField("Failure");
+        (this as Block).appendStatementInput("branch_failure").appendField(UI_RELATION_FAILURE);
         const configInput = (this as Block).getInput("CONFIG");
         if (configInput?.setVisible) configInput.setVisible(false);
         (this as Block).setPreviousStatement(true);
@@ -124,7 +125,7 @@ const fileDelete: BlockTypeDef = {
         const config = (this as Block).appendDummyInput("CONFIG");
         config.appendField(new F.FieldTextInput("fileDel1"), "NODE_ID");
         config.appendField(new F.FieldTextInput("/tmp/data.txt"), "FILE_PATH");
-        (this as Block).appendStatementInput("branch_failure").appendField("Failure");
+        (this as Block).appendStatementInput("branch_failure").appendField(UI_RELATION_FAILURE);
         const configInput = (this as Block).getInput("CONFIG");
         if (configInput?.setVisible) configInput.setVisible(false);
         (this as Block).setPreviousStatement(true);
@@ -160,7 +161,7 @@ const fileList: BlockTypeDef = {
         config.appendField(new F.FieldTextInput("fileList1"), "NODE_ID");
         config.appendField(new F.FieldTextInput("/tmp/*.txt"), "FILE_PATH");
         config.appendField(new F.FieldCheckbox(false), "FILE_RECURSIVE");
-        (this as Block).appendStatementInput("branch_failure").appendField("Failure");
+        (this as Block).appendStatementInput("branch_failure").appendField(UI_RELATION_FAILURE);
         const configInput = (this as Block).getInput("CONFIG");
         if (configInput?.setVisible) configInput.setVisible(false);
         (this as Block).setPreviousStatement(true);

@@ -1,6 +1,7 @@
 import type { Block } from "blockly/core";
 import type { BlockTypeDef, BlockHelpers } from "../types";
 import { registerBlockType } from "../registry";
+import { UI_RELATION_FAILURE } from "../../relationLabels";
 
 const blockType = "rulego_jsSwitch";
 const nodeType = "jsSwitch";
@@ -18,7 +19,7 @@ const def: BlockTypeDef = {
         const config = (this as Block).appendDummyInput("CONFIG");
         config.appendField(new (BlocklyF as any).FieldTextInput("s3"), "NODE_ID");
         config.appendField(new (BlocklyF as any).FieldTextInput("return ['Success'];"), "JS_SCRIPT");
-        (this as Block).appendStatementInput("branch_failure").appendField("Failure");
+        (this as Block).appendStatementInput("branch_failure").appendField(UI_RELATION_FAILURE);
         (this as Block).appendStatementInput("branch_default").appendField("Default");
         const configInput = (this as Block).getInput("CONFIG");
         if (configInput?.setVisible) configInput.setVisible(false);

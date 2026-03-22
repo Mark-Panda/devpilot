@@ -3,11 +3,12 @@
  * 文档：https://rulego.cc/pages/sub-rule-chain/
  * - targetId：子规则链 ID（必填）
  * - extend：是否继承子规则输出关系和消息，默认 false
- * - Success：子规则链所有分支执行完后合并结果发送；Failure：找不到子规则链或某分支失败时发送
+ * - Success：子规则链所有分支执行完后合并结果发送；执行失败：找不到子规则链或某分支失败时发送
  */
 import type { Block } from "blockly/core";
 import type { BlockTypeDef } from "../types";
 import { registerBlockType } from "../registry";
+import { UI_RELATION_FAILURE } from "../../relationLabels";
 
 const blockType = "rulego_flow";
 const nodeType = "flow";
@@ -28,7 +29,7 @@ const def: BlockTypeDef = {
         config.appendField(new (BlocklyF as any).FieldTextInput("flow1"), "NODE_ID");
         config.appendField(new (BlocklyF as any).FieldTextInput(""), "FLOW_TARGET_ID");
         config.appendField(new (BlocklyF as any).FieldCheckbox(false), "FLOW_EXTEND");
-        (this as Block).appendStatementInput("branch_failure").appendField("Failure");
+        (this as Block).appendStatementInput("branch_failure").appendField(UI_RELATION_FAILURE);
         const configInput = (this as Block).getInput("CONFIG");
         if (configInput?.setVisible) configInput.setVisible(false);
         (this as Block).setPreviousStatement(true);
