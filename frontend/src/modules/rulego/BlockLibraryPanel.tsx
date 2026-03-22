@@ -16,6 +16,7 @@ const CATEGORY_STYLES: Record<string, { bg: string; border: string }> = {
   rulego_db: { bg: "rgba(13, 148, 136, 0.2)", border: "#0d9488" },
   rulego_file: { bg: "rgba(180, 83, 9, 0.2)", border: "#b45309" },
   rulego_tracer: { bg: "rgba(8, 145, 178, 0.2)", border: "#0891b2" },
+  rulego_rpa: { bg: "rgba(99, 102, 241, 0.2)", border: "#6366f1" },
 };
 
 const BLOCK_LABELS: Record<string, string> = {
@@ -47,6 +48,14 @@ const BLOCK_LABELS: Record<string, string> = {
   rulego_apiRouteTracer_gitPrepare: "追踪·Git 工作区",
   rulego_apiRouteTracer_agentAnalyze: "追踪·Agent 分析",
   rulego_sourcegraphSearch: "Sourcegraph 搜索",
+  rulego_rpaBrowserNavigate: "RPA·浏览器打开",
+  rulego_rpaBrowserClick: "RPA·浏览器点击",
+  rulego_rpaBrowserScreenshot: "RPA·浏览器截图",
+  rulego_rpaBrowserQuery: "RPA·选择器查询",
+  rulego_rpaOcr: "RPA·OCR",
+  rulego_rpaScreenCapture: "RPA·屏幕截图",
+  rulego_rpaMacWindow: "RPA·macOS 窗口",
+  rulego_rpaDesktopClick: "RPA·桌面点击",
 };
 
 type CategoryItem = {

@@ -128,6 +128,19 @@ startTrigger → for[Do→处理节点] → 汇总
 startTrigger → fork → [n 个并行节点] → join
 ```
 
+### Web RPA（Chrome 远程调试）
+```
+startTrigger → x/rpaBrowserNavigate → x/rpaBrowserQuery → x/rpaBrowserClick → [可选 x/rpaBrowserScreenshot → x/rpaOcr]
+```
+- 先用 `--remote-debugging-port=9222`（或等价方式）启动 Chrome；链上各 `x/rpaBrowser*` 使用**相同 `debuggerUrl`** 时，**一次执行内复用同一 CDP 连接与同一标签**，不会在每步结束后关页或断连。
+- `timeoutMs` 为节点级墙钟超时，行为说明见 [nodes-reference.md](nodes-reference.md)「浏览器 CDP 会话与超时」。
+
+### 桌面 RPA（macOS）
+```
+startTrigger → x/rpaMacWindow → x/rpaScreenCapture → x/rpaDesktopClick
+```
+- `x/rpaScreenCapture`、`x/rpaMacWindow`、`x/rpaDesktopClick` **仅 macOS** 可用；其他平台需用浏览器节点或 `exec`/外部服务代替。
+
 ## 注意事项
 
 - **`ruleChain.id` 必须是 UUID v4 格式**（如 `"550e8400-e29b-41d4-a716-446655440000"`），可用 `crypto.randomUUID()` 生成；节点 id（`metadata.nodes[].id`）建议用短标识（s1, s2...）即可
@@ -135,6 +148,7 @@ startTrigger → fork → [n 个并行节点] → join
 - `root: false` 表示子规则链（可被 `flow` 节点引用）
 - `ai/llm` 节点的 `key` 字段（API Key）会在执行时由系统自动覆盖，填空字符串即可
 - `for` 节点的 `configuration.do` 填循环体首节点 id，同时需在 connections 中加 `fromId=for节点id, type=Do` 的连接
+- **RPA**：浏览器自动化依赖本机 Chrome 远程调试端口；**多浏览器节点请保持 `debuggerUrl` 一致**以复用会话。OCR 依赖本机 `tesseract`；macOS 桌面操作依赖系统权限（截屏、辅助功能、自动化等），详见 [nodes-reference.md](nodes-reference.md)「RPA 类」
 
 ## 详细参考
 

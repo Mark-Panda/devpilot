@@ -8,7 +8,8 @@ export type BlockTypeCategory =
   | "rulego_flow"
   | "rulego_db"
   | "rulego_file"
-  | "rulego_tracer";
+  | "rulego_tracer"
+  | "rulego_rpa";
 
 export interface ConnectionBranch {
   inputName: string;

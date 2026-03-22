@@ -14,6 +14,7 @@ import "./blocks/for";
 import "./blocks/groupAction";
 import "./blocks/restApiCall";
 import "./blocks/fileNodes";
+import "./blocks/rpaNodes";
 import "./blocks/llm";
 import "./blocks/delay";
 import "./blocks/switch";
@@ -124,6 +125,21 @@ export const toolbox = {
         { kind: "block" as const, type: "rulego_sourcegraphSearch" },
         { kind: "block" as const, type: "rulego_apiRouteTracer_gitPrepare" },
         { kind: "block" as const, type: "rulego_apiRouteTracer_agentAnalyze" },
+      ],
+    },
+    {
+      kind: "category" as const,
+      name: "RPA",
+      categorystyle: "rulego_rpa",
+      contents: [
+        { kind: "block" as const, type: "rulego_rpaBrowserNavigate" },
+        { kind: "block" as const, type: "rulego_rpaBrowserClick" },
+        { kind: "block" as const, type: "rulego_rpaBrowserScreenshot" },
+        { kind: "block" as const, type: "rulego_rpaBrowserQuery" },
+        { kind: "block" as const, type: "rulego_rpaOcr" },
+        { kind: "block" as const, type: "rulego_rpaScreenCapture" },
+        { kind: "block" as const, type: "rulego_rpaMacWindow" },
+        { kind: "block" as const, type: "rulego_rpaDesktopClick" },
       ],
     },
   ],

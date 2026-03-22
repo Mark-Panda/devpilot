@@ -545,6 +545,83 @@ await window.go.rulego.Service.ExecuteRule("a1b2c3d4-e5f6-7890-abcd-ef1234567890
 
 ---
 
+## 示例 9：Web RPA（Chrome 远程调试）
+
+**场景**：在已开启远程调试的 Chrome 中打开页面 → 读取标题元素文本 → 视口截图（结果在 `data` 的 JSON 内）。
+
+**前置条件**：本机启动 Chrome/Chromium，例如：
+
+`/Applications/Google\ Chrome.app/Contents/MacOS/Google\ Chrome --remote-debugging-port=9222`
+
+```json
+{
+  "ruleChain": {
+    "id": "d4e5f6a7-b8c9-4123-8def-456789012345",
+    "name": "Web RPA 示例",
+    "debugMode": false,
+    "root": true,
+    "disabled": false
+  },
+  "metadata": {
+    "firstNodeIndex": 0,
+    "nodes": [
+      {
+        "id": "s0",
+        "type": "startTrigger",
+        "name": "开始",
+        "debugMode": false,
+        "configuration": {}
+      },
+      {
+        "id": "s1",
+        "type": "x/rpaBrowserNavigate",
+        "name": "打开页面",
+        "debugMode": false,
+        "configuration": {
+          "debuggerUrl": "http://127.0.0.1:9222",
+          "url": "https://example.com",
+          "timeoutMs": 30000
+        }
+      },
+      {
+        "id": "s2",
+        "type": "x/rpaBrowserQuery",
+        "name": "读标题",
+        "debugMode": false,
+        "configuration": {
+          "debuggerUrl": "http://127.0.0.1:9222",
+          "selector": "h1",
+          "queryMode": "text",
+          "attributeName": "href",
+          "timeoutMs": 30000
+        }
+      },
+      {
+        "id": "s3",
+        "type": "x/rpaBrowserScreenshot",
+        "name": "截图",
+        "debugMode": false,
+        "configuration": {
+          "debuggerUrl": "http://127.0.0.1:9222",
+          "selector": "",
+          "timeoutMs": 30000
+        }
+      }
+    ],
+    "connections": [
+      { "fromId": "s0", "toId": "s1", "type": "Success" },
+      { "fromId": "s1", "toId": "s2", "type": "Success" },
+      { "fromId": "s2", "toId": "s3", "type": "Success" }
+    ],
+    "ruleChainConnections": []
+  }
+}
+```
+
+**执行说明**：`ExecuteRuleDefinition` / `ExecuteRule` 的初始 `data` 可为 `"{}"`；每步成功后下游收到的 `data` 为上一步输出的 JSON 字符串。本示例中 Navigate → Query → Screenshot 在**同一次执行、相同 `debuggerUrl`** 下会**复用同一 Chrome 标签与 CDP 连接**（详见 [nodes-reference.md](nodes-reference.md)「浏览器 CDP 会话与超时」）。各步的 `timeoutMs` 为墙钟超时，与 chromedp 连接生命周期解耦。若需接 `x/rpaOcr`，可将上一步截图 JSON 中的 `image_base64` 经 `jsTransform` 写成 `data` 再进入 OCR 节点（或把 `imagePath` 指向已保存文件）。
+
+---
+
 ## 完整创建流程代码示例
 
 > **说明**：以下代码运行在**前端 JS 层**（Wails IPC）。大模型在后端 Go 进程中运行，不能直接执行 `window.go.*`——大模型应将生成的 DSL 输出给前端，由前端代码提交创建。

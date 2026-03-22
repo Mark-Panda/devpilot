@@ -68,6 +68,11 @@ const scratchTheme = new ScratchBlocks.Theme(
       colourSecondary: "#06b6d4",
       colourTertiary: "#67e8f9",
     },
+    rulego_rpa: {
+      colourPrimary: "#6366f1",
+      colourSecondary: "#818cf8",
+      colourTertiary: "#a5b4fc",
+    },
   },
   {
     rulego_trigger: { colour: "#ef4444" },
@@ -78,6 +83,7 @@ const scratchTheme = new ScratchBlocks.Theme(
     rulego_db: { colour: "#0d9488" },
     rulego_file: { colour: "#b45309" },
     rulego_tracer: { colour: "#0891b2" },
+    rulego_rpa: { colour: "#6366f1" },
   }
 );
 
@@ -393,6 +399,51 @@ function BlockConfigModal({
     if (block.type === "rulego_fileList") {
       next.FILE_PATH = get("FILE_PATH") || "/tmp/*.txt";
       next.FILE_RECURSIVE = getBool("FILE_RECURSIVE");
+    }
+    if (block.type === "rulego_rpaBrowserNavigate") {
+      next.RPA_DEBUGGER_URL = get("RPA_DEBUGGER_URL") || "http://127.0.0.1:9222";
+      next.RPA_URL = get("RPA_URL") || "https://example.com";
+      next.RPA_TIMEOUT_MS = get("RPA_TIMEOUT_MS") || "30000";
+    }
+    if (block.type === "rulego_rpaBrowserClick") {
+      next.RPA_DEBUGGER_URL = get("RPA_DEBUGGER_URL") || "http://127.0.0.1:9222";
+      next.RPA_SELECTOR = get("RPA_SELECTOR") || "button.submit";
+      next.RPA_BUTTON = get("RPA_BUTTON") || "left";
+      next.RPA_TIMEOUT_MS = get("RPA_TIMEOUT_MS") || "30000";
+    }
+    if (block.type === "rulego_rpaBrowserScreenshot") {
+      next.RPA_DEBUGGER_URL = get("RPA_DEBUGGER_URL") || "http://127.0.0.1:9222";
+      next.RPA_SELECTOR = get("RPA_SELECTOR") || "";
+      next.RPA_TIMEOUT_MS = get("RPA_TIMEOUT_MS") || "30000";
+    }
+    if (block.type === "rulego_rpaBrowserQuery") {
+      next.RPA_DEBUGGER_URL = get("RPA_DEBUGGER_URL") || "http://127.0.0.1:9222";
+      next.RPA_SELECTOR = get("RPA_SELECTOR") || "h1";
+      next.RPA_QUERY_MODE = get("RPA_QUERY_MODE") || "text";
+      next.RPA_ATTRIBUTE_NAME = get("RPA_ATTRIBUTE_NAME") || "href";
+      next.RPA_TIMEOUT_MS = get("RPA_TIMEOUT_MS") || "30000";
+    }
+    if (block.type === "rulego_rpaOcr") {
+      next.RPA_IMAGE_PATH = get("RPA_IMAGE_PATH") || "";
+      next.RPA_OCR_LANG = get("RPA_OCR_LANG") || "eng";
+      next.RPA_TESSERACT_PATH = get("RPA_TESSERACT_PATH") || "tesseract";
+    }
+    if (block.type === "rulego_rpaScreenCapture") {
+      next.RPA_CAPTURE_MODE = get("RPA_CAPTURE_MODE") || "full";
+      next.RPA_REGION_TOP = get("RPA_REGION_TOP") || "0";
+      next.RPA_REGION_LEFT = get("RPA_REGION_LEFT") || "0";
+      next.RPA_REGION_W = get("RPA_REGION_W") || "800";
+      next.RPA_REGION_H = get("RPA_REGION_H") || "600";
+      next.RPA_CAPTURE_OUTPUT_PATH = get("RPA_CAPTURE_OUTPUT_PATH") || "";
+    }
+    if (block.type === "rulego_rpaMacWindow") {
+      next.RPA_MAC_ACTION = get("RPA_MAC_ACTION") || "frontmost";
+      next.RPA_MAC_APP = get("RPA_MAC_APP") || "";
+      next.RPA_MAC_WINDOW_TITLE = get("RPA_MAC_WINDOW_TITLE") || "";
+    }
+    if (block.type === "rulego_rpaDesktopClick") {
+      next.RPA_CLICK_X = get("RPA_CLICK_X") || "100";
+      next.RPA_CLICK_Y = get("RPA_CLICK_Y") || "100";
     }
     if (block.type === "rulego_for") {
       next.FOR_RANGE = get("FOR_RANGE") || "1..3";
@@ -1792,6 +1843,307 @@ function BlockConfigModal({
             />
             <span>递归 recursive</span>
           </label>
+        </>
+      )}
+      {(block.type === "rulego_rpaBrowserNavigate" ||
+        block.type === "rulego_rpaBrowserClick" ||
+        block.type === "rulego_rpaBrowserScreenshot" ||
+        block.type === "rulego_rpaBrowserQuery") && (
+        <>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>Chrome 远程调试地址 debuggerUrl</span>
+            <input
+              value={String(form.RPA_DEBUGGER_URL ?? "http://127.0.0.1:9222")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_DEBUGGER_URL: e.target.value }))}
+              placeholder="http://127.0.0.1:9222"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
+            请先用 <code>--remote-debugging-port=9222</code> 等方式启动 Chrome，多步操作共享同一调试端口。
+          </p>
+        </>
+      )}
+      {block.type === "rulego_rpaBrowserNavigate" && (
+        <>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>目标 URL（支持模板）</span>
+            <input
+              value={String(form.RPA_URL ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_URL: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>超时 timeoutMs</span>
+            <input
+              type="number"
+              value={String(form.RPA_TIMEOUT_MS ?? "30000")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_TIMEOUT_MS: e.target.value }))}
+            />
+          </label>
+        </>
+      )}
+      {block.type === "rulego_rpaBrowserClick" && (
+        <>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>CSS 选择器 selector</span>
+            <input
+              value={String(form.RPA_SELECTOR ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_SELECTOR: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>鼠标键 button</span>
+            <select
+              value={String(form.RPA_BUTTON ?? "left")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_BUTTON: e.target.value }))}
+            >
+              <option value="left">左键</option>
+              <option value="right">右键</option>
+            </select>
+          </label>
+          <label className="form-field">
+            <span>超时 timeoutMs</span>
+            <input
+              type="number"
+              value={String(form.RPA_TIMEOUT_MS ?? "30000")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_TIMEOUT_MS: e.target.value }))}
+            />
+          </label>
+        </>
+      )}
+      {block.type === "rulego_rpaBrowserScreenshot" && (
+        <>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>元素选择器 selector（留空则视口整页）</span>
+            <input
+              value={String(form.RPA_SELECTOR ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_SELECTOR: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>超时 timeoutMs</span>
+            <input
+              type="number"
+              value={String(form.RPA_TIMEOUT_MS ?? "30000")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_TIMEOUT_MS: e.target.value }))}
+            />
+          </label>
+        </>
+      )}
+      {block.type === "rulego_rpaBrowserQuery" && (
+        <>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>CSS 选择器 selector</span>
+            <input
+              value={String(form.RPA_SELECTOR ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_SELECTOR: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>查询模式 queryMode</span>
+            <select
+              value={String(form.RPA_QUERY_MODE ?? "text")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_QUERY_MODE: e.target.value }))}
+            >
+              <option value="text">text 文本</option>
+              <option value="html">html 外层 HTML</option>
+              <option value="value">value 表单值</option>
+              <option value="attr">attr 属性</option>
+            </select>
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>属性名 attributeName（仅 attr 模式）</span>
+            <input
+              value={String(form.RPA_ATTRIBUTE_NAME ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_ATTRIBUTE_NAME: e.target.value }))}
+              placeholder="href"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>超时 timeoutMs</span>
+            <input
+              type="number"
+              value={String(form.RPA_TIMEOUT_MS ?? "30000")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_TIMEOUT_MS: e.target.value }))}
+            />
+          </label>
+        </>
+      )}
+      {block.type === "rulego_rpaOcr" && (
+        <>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>图像路径 imagePath（空则用消息 data 为 Base64 或 JSON 含 image_base64）</span>
+            <input
+              value={String(form.RPA_IMAGE_PATH ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_IMAGE_PATH: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>语言 lang</span>
+            <input
+              value={String(form.RPA_OCR_LANG ?? "eng")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_OCR_LANG: e.target.value }))}
+              placeholder="eng / chi_sim+eng"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>Tesseract 可执行文件 tesseractPath</span>
+            <input
+              value={String(form.RPA_TESSERACT_PATH ?? "tesseract")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_TESSERACT_PATH: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+        </>
+      )}
+      {block.type === "rulego_rpaScreenCapture" && (
+        <>
+          <label className="form-field">
+            <span>模式 mode</span>
+            <select
+              value={String(form.RPA_CAPTURE_MODE ?? "full")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_CAPTURE_MODE: e.target.value }))}
+            >
+              <option value="full">全屏</option>
+              <option value="region">区域</option>
+            </select>
+          </label>
+          <label className="form-field">
+            <span>区域 top</span>
+            <input
+              type="number"
+              value={String(form.RPA_REGION_TOP ?? "0")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_REGION_TOP: e.target.value }))}
+            />
+          </label>
+          <label className="form-field">
+            <span>区域 left</span>
+            <input
+              type="number"
+              value={String(form.RPA_REGION_LEFT ?? "0")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_REGION_LEFT: e.target.value }))}
+            />
+          </label>
+          <label className="form-field">
+            <span>宽 width</span>
+            <input
+              type="number"
+              value={String(form.RPA_REGION_W ?? "800")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_REGION_W: e.target.value }))}
+            />
+          </label>
+          <label className="form-field">
+            <span>高 height</span>
+            <input
+              type="number"
+              value={String(form.RPA_REGION_H ?? "600")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_REGION_H: e.target.value }))}
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>保存路径 outputPath（空则仅返回 Base64 到 data）</span>
+            <input
+              value={String(form.RPA_CAPTURE_OUTPUT_PATH ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_CAPTURE_OUTPUT_PATH: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
+            仅 macOS 生效；使用系统 <code>screencapture</code>。非 macOS 上该节点会失败。
+          </p>
+        </>
+      )}
+      {block.type === "rulego_rpaMacWindow" && (
+        <>
+          <label className="form-field">
+            <span>动作 action</span>
+            <select
+              value={String(form.RPA_MAC_ACTION ?? "frontmost")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_MAC_ACTION: e.target.value }))}
+            >
+              <option value="frontmost">frontmost 前置窗口信息</option>
+              <option value="activate">activate 激活应用</option>
+              <option value="list">list 列出窗口</option>
+            </select>
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>应用名 appName（activate 必填）</span>
+            <input
+              value={String(form.RPA_MAC_APP ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_MAC_APP: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>窗口标题 windowTitle（可选，尽力前置匹配窗口）</span>
+            <input
+              value={String(form.RPA_MAC_WINDOW_TITLE ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_MAC_WINDOW_TITLE: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
+            基于 AppleScript；仅 macOS。需为终端/DevPilot 授予自动化/辅助功能权限（视脚本而定）。
+          </p>
+        </>
+      )}
+      {block.type === "rulego_rpaDesktopClick" && (
+        <>
+          <label className="form-field">
+            <span>屏幕 X（支持模板）</span>
+            <input
+              value={String(form.RPA_CLICK_X ?? "0")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_CLICK_X: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>屏幕 Y（支持模板）</span>
+            <input
+              value={String(form.RPA_CLICK_Y ?? "0")}
+              onChange={(e) => setForm((f) => ({ ...f, RPA_CLICK_Y: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
+            仅 macOS；使用 System Events 的 <code>click at</code>，需为 DevPilot 开启辅助功能权限。
+          </p>
         </>
       )}
       {block.type === "rulego_dbClient" && (

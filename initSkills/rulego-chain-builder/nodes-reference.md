@@ -434,3 +434,175 @@
   }
 }
 ```
+
+---
+
+## RPA 类（DevPilot 自定义）
+
+以下节点由 `backend/internal/services/rulego/node_rpa_*.go` 注册；`url`、`selector`、`debuggerUrl`、`imagePath`、`outputPath`、`x`、`y` 等字段均支持 RuleGo 模板（如 `${msg.field}`、`${metadata.field}`）。成功时通常将 **JSON 字符串** 写入消息 `data`，失败走 `Failure`。
+
+### 浏览器 CDP（`x/rpaBrowser*`）会话与超时
+
+- **同一次规则链执行**且各节点 **`debuggerUrl` 一致**时，后端**复用同一条 CDP 连接并附着同一标签页**，不会在单个浏览器节点结束时关闭该标签（历史上若每步取消 chromedp 上下文，会触发 `CloseTarget` 或拆掉 WebSocket，表现为下一步 **`No target with given id (-32602)`** 或 **`context canceled`**）。
+- **`timeoutMs`**：表示该节点**整步操作**的墙钟超时。实现上**不能**用「随后会 `cancel` 掉的 `context.WithTimeout`」包住传给 chromedp 的 `Run`（`RemoteAllocator` 会把该 context 与连接 teardown 绑定）。当前实现用**独立等待**做超时；若触发超时，错误会返回，但底层 CDP 调用**可能仍在进行**，下一节点一般仍可继续；若遇异常状态，可调大 `timeoutMs` 或重试整条链。
+- **中途修改 `debuggerUrl`**：会关闭旧会话并按新地址重建。
+- **链执行结束**后，会话随 RuleContext 丢弃而释放；Chrome 进程本身仍由你本地命令维持，不会被 DevPilot 退出。
+
+### `x/rpaBrowserNavigate` — 浏览器打开 URL（Chrome CDP）
+
+需先以远程调试方式启动 Chrome/Chromium（例如 `--remote-debugging-port=9222`），链上各 `x/rpaBrowser*` 使用相同 `debuggerUrl` 即可共用上述会话。
+
+```json
+{
+  "type": "x/rpaBrowserNavigate",
+  "configuration": {
+    "debuggerUrl": "http://127.0.0.1:9222",
+    "url": "https://example.com",
+    "timeoutMs": 30000
+  }
+}
+```
+
+- `debuggerUrl`：远程调试入口，默认 `http://127.0.0.1:9222`
+- `url`：导航目标地址
+- `timeoutMs`：超时毫秒数（至少按 1ms 生效）；语义见本节「浏览器 CDP 会话与超时」
+- 成功 `data` 示例：`{"ok":true,"url":"..."}`
+- 连接：`Success` / `Failure`
+
+### `x/rpaBrowserClick` — 浏览器按选择器点击
+
+```json
+{
+  "type": "x/rpaBrowserClick",
+  "configuration": {
+    "debuggerUrl": "http://127.0.0.1:9222",
+    "selector": "button.submit",
+    "button": "left",
+    "timeoutMs": 30000
+  }
+}
+```
+
+- `selector`：CSS 选择器
+- `button`：`left` 或 `right`
+- `timeoutMs`：见「浏览器 CDP 会话与超时」
+- 成功 `data`：`{"ok":true,"selector":"..."}`
+- 连接：`Success` / `Failure`
+
+### `x/rpaBrowserScreenshot` — 浏览器截图
+
+```json
+{
+  "type": "x/rpaBrowserScreenshot",
+  "configuration": {
+    "debuggerUrl": "http://127.0.0.1:9222",
+    "selector": "",
+    "timeoutMs": 30000
+  }
+}
+```
+
+- `selector`：空字符串表示当前视口；非空则截取匹配元素
+- `timeoutMs`：见「浏览器 CDP 会话与超时」
+- 成功 `data`：`{"ok":true,"image_base64":"...","selector":"..."}`
+- 连接：`Success` / `Failure`
+
+### `x/rpaBrowserQuery` — 选择器查询（文本 / HTML / 属性）
+
+```json
+{
+  "type": "x/rpaBrowserQuery",
+  "configuration": {
+    "debuggerUrl": "http://127.0.0.1:9222",
+    "selector": "h1",
+    "queryMode": "text",
+    "attributeName": "href",
+    "timeoutMs": 30000
+  }
+}
+```
+
+- `queryMode`：`text`（可见文本）、`html`（outer HTML）、`value`（表单控件值）、`attr`（属性，需配合 `attributeName`）
+- `timeoutMs`：见「浏览器 CDP 会话与超时」
+- 成功 `data`：`{"ok":true,"query_mode":"...","selector":"...","result":"..."}`；`attr` 模式另有 `attribute` 字段
+- 连接：`Success` / `Failure`
+
+### `x/rpaOcr` — Tesseract OCR
+
+本机需安装 `tesseract` 及所需语言包；可通过 `tesseractPath` 指定可执行文件。
+
+```json
+{
+  "type": "x/rpaOcr",
+  "configuration": {
+    "imagePath": "/tmp/cap.png",
+    "lang": "eng",
+    "tesseractPath": "tesseract"
+  }
+}
+```
+
+- `imagePath`：图像文件路径；**留空**时从消息 `data` 读取：纯 Base64 字符串，或 JSON 中的 `image_base64` 字段
+- `lang`：如 `eng`、`chi_sim+eng`
+- 成功 `data`：`{"ok":true,"text":"..."}`；路径读写受引擎 `filePathWhitelist` / `workDir` 等与文件节点相同规则约束
+- 连接：`Success` / `Failure`
+
+### `x/rpaScreenCapture` — 屏幕截图（仅 macOS）
+
+使用系统 `/usr/sbin/screencapture`。非 macOS 上节点会注册但执行失败。
+
+```json
+{
+  "type": "x/rpaScreenCapture",
+  "configuration": {
+    "mode": "full",
+    "top": 0,
+    "left": 0,
+    "width": 800,
+    "height": 600,
+    "outputPath": ""
+  }
+}
+```
+
+- `mode`：`full` 全屏，`region` 区域（`top,left,width,height` 对应 `screencapture -R` 矩形）
+- `outputPath`：非空则写入该路径（须通过路径校验）；无论是否写文件，成功时 `data` 均含 `image_base64`
+- 连接：`Success` / `Failure`
+
+### `x/rpaMacWindow` — macOS 窗口与应用（AppleScript）
+
+非 macOS 上执行失败。返回应用名、窗口标题等**语义信息**，非 Windows 式数值句柄。
+
+```json
+{
+  "type": "x/rpaMacWindow",
+  "configuration": {
+    "action": "frontmost",
+    "appName": "",
+    "windowTitle": ""
+  }
+}
+```
+
+- `action`：`frontmost`（前置应用与窗口标题）、`activate`（激活 `appName`，可选按 `windowTitle` 尝试前置窗口）、`list`（列出进程与窗口文本）
+- `appName` / `windowTitle`：支持模板
+- 成功 `data`：JSON，`frontmost` 时常含 `app_name`、`window_title`
+- 连接：`Success` / `Failure`
+
+### `x/rpaDesktopClick` — 屏幕坐标点击（仅 macOS）
+
+通过 `System Events` 的 `click at {x,y}`，需为 DevPilot 授予**辅助功能**等权限。
+
+```json
+{
+  "type": "x/rpaDesktopClick",
+  "configuration": {
+    "x": "100",
+    "y": "200"
+  }
+}
+```
+
+- `x` / `y`：整数像素，字符串形式且支持模板（解析后为整数）
+- 成功 `data`：`{"ok":true,"x":100,"y":200}`
+- 连接：`Success` / `Failure`

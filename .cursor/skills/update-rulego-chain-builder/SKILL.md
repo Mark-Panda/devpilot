@@ -13,7 +13,7 @@ description: 更新 initSkills/rulego-chain-builder/ 技能文档，包括新增
 initSkills/rulego-chain-builder/
 ├── SKILL.md           # 主技能：核心概念 + 调用架构 + 常用模式 + 注意事项
 ├── nodes-reference.md # 节点速查表：所有节点类型及完整 configuration 参数
-└── dsl-examples.md    # DSL 完整示例：8 个端到端示例 + 创建流程代码
+└── dsl-examples.md    # DSL 完整示例：端到端示例（含 RPA 等）+ 创建流程代码
 ```
 
 ## 触发场景 → 对应操作
@@ -86,6 +86,7 @@ backend/internal/services/rulego/methods.go
 5. 数据处理类（exprTransform、metadataTransform、text/template、fieldFilter、fetchNodeOutput）
 6. 缓存类（cacheSet、cacheGet、cacheDelete）
 7. 外部通信类（mqttClient、sendEmail、ssh、exec）
+8. RPA 类（DevPilot 自定义：`x/rpaBrowser*`、`x/rpaOcr`、macOS `x/rpaScreenCapture` / `x/rpaMacWindow` / `x/rpaDesktopClick`）— 见 `nodes-reference.md` 文末独立章节
 
 ### Step 3：更新 dsl-examples.md（如需）
 
