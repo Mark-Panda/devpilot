@@ -213,15 +213,16 @@ export default function RuleGoForm({
         ) : null}
         <label className="form-field">
           <span>是否启用</span>
-          <select
-            value={values.enabled ? "true" : "false"}
-            onChange={(event) =>
-              setValues({ ...values, enabled: event.target.value === "true" })
-            }
+          <button
+            type="button"
+            role="switch"
+            aria-checked={values.enabled}
+            aria-label={values.enabled ? "已启用" : "已停用"}
+            className="rulego-enable-switch"
+            onClick={() => setValues({ ...values, enabled: !values.enabled })}
           >
-            <option value="true">启用</option>
-            <option value="false">停用</option>
-          </select>
+            <span className="rulego-enable-switch-thumb" aria-hidden />
+          </button>
           <small className="form-hint">控制规则是否生效</small>
         </label>
         {initial?.definition ? (

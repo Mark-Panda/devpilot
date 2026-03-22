@@ -19,15 +19,22 @@ export function getEnabledFromDefinition(definition: string): boolean {
  * 判断规则链是否为子规则链（DSL 中 ruleChain.root === false）。
  * 用于子规则链组件的 targetId 下拉选项筛选。
  */
-export function isSubRuleChain(definition: string): boolean {
-  if (!definition?.trim()) return false;
+/** 与表单/编辑器一致：ruleChain.root === false 为子规则链，缺省或非 false 为根规则链；无定义或 JSON 无效为 unknown */
+export function getRuleChainRootKind(definition: string): "root" | "sub" | "unknown" {
+  if (!definition?.trim()) return "unknown";
   try {
     const parsed = JSON.parse(definition);
     const chain = parsed?.ruleChain;
-    return chain != null && typeof chain === "object" && chain.root === false;
+    if (chain == null || typeof chain !== "object") return "root";
+    if (chain.root === false) return "sub";
+    return "root";
   } catch {
-    return false;
+    return "unknown";
   }
+}
+
+export function isSubRuleChain(definition: string): boolean {
+  return getRuleChainRootKind(definition) === "sub";
 }
 
 /** 从规则链 definition JSON 中解析 metadata.nodes，供 ref 节点 targetId 下拉（跨链 `chainId:nodeId`）等使用 */

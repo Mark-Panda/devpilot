@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ListModelConfigs } from "../../../wailsjs/go/model_management/Service";
-import { getEnabledFromDefinition, setDisabledInDefinition } from "./dslUtils";
+import { getEnabledFromDefinition, getRuleChainRootKind, setDisabledInDefinition } from "./dslUtils";
 import RuleGoForm from "./RuleGoForm";
 import type { RuleGoRule } from "./types";
 import { useRuleGoRules } from "./useRuleGoRules";
@@ -16,6 +16,8 @@ export default function RuleGoPage() {
   const [actionFeedback, setActionFeedback] = useState<{ msg: string; isError?: boolean } | null>(null);
   /** 正在生成技能的规则 ID，用于显示“生成中...”并禁用按钮 */
   const [generatingSkillRuleId, setGeneratingSkillRuleId] = useState<string | null>(null);
+  /** 正在切换启用状态的规则 ID，防止重复点击 */
+  const [togglingRuleId, setTogglingRuleId] = useState<string | null>(null);
 
   const withFeedback = async (fn: () => Promise<void>, successMsg: string) => {
     try {
@@ -54,6 +56,7 @@ export default function RuleGoPage() {
         <div className="table-head">
           <div className="table-cell">名称</div>
           <div className="table-cell">描述</div>
+          <div className="table-cell">主/子</div>
           <div className="table-cell">状态</div>
           <div className="table-cell">操作</div>
         </div>
@@ -67,6 +70,8 @@ export default function RuleGoPage() {
               // 状态以 definition 中 DSL 的 ruleChain.disabled 为准（表中已无 enabled 字段）
               const effectiveEnabled = getEnabledFromDefinition(rule.definition);
               const hasDefinition = Boolean(rule.definition);
+              const rootKind = getRuleChainRootKind(rule.definition);
+              const rootKindLabel = rootKind === "sub" ? "子" : rootKind === "root" ? "主" : "—";
               const basePayload = {
                 name: rule.name,
                 description: rule.description,
@@ -77,6 +82,7 @@ export default function RuleGoPage() {
               <div className="table-row" key={rule.id}>
                 <div className="table-cell">{rule.name}</div>
                 <div className="table-cell">{rule.description || "-"}</div>
+                <div className="table-cell">{rootKindLabel}</div>
                 <div className="table-cell">
                   {hasDefinition
                     ? effectiveEnabled
@@ -92,7 +98,7 @@ export default function RuleGoPage() {
                     type="button"
                     onClick={() => navigate(`/rulego/editor/${rule.id}`)}
                   >
-                    编辑
+                    可视化
                   </button>
                   <button
                     className="text-button"
@@ -102,31 +108,45 @@ export default function RuleGoPage() {
                       setModalOpen(true);
                     }}
                   >
-                    表单编辑
+                    编辑
                   </button>
                   {hasDefinition ? (
                     <button
-                      className="text-button"
                       type="button"
+                      role="switch"
+                      aria-checked={effectiveEnabled}
+                      aria-label={effectiveEnabled ? "关闭规则" : "开启规则"}
+                      className="rulego-enable-switch"
+                      disabled={togglingRuleId === rule.id}
                       onClick={() =>
                         effectiveEnabled
                           ? withFeedback(async () => {
-                              await update(rule.id, {
-                                ...basePayload,
-                                definition: setDisabledInDefinition(rule.definition, true),
-                              });
-                              await unloadChain(rule.id);
+                              setTogglingRuleId(rule.id);
+                              try {
+                                await update(rule.id, {
+                                  ...basePayload,
+                                  definition: setDisabledInDefinition(rule.definition, true),
+                                });
+                                await unloadChain(rule.id);
+                              } finally {
+                                setTogglingRuleId(null);
+                              }
                             }, "已关闭")
                           : withFeedback(async () => {
-                              await update(rule.id, {
-                                ...basePayload,
-                                definition: setDisabledInDefinition(rule.definition, false),
-                              });
-                              await loadChain(rule.id);
+                              setTogglingRuleId(rule.id);
+                              try {
+                                await update(rule.id, {
+                                  ...basePayload,
+                                  definition: setDisabledInDefinition(rule.definition, false),
+                                });
+                                await loadChain(rule.id);
+                              } finally {
+                                setTogglingRuleId(null);
+                              }
                             }, "已开启")
                       }
                     >
-                      {effectiveEnabled ? "关闭" : "开启"}
+                      <span className="rulego-enable-switch-thumb" aria-hidden />
                     </button>
                   ) : null}
                   {effectiveEnabled && hasDefinition ? (
