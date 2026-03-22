@@ -2462,7 +2462,6 @@ export default function RuleGoScratchEditorPage() {
   const [debugDraftInModal, setDebugDraftInModal] = useState(false);
   const [nameModalError, setNameModalError] = useState<string | null>(null);
   const [viewDslOpen, setViewDslOpen] = useState(false);
-  const [viewJsonOpen, setViewJsonOpen] = useState(false);
   const [testModalOpen, setTestModalOpen] = useState(false);
   const [testMessageType, setTestMessageType] = useState("default");
   const [testMetadataJson, setTestMetadataJson] = useState("{}");
@@ -2484,6 +2483,8 @@ export default function RuleGoScratchEditorPage() {
     return () => clearTimeout(t);
   }, [saveFeedback]);
   const [blockCount, setBlockCount] = useState(0);
+  /** 与 Blockly workspace 缩放同步，便于工具栏显示与滚轮缩放后刷新 */
+  const [zoomPercent, setZoomPercent] = useState(90);
   const [librarySearchKeyword, setLibrarySearchKeyword] = useState("");
   const sidePanelRef = useRef<HTMLDivElement>(null);
   const lastTouchedBlockIdRef = useRef<string | null>(null);
@@ -2500,6 +2501,16 @@ export default function RuleGoScratchEditorPage() {
   }, [name, debugMode, root, enabled]);
 
   const editingRule = useMemo(() => rules.find((rule) => rule.id === id), [rules, id]);
+
+  const bumpWorkspaceZoom = useCallback((dir: 1 | -1) => {
+    const ws = workspaceRef.current as (WorkspaceSvg & { zoomCenter?: (d: number) => void }) | null;
+    ws?.zoomCenter?.(dir);
+    requestAnimationFrame(() => {
+      const s =
+        (workspaceRef.current as WorkspaceSvg & { getScale?: () => number } | null)?.getScale?.() ?? 1;
+      setZoomPercent(Math.round(s * 100));
+    });
+  }, []);
 
   /** 规则管理中 root 为 false 的子规则链，供 flow 块 targetId 下拉选择 */
   const subRuleChains = useMemo(
@@ -2570,7 +2581,7 @@ export default function RuleGoScratchEditorPage() {
       renderer: "scratch",
       theme: scratchTheme,
       zoom: {
-        controls: true,
+        controls: false,
         wheel: true,
         startScale: 0.9,
         maxScale: 2,
@@ -2578,7 +2589,12 @@ export default function RuleGoScratchEditorPage() {
         scaleSpeed: 1.1,
       },
       trashcan: false,
-      grid: { spacing: 20, length: 3, colour: "#334155", snap: true },
+      grid: {
+        spacing: 20,
+        length: 20,
+        colour: "rgba(148, 163, 184, 0.42)",
+        snap: true,
+      },
     }) as WorkspaceSvg;
 
     workspaceRef.current = workspace;
@@ -2599,6 +2615,8 @@ export default function RuleGoScratchEditorPage() {
       setTriggerLayoutErrorRef.current(validateRuleGoTriggerLayout(workspace));
       const topBlocks = workspace.getTopBlocks(true);
       setBlockCount(topBlocks.length);
+      const scale = (workspace as WorkspaceSvg & { getScale?: () => number }).getScale?.() ?? 1;
+      setZoomPercent(Math.round(scale * 100));
       // 不在 handleChange 里用 getSelected() 覆盖 selectedBlockId，否则焦点移到属性面板时会被清空
     };
 
@@ -3359,7 +3377,7 @@ export default function RuleGoScratchEditorPage() {
     );
   };
 
-  const workspaceWs = workspaceRef.current as (WorkspaceSvg & { undo?: () => void; redo?: () => void; zoom?: (delta: number, cursor?: { x: number; y: number }) => void; getScale?: () => number }) | null;
+  const workspaceWs = workspaceRef.current as (WorkspaceSvg & { undo?: () => void; redo?: () => void }) | null;
   const blockLibraryCount = useMemo(() => {
     const contents = rulegoToolbox.contents;
     if (!Array.isArray(contents)) return 0;
@@ -3417,17 +3435,41 @@ export default function RuleGoScratchEditorPage() {
           >
             ↷
           </button>
-          <span className="rulego-zoom-label" title="缩放">
-            {workspaceWs?.getScale ? `${Math.round((workspaceWs.getScale() ?? 1) * 100)}%` : "100%"}
+          <button
+            className="rulego-toolbar-btn icon"
+            type="button"
+            title="缩小画布"
+            onClick={() => bumpWorkspaceZoom(-1)}
+          >
+            −
+          </button>
+          <span className="rulego-zoom-label" title="当前缩放比例">
+            {zoomPercent}%
           </span>
+          <button
+            className="rulego-toolbar-btn icon"
+            type="button"
+            title="放大画布"
+            onClick={() => bumpWorkspaceZoom(1)}
+          >
+            +
+          </button>
           <button
             className="rulego-toolbar-btn icon"
             type="button"
             title="适配画布"
             onClick={() => {
               if (workspaceRef.current) {
-                const ws = workspaceRef.current as WorkspaceSvg & { zoomToFit?: (opt?: { padding?: number }) => void };
+                const ws = workspaceRef.current as WorkspaceSvg & {
+                  zoomToFit?: (opt?: { padding?: number }) => void;
+                  getScale?: () => number;
+                };
                 ws.zoomToFit?.({ padding: 40 });
+                requestAnimationFrame(() => {
+                  const cur = workspaceRef.current as WorkspaceSvg & { getScale?: () => number } | null;
+                  const s = cur?.getScale?.() ?? 1;
+                  setZoomPercent(Math.round(s * 100));
+                });
               }
             }}
           >
@@ -3456,18 +3498,6 @@ export default function RuleGoScratchEditorPage() {
             }}
           >
             导出
-          </button>
-          <button
-            className="rulego-toolbar-btn text"
-            type="button"
-            onClick={() => {
-              if (workspaceRef.current) {
-                setJson(JSON.stringify(ScratchBlocks.serialization.workspaces.save(workspaceRef.current), null, 2));
-              }
-              setViewJsonOpen(true);
-            }}
-          >
-            查看 JSON
           </button>
         </div>
       </header>
@@ -3550,22 +3580,6 @@ export default function RuleGoScratchEditorPage() {
             </div>
             <div className="modal-body">
               <textarea readOnly value={dsl} rows={20} style={{ width: "100%", fontFamily: "monospace", fontSize: 13 }} />
-            </div>
-          </div>
-        </div>
-      )}
-
-      {viewJsonOpen && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setViewJsonOpen(false)}>
-          <div className="modal" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>Scratch JSON</h3>
-              <button type="button" className="text-button" onClick={() => setViewJsonOpen(false)} aria-label="关闭">
-                ×
-              </button>
-            </div>
-            <div className="modal-body">
-              <textarea readOnly value={json} rows={20} style={{ width: "100%", fontFamily: "monospace", fontSize: 13 }} />
             </div>
           </div>
         </div>

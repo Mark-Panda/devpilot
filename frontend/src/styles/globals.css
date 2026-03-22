@@ -988,14 +988,19 @@ body {
   fill: #1e293b;
 }
 
-/* 画布工作区主背景与网格统一为深色 */
+/* 画布工作区：SVG 底色；勿对 .blocklyMainBackground 使用 fill !important，否则会盖住 Blockly 的 var(--blocklyGridPattern) 网格 */
 .rulego-editor-canvas .blocklySvg {
   background-color: #1e293b !important;
 }
 
 .rulego-editor-canvas .blocklyMainBackground {
-  fill: #1e293b !important;
   stroke: #334155 !important;
+}
+
+/* Blockly 工作区网格：加深 pattern 内线段，在深色背景上更易辨认 */
+.rulego-editor-canvas defs pattern[id^="blocklyGridPattern"] line {
+  stroke: rgba(148, 163, 184, 0.4) !important;
+  stroke-width: 1px;
 }
 
 .rulego-editor-canvas .injectionDiv {

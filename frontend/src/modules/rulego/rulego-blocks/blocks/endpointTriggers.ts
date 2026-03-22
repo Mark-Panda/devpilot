@@ -80,10 +80,11 @@ const httpDef: BlockTypeDef = {
     const blocks = (ScratchBlocks as { Blocks: Record<string, object> }).Blocks;
     blocks[httpBlockType] = {
       init: function (this: Block) {
-        (this as Block).appendDummyInput("HEAD").appendField("HTTP 端点");
+        (this as Block)
+          .appendDummyInput("HEAD")
+          .appendField(new (BlocklyF as any).FieldTextInput("HTTP 端点"), "NODE_NAME");
         const config = (this as Block).appendDummyInput("CONFIG");
         config.appendField(new (BlocklyF as any).FieldTextInput("http_ep1"), "NODE_ID");
-        config.appendField(new (BlocklyF as any).FieldTextInput("HTTP 端点"), "NODE_NAME");
         config.appendField(new (BlocklyF as any).FieldTextInput(""), "EP_EXTRA_ROUTERS_JSON");
         config.appendField(new (BlocklyF as any).FieldTextInput(""), "RT_ID");
         config.appendField(new (BlocklyF as any).FieldTextInput(":9090"), "EP_SERVER");
@@ -181,10 +182,11 @@ const wsDef: BlockTypeDef = {
     const blocks = (ScratchBlocks as { Blocks: Record<string, object> }).Blocks;
     blocks[wsBlockType] = {
       init: function (this: Block) {
-        (this as Block).appendDummyInput("HEAD").appendField("WebSocket 端点");
+        (this as Block)
+          .appendDummyInput("HEAD")
+          .appendField(new (BlocklyF as any).FieldTextInput("WebSocket 端点"), "NODE_NAME");
         const config = (this as Block).appendDummyInput("CONFIG");
         config.appendField(new (BlocklyF as any).FieldTextInput("ws_ep1"), "NODE_ID");
-        config.appendField(new (BlocklyF as any).FieldTextInput("WebSocket 端点"), "NODE_NAME");
         config.appendField(new (BlocklyF as any).FieldTextInput(""), "EP_EXTRA_ROUTERS_JSON");
         config.appendField(new (BlocklyF as any).FieldTextInput(""), "RT_ID");
         config.appendField(new (BlocklyF as any).FieldTextInput(":9090"), "EP_SERVER");
@@ -271,10 +273,11 @@ const mqttDef: BlockTypeDef = {
     const blocks = (ScratchBlocks as { Blocks: Record<string, object> }).Blocks;
     blocks[mqttBlockType] = {
       init: function (this: Block) {
-        (this as Block).appendDummyInput("HEAD").appendField("MQTT 端点");
+        (this as Block)
+          .appendDummyInput("HEAD")
+          .appendField(new (BlocklyF as any).FieldTextInput("MQTT 端点"), "NODE_NAME");
         const config = (this as Block).appendDummyInput("CONFIG");
         config.appendField(new (BlocklyF as any).FieldTextInput("mqtt_ep1"), "NODE_ID");
-        config.appendField(new (BlocklyF as any).FieldTextInput("MQTT 端点"), "NODE_NAME");
         config.appendField(new (BlocklyF as any).FieldTextInput(""), "EP_EXTRA_ROUTERS_JSON");
         config.appendField(new (BlocklyF as any).FieldTextInput(""), "RT_ID");
         config.appendField(new (BlocklyF as any).FieldTextInput("127.0.0.1:1883"), "EP_SERVER");
@@ -375,10 +378,11 @@ const scheduleDef: BlockTypeDef = {
     const blocks = (ScratchBlocks as { Blocks: Record<string, object> }).Blocks;
     blocks[scheduleBlockType] = {
       init: function (this: Block) {
-        (this as Block).appendDummyInput("HEAD").appendField("定时端点");
+        (this as Block)
+          .appendDummyInput("HEAD")
+          .appendField(new (BlocklyF as any).FieldTextInput("定时端点"), "NODE_NAME");
         const config = (this as Block).appendDummyInput("CONFIG");
         config.appendField(new (BlocklyF as any).FieldTextInput("sched_ep1"), "NODE_ID");
-        config.appendField(new (BlocklyF as any).FieldTextInput("定时端点"), "NODE_NAME");
         config.appendField(new (BlocklyF as any).FieldTextInput(""), "EP_EXTRA_ROUTERS_JSON");
         config.appendField(new (BlocklyF as any).FieldTextInput("*/1 * * * * *"), "RT_PATH");
         config.appendField(new (BlocklyF as any).FieldTextInput(""), "EP_PROCESSORS");
@@ -460,10 +464,11 @@ const netDef: BlockTypeDef = {
     const blocks = (ScratchBlocks as { Blocks: Record<string, object> }).Blocks;
     blocks[netBlockType] = {
       init: function (this: Block) {
-        (this as Block).appendDummyInput("HEAD").appendField("TCP/UDP 端点");
+        (this as Block)
+          .appendDummyInput("HEAD")
+          .appendField(new (BlocklyF as any).FieldTextInput("TCP/UDP 端点"), "NODE_NAME");
         const config = (this as Block).appendDummyInput("CONFIG");
         config.appendField(new (BlocklyF as any).FieldTextInput("net_ep1"), "NODE_ID");
-        config.appendField(new (BlocklyF as any).FieldTextInput("Net 端点"), "NODE_NAME");
         config.appendField(new (BlocklyF as any).FieldTextInput(""), "EP_EXTRA_ROUTERS_JSON");
         config.appendField(new (BlocklyF as any).FieldTextInput("tcp"), "EP_PROTOCOL");
         config.appendField(new (BlocklyF as any).FieldTextInput(":8888"), "EP_SERVER");
@@ -488,7 +493,7 @@ const netDef: BlockTypeDef = {
   defaultConnectionType: "Success",
   getEndpointDsl(block, helpers) {
     const id = helpers.getFieldValue(block, "NODE_ID") || block.id;
-    const name = helpers.getFieldValue(block, "NODE_NAME") || "Net 端点";
+    const name = helpers.getFieldValue(block, "NODE_NAME") || "TCP/UDP 端点";
     const protocol = helpers.getFieldValue(block, "EP_PROTOCOL") || "tcp";
     const server = helpers.getFieldValue(block, "EP_SERVER") || ":8888";
     const path = helpers.getFieldValue(block, "RT_PATH") || ".*";
