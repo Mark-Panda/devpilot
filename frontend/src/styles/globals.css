@@ -208,7 +208,7 @@ body {
   color: #ffffff;
 }
 
-/* ========== OpenClaw 参考：浅色壳 + 侧栏红色选中条（RuleGo 全屏编辑器除外）========== */
+/* ========== OpenClaw 参考：浅色壳 + 侧栏红色选中条（规则链全屏编辑器除外）========== */
 .app-shell--openclaw {
   background: #fafafa;
 }
@@ -505,7 +505,7 @@ body {
   gap: 8px;
 }
 
-/* RuleGo 规则管理：5 列（名称、描述、主/子、状态、操作），为操作列留足空间 */
+/* 规则管理表：5 列（名称、描述、主/子、状态、操作），为操作列留足空间 */
 .rulego-table .table-head,
 .rulego-table .table-row {
   grid-template-columns: 1.15fr 1.35fr 0.72fr 0.58fr minmax(280px, auto);
@@ -517,7 +517,7 @@ body {
   align-items: center;
 }
 
-/* RuleGo 规则管理：胶囊开关（与 .text-button 同为 13px 刻度，体量与表格操作区一致） */
+/* 规则管理：启用胶囊开关（与 .text-button 同为 13px 刻度，体量与表格操作区一致） */
 .rulego-enable-switch {
   --rulego-sw-w: 32px;
   --rulego-sw-pad: 2px;
@@ -1608,7 +1608,7 @@ body {
   background-color: #f8fafc !important;
 }
 
-/* RuleGo 执行日志列表 */
+/* 规则链执行日志列表 */
 .rulego-logs-table .table-head.rulego-logs-head,
 .rulego-logs-table .table-row.rulego-logs-row {
   grid-template-columns: 1.4fr 0.7fr 0.6fr 1.4fr minmax(100px, auto);
@@ -1660,7 +1660,7 @@ body {
   color: #64748b;
 }
 
-/* RuleGo 执行明细 */
+/* 规则链执行明细 */
 .rulego-log-detail-page {
   max-width: 960px;
 }

@@ -686,7 +686,7 @@ function BlockConfigModal({
           <small className="form-hint">
             画布上会同步显示对应数量的 Case 槽位；Default / {UI_RELATION_FAILURE} 为固定槽位。最多 6 个 case。参考{" "}
             <a href="https://rulego.cc/pages/switch/#%E9%85%8D%E7%BD%AE%E7%A4%BA%E4%BE%8B" target="_blank" rel="noopener noreferrer">
-              RuleGo 条件分支
+              条件分支
             </a>
           </small>
         </div>
@@ -702,7 +702,7 @@ function BlockConfigModal({
             onChange={(e) => setForm((f) => ({ ...f, FORK_BRANCH_COUNT: e.target.value }))}
           />
           <small className="form-hint">
-            参考 <a href="https://rulego.cc/pages/fork/#%E9%85%8D%E7%BD%AE" target="_blank" rel="noopener noreferrer">RuleGo 并行网关</a>
+            参考 <a href="https://rulego.cc/pages/fork/#%E9%85%8D%E7%BD%AE" target="_blank" rel="noopener noreferrer">并行网关</a>
           </small>
         </label>
       )}
@@ -851,7 +851,7 @@ function BlockConfigModal({
             </div>
             <small className="form-hint" style={{ gridColumn: "1 / -1" }}>
               将并行分支末端积木接到本块上方凹槽，或在此处「添加汇聚节点」指定其余分支；保存后 DSL 会包含所有汇聚关系。参考{" "}
-              <a href="https://rulego.cc/pages/join/" target="_blank" rel="noopener noreferrer">RuleGo 汇聚</a>
+              <a href="https://rulego.cc/pages/join/" target="_blank" rel="noopener noreferrer">汇聚</a>
             </small>
           </>
         );
@@ -940,7 +940,7 @@ function BlockConfigModal({
           </label>
           <small className="form-hint" style={{ gridColumn: "1 / -1" }}>
             画布上会同步显示对应数量的「组内节点N」槽位（1～8）。参考{" "}
-            <a href="https://rulego.cc/pages/group-action/" target="_blank" rel="noopener noreferrer">RuleGo 节点组</a>
+            <a href="https://rulego.cc/pages/group-action/" target="_blank" rel="noopener noreferrer">节点组</a>
           </small>
         </>
       )}
@@ -979,7 +979,7 @@ function BlockConfigModal({
           <small className="form-hint" style={{ gridColumn: "1 / -1" }}>
             参考{" "}
             <a href="https://rulego.cc/pages/for/#%E9%85%8D%E7%BD%AE%E7%A4%BA%E4%BE%8B" target="_blank" rel="noopener noreferrer">
-              RuleGo 遍历组件
+              遍历组件
             </a>
           </small>
         </>
@@ -1093,7 +1093,7 @@ function BlockConfigModal({
             <small className="form-hint">
               本链填节点 ID；跨链为「规则链 ID:节点 ID」。也可直接在下框编辑。详见{" "}
               <a href="https://rulego.cc/pages/ref/#%E9%85%8D%E7%BD%AE" target="_blank" rel="noopener noreferrer">
-                RuleGo 节点引用
+                节点引用
               </a>
             </small>
           </label>
@@ -1679,7 +1679,7 @@ function BlockConfigModal({
             />
           </label>
           <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
-            后端 <code>restApiCall</code> 使用 FastHTTP 实现；配置与 RuleGo 标准一致。
+            后端 <code>restApiCall</code> 使用 FastHTTP 实现；配置与标准引擎一致。
           </p>
         </>
       )}
@@ -1897,7 +1897,7 @@ function BlockConfigModal({
                     </div>
                   );
                 })}
-                <span className="form-hint">支持 RuleGo 组件配置变量；数字类型在 DSL 中会输出为 number</span>
+                <span className="form-hint">支持组件配置变量；数字类型在 DSL 中会输出为 number</span>
               </div>
             );
           })()}
@@ -2542,7 +2542,7 @@ export default function RuleGoScratchEditorPage() {
     const onUnhandledRejection = (ev: PromiseRejectionEvent) => {
       const msg = ev.reason?.message ?? String(ev.reason);
       if (msg && (msg.includes("Decoding") || msg.includes("EncodingError"))) {
-        console.warn("[RuleGo] Media/decoding error (scratch-blocks):", ev.reason);
+        console.warn("[scratch-blocks] Media/decoding error:", ev.reason);
         ev.preventDefault();
         ev.stopPropagation();
       }
@@ -2723,7 +2723,7 @@ export default function RuleGoScratchEditorPage() {
         setDsl(loadedDsl);
         setSavedDsl(loadedDsl);
       } catch (err) {
-        setError((err as Error).message || "RuleGo DSL 解析失败");
+        setError((err as Error).message || "DSL 解析失败");
       }
     }
   }, [editingRule]);
@@ -2760,7 +2760,7 @@ export default function RuleGoScratchEditorPage() {
         ? buildRuleGoDsl(workspaceRef.current, trimmedName, useDebugMode, useRoot, useEnabled)
         : dsl;
     if (!nextDsl.trim()) {
-      const msg = "RuleGo DSL 不能为空";
+      const msg = "DSL 不能为空";
       setError(msg);
       setSaveFeedback({ type: "error", message: msg });
       return;
@@ -3441,7 +3441,7 @@ export default function RuleGoScratchEditorPage() {
           <button
             className="rulego-toolbar-btn text"
             type="button"
-            title="弹出 RuleGo DSL"
+            title="查看规则链 DSL"
             onClick={() => {
               if (workspaceRef.current) {
                 const te = validateRuleGoTriggerLayout(workspaceRef.current);
@@ -3543,7 +3543,7 @@ export default function RuleGoScratchEditorPage() {
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setViewDslOpen(false)}>
           <div className="modal" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>RuleGo DSL</h3>
+              <h3>规则链 DSL</h3>
               <button type="button" className="text-button" onClick={() => setViewDslOpen(false)} aria-label="关闭">
                 ×
               </button>
@@ -3683,7 +3683,7 @@ export default function RuleGoScratchEditorPage() {
             </div>
             <div className="modal-body" style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
               <p className="form-hint" style={{ marginBottom: 12 }}>
-                参考 RuleGo 调试：输入消息类型、元数据与消息体，对当前画布规则链执行一次，查看末端输出。
+                与常规调试一致：输入消息类型、元数据与消息体，对当前画布规则链执行一次，查看末端输出。
               </p>
               <p className="form-hint" style={{ marginBottom: 12, padding: 8, background: "var(--color-warning-bg, #fffbeb)", borderRadius: 6, border: "1px solid var(--color-warning, #f59e0b)", fontSize: 13 }}>
                 <strong>注意：</strong>若规则链中启用了技能（如 API 追踪），技能执行可能需 <strong>1–3 分钟</strong>。执行期间请<strong>勿关闭本弹窗或应用</strong>，否则会导致技能未执行完毕即终止、结果无法返回。

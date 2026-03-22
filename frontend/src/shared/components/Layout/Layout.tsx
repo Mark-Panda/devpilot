@@ -19,8 +19,8 @@ const menuGroups: { group?: string; items: { path: string; label: string; end?: 
   {
     group: "规则引擎",
     items: [
-      { path: "/rulego", label: "RuleGo 规则管理", end: true },
-      { path: "/rulego/logs", label: "RuleGo 执行日志" },
+      { path: "/rulego", label: "规则管理", end: true },
+      { path: "/rulego/logs", label: "执行日志" },
     ],
   },
   {
@@ -43,7 +43,7 @@ export default function Layout({ children }: LayoutProps) {
   const isRuleGoEditor = location.pathname.startsWith("/rulego/editor");
   const isChatRoute =
     location.pathname === "/agent" || location.pathname.startsWith("/studios");
-  /** OpenClaw 风格浅色侧栏 + 主区底（RuleGo 全屏编辑器除外） */
+  /** OpenClaw 风格浅色侧栏 + 主区底（规则链可视化全屏编辑器除外） */
   const openClawChrome = !isRuleGoEditor;
 
   return (

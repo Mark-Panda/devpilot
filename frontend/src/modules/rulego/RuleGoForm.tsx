@@ -160,7 +160,7 @@ export default function RuleGoForm({
           <input
             value={values.name}
             onChange={(event) => setValues({ ...values, name: event.target.value })}
-            placeholder="RuleGo 规则名称"
+            placeholder="规则名称"
             autoCapitalize="off"
             autoCorrect="off"
             autoComplete="off"
@@ -192,7 +192,7 @@ export default function RuleGoForm({
               autoComplete="off"
               spellCheck={false}
             />
-            <small className="form-hint">保存为 RuleGo DSL</small>
+            <small className="form-hint">保存为规则链 DSL</small>
           </label>
         ) : null}
         {showEditorJson ? (

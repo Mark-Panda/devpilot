@@ -35,8 +35,8 @@ export default function RuleGoPage() {
     <div className="page">
       <div className="page-header">
         <div>
-          <h2>RuleGo 规则管理</h2>
-          <p className="page-subtitle">管理 RuleGo 规则定义</p>
+          <h2>规则管理</h2>
+          <p className="page-subtitle">管理规则链定义</p>
         </div>
         <div className="page-actions">
           <button

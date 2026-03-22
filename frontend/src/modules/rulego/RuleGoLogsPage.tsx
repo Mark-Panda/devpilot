@@ -80,7 +80,7 @@ export default function RuleGoLogsPage() {
     <div className="page">
       <div className="page-header">
         <div>
-          <h2>RuleGo 执行日志</h2>
+          <h2>执行日志</h2>
           <p className="page-subtitle">查看规则链执行记录与各节点入参/出参</p>
         </div>
         <div className="page-actions">
