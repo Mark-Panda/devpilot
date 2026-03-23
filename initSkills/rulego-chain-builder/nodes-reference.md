@@ -68,6 +68,31 @@
 - `body`：请求体模板，支持变量插值，空字符串时自动使用消息体
 - 连接：`Success` / `Failure`
 
+### `volcTls/searchLogs` — 火山引擎 TLS 日志检索
+```json
+{
+  "type": "volcTls/searchLogs",
+  "configuration": {
+    "endpoint": "",
+    "region": "cn-beijing",
+    "accessKeyId": "",
+    "secretAccessKey": "",
+    "sessionToken": "",
+    "topicId": "",
+    "defaultQuery": "*",
+    "limit": 100,
+    "useApiV3": false,
+    "timeoutSec": 60
+  }
+}
+```
+- `endpoint`：留空时使用 `https://tls.{region}.volces.com`
+- `sessionToken`：STS 临时凭证时填写，否则留空
+- `useApiV3`：`true` 时使用 SearchLogsV2（API 0.3.0），与控制台检索行为更接近
+- 入站消息 `data`：可为检索语句字符串，或 JSON `{"query","startTime","endTime","topicId","context","sort","highLight"}`（时间单位为毫秒）
+- 成功时 `data` 为 TLS 返回的 JSON（含 `Logs`、`HitCount` 等）；`metadata` 含 `volc_tls_topic_id`、`volc_tls_query`、`volc_tls_hit_count`
+- 连接：`Success` / `Failure`
+
 ### `jsTransform` — JS 转换器
 ```json
 {

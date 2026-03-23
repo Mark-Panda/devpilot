@@ -13,6 +13,7 @@ import "./blocks/fork";
 import "./blocks/for";
 import "./blocks/groupAction";
 import "./blocks/restApiCall";
+import "./blocks/volcTlsSearchLogs";
 import "./blocks/fileNodes";
 import "./blocks/rpaNodes";
 import "./blocks/llm";
@@ -64,6 +65,7 @@ export const toolbox = {
       categorystyle: "rulego_action",
       contents: [
         { kind: "block" as const, type: "rulego_restApiCall" },
+        { kind: "block" as const, type: "rulego_volcTlsSearchLogs" },
         { kind: "block" as const, type: "rulego_llm" },
         { kind: "block" as const, type: "rulego_delay" },
         { kind: "block" as const, type: "rulego_jsTransform" },

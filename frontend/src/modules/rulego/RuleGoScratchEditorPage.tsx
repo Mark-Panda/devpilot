@@ -264,6 +264,18 @@ function BlockConfigModal({
       next.SG_TIMEOUT_SEC = get("SG_TIMEOUT_SEC") || "30";
       next.SG_DEFAULT_QUERY = get("SG_DEFAULT_QUERY");
     }
+    if (block.type === "rulego_volcTlsSearchLogs") {
+      next.TLS_ENDPOINT = get("TLS_ENDPOINT");
+      next.TLS_REGION = get("TLS_REGION") || "cn-beijing";
+      next.TLS_AK = get("TLS_AK");
+      next.TLS_SK = get("TLS_SK");
+      next.TLS_SESSION_TOKEN = get("TLS_SESSION_TOKEN");
+      next.TLS_TOPIC_ID = get("TLS_TOPIC_ID");
+      next.TLS_DEFAULT_QUERY = get("TLS_DEFAULT_QUERY") || "*";
+      next.TLS_LIMIT = get("TLS_LIMIT") || "100";
+      next.TLS_API_V3 = getBool("TLS_API_V3");
+      next.TLS_TIMEOUT_SEC = get("TLS_TIMEOUT_SEC") || "60";
+    }
     if (block.type === "rulego_dbClient") {
       next.DB_DRIVER_NAME = get("DB_DRIVER_NAME") || "mysql";
       next.DB_DSN = get("DB_DSN");
@@ -1664,6 +1676,116 @@ function BlockConfigModal({
           <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
             调用 <code>/.api/graphql</code>，使用官方 search 查询；消息 data 可为纯文本或 JSON{" "}
             <code>{"{\"query\":\"repo:foo/bar func\"}"}</code>。鉴权头为 <code>Authorization: token …</code>。
+          </p>
+        </>
+      )}
+      {block.type === "rulego_volcTlsSearchLogs" && (
+        <>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>Endpoint（留空时按 Region 使用官方 TLS 域名）</span>
+            <input
+              value={String(form.TLS_ENDPOINT ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, TLS_ENDPOINT: e.target.value }))}
+              placeholder="如 https://tls.cn-beijing.volces.com"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>Region</span>
+            <input
+              value={String(form.TLS_REGION ?? "cn-beijing")}
+              onChange={(e) => setForm((f) => ({ ...f, TLS_REGION: e.target.value }))}
+              placeholder="cn-beijing"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>Access Key ID</span>
+            <input
+              value={String(form.TLS_AK ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, TLS_AK: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>Secret Access Key</span>
+            <input
+              type="password"
+              value={String(form.TLS_SK ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, TLS_SK: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>Session Token（STS 可选）</span>
+            <input
+              type="password"
+              value={String(form.TLS_SESSION_TOKEN ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, TLS_SESSION_TOKEN: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>Topic ID</span>
+            <input
+              value={String(form.TLS_TOPIC_ID ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, TLS_TOPIC_ID: e.target.value }))}
+              placeholder="日志主题 ID"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>默认检索语句 (defaultQuery)</span>
+            <input
+              value={String(form.TLS_DEFAULT_QUERY ?? "*")}
+              onChange={(e) => setForm((f) => ({ ...f, TLS_DEFAULT_QUERY: e.target.value }))}
+              placeholder="* 或 TLS 检索语法"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>单次返回条数上限 (limit)</span>
+            <input
+              type="number"
+              min={1}
+              max={500}
+              value={String(form.TLS_LIMIT ?? "100")}
+              onChange={(e) => setForm((f) => ({ ...f, TLS_LIMIT: e.target.value }))}
+            />
+          </label>
+          <label className="form-field">
+            <span>超时 (秒)</span>
+            <input
+              type="number"
+              value={String(form.TLS_TIMEOUT_SEC ?? "60")}
+              onChange={(e) => setForm((f) => ({ ...f, TLS_TIMEOUT_SEC: e.target.value }))}
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={Boolean(form.TLS_API_V3)}
+              onChange={(e) => setForm((f) => ({ ...f, TLS_API_V3: e.target.checked }))}
+            />
+            <span>使用 API 0.3.0（SearchLogsV2，与控制台检索一致）</span>
+          </label>
+          <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
+            成功时消息 data 为 TLS 返回 JSON（含 Logs、HitCount 等）。消息 data 可覆盖检索：纯文本作 query，或 JSON{" "}
+            <code>{"{\"query\":\"*\",\"startTime\":毫秒,\"endTime\":毫秒,\"topicId\":\"…\"}"}</code>。
           </p>
         </>
       )}
