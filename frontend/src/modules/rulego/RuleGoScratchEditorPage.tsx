@@ -2932,6 +2932,10 @@ export default function RuleGoScratchEditorPage() {
       media: mediaPath,
       renderer: "scratch",
       theme: scratchTheme,
+      // 无分类 toolbox 时 Blockly 默认关闭 scrollbars，会导致无法拖动画布；开启后与滚轮缩放并存（move.wheel 默认为 false）
+      move: {
+        scrollbars: true,
+      },
       zoom: {
         controls: false,
         wheel: true,
