@@ -276,6 +276,17 @@ function BlockConfigModal({
       next.TLS_API_V3 = getBool("TLS_API_V3");
       next.TLS_TIMEOUT_SEC = get("TLS_TIMEOUT_SEC") || "60";
     }
+    if (block.type === "rulego_opensearchSearch") {
+      next.OS_ENDPOINT = get("OS_ENDPOINT") || "https://localhost:9200";
+      next.OS_INDEX = get("OS_INDEX") || "logs-*";
+      next.OS_USER = get("OS_USER");
+      next.OS_PASS = get("OS_PASS");
+      next.OS_INSECURE = getBool("OS_INSECURE");
+      next.OS_TIMEOUT_SEC = get("OS_TIMEOUT_SEC") || "60";
+      next.OS_DEFAULT_BODY =
+        get("OS_DEFAULT_BODY") ||
+        '{"size":100,"sort":[{"@timestamp":{"order":"desc"}}],"query":{"match_all":{}}}';
+    }
     if (block.type === "rulego_dbClient") {
       next.DB_DRIVER_NAME = get("DB_DRIVER_NAME") || "mysql";
       next.DB_DSN = get("DB_DSN");
@@ -1786,6 +1797,86 @@ function BlockConfigModal({
           <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
             成功时消息 data 为 TLS 返回 JSON（含 Logs、HitCount 等）。消息 data 可覆盖检索：纯文本作 query，或 JSON{" "}
             <code>{"{\"query\":\"*\",\"startTime\":毫秒,\"endTime\":毫秒,\"topicId\":\"…\"}"}</code>。
+          </p>
+        </>
+      )}
+      {block.type === "rulego_opensearchSearch" && (
+        <>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>Endpoint</span>
+            <input
+              value={String(form.OS_ENDPOINT ?? "https://localhost:9200")}
+              onChange={(e) => setForm((f) => ({ ...f, OS_ENDPOINT: e.target.value }))}
+              placeholder="https://host:9200"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>Index（单索引、逗号多索引或通配）</span>
+            <input
+              value={String(form.OS_INDEX ?? "logs-*")}
+              onChange={(e) => setForm((f) => ({ ...f, OS_INDEX: e.target.value }))}
+              placeholder="logs-*"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>用户名（可选）</span>
+            <input
+              value={String(form.OS_USER ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, OS_USER: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>密码（可选）</span>
+            <input
+              type="password"
+              value={String(form.OS_PASS ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, OS_PASS: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>超时 (秒)</span>
+            <input
+              type="number"
+              value={String(form.OS_TIMEOUT_SEC ?? "60")}
+              onChange={(e) => setForm((f) => ({ ...f, OS_TIMEOUT_SEC: e.target.value }))}
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={Boolean(form.OS_INSECURE)}
+              onChange={(e) => setForm((f) => ({ ...f, OS_INSECURE: e.target.checked }))}
+            />
+            <span>跳过 TLS 证书校验（仅建议开发环境）</span>
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>默认 _search 请求体（JSON）</span>
+            <textarea
+              rows={10}
+              value={String(
+                form.OS_DEFAULT_BODY ??
+                  '{"size":100,"sort":[{"@timestamp":{"order":"desc"}}],"query":{"match_all":{}}}'
+              )}
+              onChange={(e) => setForm((f) => ({ ...f, OS_DEFAULT_BODY: e.target.value }))}
+              style={{ width: "100%", fontFamily: "monospace", fontSize: 12, padding: 8, borderRadius: 8, border: "1px solid #e2e8f0" }}
+              spellCheck={false}
+            />
+          </label>
+          <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
+            POST <code>{"{endpoint}/{index}/_search"}</code>。消息 data 为空时用上述默认体；为 JSON 对象时作为完整请求体；为纯文本时按{" "}
+            <code>query_string</code> 检索（size/sort 尽量继承默认体）。
           </p>
         </>
       )}

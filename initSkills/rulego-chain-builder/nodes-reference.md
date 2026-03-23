@@ -93,6 +93,27 @@
 - 成功时 `data` 为 TLS 返回的 JSON（含 `Logs`、`HitCount` 等）；`metadata` 含 `volc_tls_topic_id`、`volc_tls_query`、`volc_tls_hit_count`
 - 连接：`Success` / `Failure`
 
+### `opensearch/search` — OpenSearch / Elasticsearch 日志检索
+```json
+{
+  "type": "opensearch/search",
+  "configuration": {
+    "endpoint": "https://localhost:9200",
+    "index": "logs-*",
+    "username": "",
+    "password": "",
+    "insecureSkipVerify": false,
+    "timeoutSec": 60,
+    "defaultSearchBody": "{\"size\":100,\"sort\":[{\"@timestamp\":{\"order\":\"desc\"}}],\"query\":{\"match_all\":{}}}"
+  }
+}
+```
+- 请求：`POST {endpoint}/{index}/_search`，`index` 支持逗号分隔多索引或通配（如 `logs-*,metrics-*`）
+- `defaultSearchBody`：合法 JSON 对象；鉴权为可选 Basic Auth
+- 入站消息 `data`：空则使用 `defaultSearchBody`；为 JSON **对象**则作为完整 `_search` 请求体；为纯文本则包装为 `query_string.query`（`size` / `sort` 尽量从默认体继承）
+- 成功时 `data` 为集群返回的 JSON；`metadata` 含 `opensearch_index`、`opensearch_http_status`、`opensearch_took_ms`、`opensearch_hits_total`（若能解析）
+- 连接：`Success` / `Failure`
+
 ### `jsTransform` — JS 转换器
 ```json
 {
