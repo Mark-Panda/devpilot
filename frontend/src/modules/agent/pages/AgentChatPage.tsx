@@ -66,17 +66,17 @@ function OcTopBar() {
   return (
     <header className="flex flex-shrink-0 items-center gap-3 border-b border-stone-200 bg-white px-4 py-2.5 sm:px-6">
       <nav className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-stone-500">
-        <Link to="/agent" className="shrink-0 hover:text-stone-800">
+        <Link to="/agent" className="shrink-0 font-bold text-stone-800 hover:text-rose-800">
           聊天
         </Link>
         <span className="shrink-0 text-stone-300" aria-hidden>
           ›
         </span>
-        <span className="min-w-0 truncate font-medium text-stone-800">当前会话</span>
+        <span className="min-w-0 truncate text-base font-bold text-stone-900 sm:text-sm">当前会话</span>
       </nav>
       <Link
         to="/studios"
-        className="shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:border-stone-300 hover:bg-stone-100"
+        className="shrink-0 rounded-lg border border-rose-100 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-800 transition-colors hover:border-rose-200 hover:bg-rose-100"
       >
         工作室
       </Link>
@@ -244,7 +244,7 @@ export const AgentChatPage: React.FC = () => {
 
       <div className="flex flex-shrink-0 flex-col gap-2 border-b border-stone-200 bg-white px-4 py-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:px-6">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-xs text-stone-600">
-          <span className="shrink-0 font-medium text-stone-500">
+          <span className="shrink-0 text-xs font-bold text-stone-800">
             {currentAgent?.config.workspace_root?.trim()
               ? '本 Agent 工作区'
               : '应用默认工作区'}
@@ -283,7 +283,7 @@ export const AgentChatPage: React.FC = () => {
               setModelMenuOpen(false)
               setAgentMenuOpen((o) => !o)
             }}
-            className="flex items-center gap-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm font-medium text-stone-800 transition-colors hover:bg-stone-100"
+            className="flex items-center gap-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 text-sm font-bold text-stone-900 transition-colors hover:bg-stone-100"
             aria-expanded={agentMenuOpen}
             aria-haspopup="listbox"
           >
@@ -565,7 +565,7 @@ export const AgentChatPage: React.FC = () => {
           aria-labelledby="clear-memory-title"
         >
           <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl">
-            <h2 id="clear-memory-title" className="text-lg font-semibold text-stone-800">
+            <h2 id="clear-memory-title" className="text-lg font-bold text-stone-900">
               清空对话记忆
             </h2>
             <p className="mt-2 text-sm text-stone-600">

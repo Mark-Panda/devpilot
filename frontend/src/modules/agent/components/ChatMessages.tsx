@@ -51,7 +51,7 @@ export function ChatMessages({
             <path strokeLinecap="round" strokeLinejoin="round" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
           </svg>
         </div>
-        <h3 className="mb-1 text-lg font-medium text-stone-700">开始对话</h3>
+        <h3 className="mb-1 text-lg font-bold text-stone-900">开始对话</h3>
         <p className="mb-8 text-sm text-stone-500">在下方输入消息发送给助手</p>
         <div className="grid w-full max-w-xl grid-cols-1 gap-2 text-left sm:grid-cols-2">
           {['分析当前项目结构', '解释一段代码', '写一个 HTTP 客户端示例', '列出常用重构手法'].map((text, idx) => (
@@ -129,7 +129,7 @@ export function ChatMessages({
               <div className="min-w-0 flex-1">
                 {toolCount > 0 && (
                   <>
-                    <div className="mb-2 flex items-center gap-2 text-xs font-medium text-stone-600">
+                    <div className="mb-2 flex items-center gap-2 text-xs font-bold text-stone-800">
                       <IconLightning className="h-4 w-4 text-orange-500" />
                       <span>
                         {toolCount} tool{toolCount > 1 ? 's' : ''} read

@@ -21,6 +21,24 @@ func AgentGlobalDataDir() (string, error) {
 	return filepath.Join(home, ".devpilot"), nil
 }
 
+// DefaultAgentWorkspaceDir 应用级默认 Agent 工作区根目录：~/.devpilot/workData。
+// 目录不存在时会创建（0755）；供聊天页「应用默认工作区」与未设置 workspace_root 的 Agent 使用。
+func DefaultAgentWorkspaceDir() (string, error) {
+	base, err := AgentGlobalDataDir()
+	if err != nil {
+		return "", err
+	}
+	dir := filepath.Join(base, "workData")
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return "", fmt.Errorf("default workData dir: %w", err)
+	}
+	abs, err := filepath.Abs(dir)
+	if err != nil {
+		return dir, nil
+	}
+	return abs, nil
+}
+
 func agentGlobalDataDirOrEmpty() string {
 	d, _ := AgentGlobalDataDir()
 	return d

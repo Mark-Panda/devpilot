@@ -80,7 +80,7 @@ export const StudioListPage: React.FC = () => {
       <div className="mx-auto max-w-4xl">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl font-semibold text-stone-800">工作室</h1>
+            <h1 className="text-2xl font-bold text-stone-900">工作室</h1>
             <p className="mt-1 text-sm text-stone-500">
               每个工作室绑定一个主 Agent；创建时会以当前主 Agent 下属树作为协作成员。对话仅与主 Agent 进行，子任务由主 Agent
               委派，进度在工作室页实时展示。
@@ -106,7 +106,7 @@ export const StudioListPage: React.FC = () => {
           </div>
         ) : studios.length === 0 ? (
           <div className="rounded-2xl border border-dashed border-stone-200 bg-white px-8 py-14 text-center shadow-sm">
-            <p className="text-base font-medium text-stone-800">还没有工作室</p>
+            <p className="text-base font-bold text-stone-900">还没有工作室</p>
             <p className="mx-auto mt-2 max-w-md text-sm text-stone-500">
               创建一个工作室，把主 Agent 及其子 Agent 拉进同一协作空间，在左侧看任务进度与 TODO，在右侧与主 Agent 对话。
             </p>
@@ -166,7 +166,7 @@ export const StudioListPage: React.FC = () => {
           aria-labelledby="studio-delete-title"
         >
           <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl">
-            <h2 id="studio-delete-title" className="text-lg font-semibold text-stone-800">
+            <h2 id="studio-delete-title" className="text-lg font-bold text-stone-900">
               删除工作室
             </h2>
             <p className="mt-2 text-sm text-stone-600">
@@ -200,7 +200,7 @@ export const StudioListPage: React.FC = () => {
             onSubmit={(e) => void handleCreate(e)}
             className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl"
           >
-            <h2 className="text-lg font-semibold text-stone-800">新建工作室</h2>
+            <h2 className="text-lg font-bold text-stone-900">新建工作室</h2>
             <p className="mt-1 text-xs text-stone-500">将同步纳入当前主 Agent 下的全部子 Agent（以运行时树为准）。</p>
             <div className="mt-4 space-y-3">
               <div>

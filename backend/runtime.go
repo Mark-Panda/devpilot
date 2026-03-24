@@ -65,17 +65,21 @@ func InitRuntime(dataDir string, initSkillsFS fs.FS) (*Runtime, error) {
 
 	EnsureSkillsFromInitFS(initSkillsFS, "initSkills")
 
-	// 初始化 Agent 服务：项目根默认为进程启动时的 cwd；用户可在聊天页「Agent 工作区」改为任意目录。
-	cwd, err := os.Getwd()
+	// 初始化 Agent 服务：项目根默认为 ~/.devpilot/workData（不存在则创建）；失败时回退到启动 cwd。用户可在聊天页改为任意目录。
+	projectRoot, err := agent.DefaultAgentWorkspaceDir()
 	if err != nil {
-		log.Printf("[agent] 获取当前目录失败: %v, 使用 /tmp", err)
-		cwd = "/tmp"
+		log.Printf("[agent] 默认工作区 ~/.devpilot/workData 不可用: %v, 回退到启动目录", err)
+		projectRoot, err = os.Getwd()
+		if err != nil {
+			log.Printf("[agent] 获取当前目录失败: %v, 使用 /tmp", err)
+			projectRoot = "/tmp"
+		}
 	}
-	agentService, err := agent.NewService(cwd)
+	agentService, err := agent.NewService(projectRoot)
 	if err != nil {
 		log.Printf("[agent] 初始化 Agent 服务失败: %v", err)
 	} else {
-		log.Printf("[agent] Agent 服务已启动, 初始项目路径(可 SetAgentWorkspaceRoot 切换): %s", cwd)
+		log.Printf("[agent] Agent 服务已启动, 初始项目路径(可 SetAgentWorkspaceRoot 切换): %s", projectRoot)
 	}
 
 	agentWrapper := NewAgentServiceWrapper(agentService)

@@ -314,7 +314,7 @@ func (s *Service) SetProjectConfig(ctx context.Context, key string, value interf
 	return s.projectCtx.SetConfig(ctx, key, value)
 }
 
-// RelocateProjectRoot 切换 Agent 与内置文件工具使用的项目根（默认曾为进程启动时的 cwd）。
+// RelocateProjectRoot 切换 Agent 与内置文件工具使用的项目根（启动默认为 ~/.devpilot/workData）。
 func (s *Service) RelocateProjectRoot(path string) error {
 	return s.projectCtx.RelocateRoot(path)
 }

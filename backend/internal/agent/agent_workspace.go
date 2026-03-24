@@ -53,7 +53,7 @@ func resolveWorkspacePathIfDir(p string) string {
 	return abs
 }
 
-// effectiveFileWorkspaceRootGlobal Agent 全局 workspace_root，否则应用项目根
+// effectiveFileWorkspaceRootGlobal Agent 全局 workspace_root，否则应用默认工作区根（~/.devpilot/workData 或 Relocate 后的路径）
 func (a *agentImpl) effectiveFileWorkspaceRootGlobal() string {
 	a.mu.RLock()
 	ws := strings.TrimSpace(a.config.WorkspaceRoot)
@@ -62,7 +62,7 @@ func (a *agentImpl) effectiveFileWorkspaceRootGlobal() string {
 		if got := resolveWorkspacePathIfDir(ws); got != "" {
 			return got
 		}
-		log.Warn().Str("agent_id", a.config.ID).Str("workspace_root", ws).Msg("agent workspace_root 无效，回退到应用项目根")
+		log.Warn().Str("agent_id", a.config.ID).Str("workspace_root", ws).Msg("agent workspace_root 无效，回退到应用默认工作区根")
 	}
 	if a.projectCtx != nil {
 		return strings.TrimSpace(a.projectCtx.RootPath())
@@ -70,7 +70,7 @@ func (a *agentImpl) effectiveFileWorkspaceRootGlobal() string {
 	return ""
 }
 
-// effectiveFileWorkspaceRoot 会话内文件工具与 MCP 根路径：工作室 (studio,agent) 覆盖 > Agent workspace_root > 应用项目根
+// effectiveFileWorkspaceRoot 会话内文件工具与 MCP 根路径：工作室 (studio,agent) 覆盖 > Agent workspace_root > 应用默认工作区根
 func (a *agentImpl) effectiveFileWorkspaceRoot(ctx context.Context) string {
 	sid := strings.TrimSpace(StudioIDFromContext(ctx))
 	if sid != "" && a.studioAgentWorkspace != nil {
