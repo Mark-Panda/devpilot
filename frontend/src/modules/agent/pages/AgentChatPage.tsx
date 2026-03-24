@@ -61,50 +61,25 @@ function proxyHostFromBaseUrl(baseUrl: string | undefined): string {
   }
 }
 
-/** OpenClaw 第一行：汉堡 + 面包屑 + 搜索 + 显示器 / 日 / 月 */
+/** 顶栏：面包屑 + 快捷入口（去掉无行为的占位按钮，减少干扰） */
 function OcTopBar() {
   return (
-    <header className="flex flex-shrink-0 items-center gap-2 border-b border-stone-200 bg-white px-4 py-2.5 sm:gap-3 sm:px-6">
-      <button type="button" className="rounded-lg p-1.5 text-stone-500 hover:bg-stone-100" aria-label="菜单">
-        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-        </svg>
-      </button>
-      <nav className="flex flex-shrink-0 items-center gap-1.5 text-sm text-stone-500">
-        <Link to="/" className="hover:text-stone-800">
-          DevPilot
+    <header className="flex flex-shrink-0 items-center gap-3 border-b border-stone-200 bg-white px-4 py-2.5 sm:px-6">
+      <nav className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-stone-500">
+        <Link to="/agent" className="shrink-0 hover:text-stone-800">
+          聊天
         </Link>
-        <span className="text-stone-300">›</span>
-        <span className="font-medium text-stone-800">聊天</span>
+        <span className="shrink-0 text-stone-300" aria-hidden>
+          ›
+        </span>
+        <span className="min-w-0 truncate font-medium text-stone-800">当前会话</span>
       </nav>
-      <div className="hidden min-w-0 flex-1 justify-center md:flex">
-        <div className="flex w-full max-w-lg items-center gap-2 rounded-xl border border-stone-200 bg-stone-50 px-4 py-2 text-sm text-stone-400">
-          <span className="truncate">Search…</span>
-          <kbd className="ml-auto rounded border border-stone-200 bg-white px-1.5 py-0.5 font-sans text-[10px] text-stone-500">
-            ⌘K
-          </kbd>
-        </div>
-      </div>
-      <div className="ml-auto flex flex-shrink-0 items-center gap-0.5">
-        <button type="button" className="rounded-lg p-2 text-stone-500 hover:bg-stone-100 md:hidden" aria-label="搜索">
-          <span className="text-xs text-stone-400">⌘K</span>
-        </button>
-        <button type="button" className="rounded-lg p-2 text-stone-500 hover:bg-stone-100" title="布局" aria-label="布局">
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-          </svg>
-        </button>
-        <button type="button" className="rounded-lg p-2 text-stone-500 hover:bg-stone-100" title="浅色" aria-label="浅色">
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-          </svg>
-        </button>
-        <button type="button" className="rounded-lg p-2 text-stone-500 hover:bg-stone-100" title="深色" aria-label="深色">
-          <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-          </svg>
-        </button>
-      </div>
+      <Link
+        to="/studios"
+        className="shrink-0 rounded-lg border border-stone-200 bg-stone-50 px-3 py-1.5 text-xs font-medium text-stone-700 transition-colors hover:border-stone-300 hover:bg-stone-100"
+      >
+        工作室
+      </Link>
     </header>
   )
 }
@@ -198,8 +173,18 @@ export const AgentChatPage: React.FC = () => {
       if (agentMenuOpen && agentEl && !agentEl.contains(t)) setAgentMenuOpen(false)
       if (modelMenuOpen && modelEl && !modelEl.contains(t)) setModelMenuOpen(false)
     }
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setAgentMenuOpen(false)
+        setModelMenuOpen(false)
+      }
+    }
     document.addEventListener('mousedown', onDocMouseDown)
-    return () => document.removeEventListener('mousedown', onDocMouseDown)
+    document.addEventListener('keydown', onKeyDown)
+    return () => {
+      document.removeEventListener('mousedown', onDocMouseDown)
+      document.removeEventListener('keydown', onKeyDown)
+    }
   }, [agentMenuOpen, modelMenuOpen])
 
   const currentAgent = agents.find((a) => a.config.id === currentAgentId)
@@ -257,38 +242,40 @@ export const AgentChatPage: React.FC = () => {
     <div className="agent-chat-shell">
       <OcTopBar />
 
-      <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-stone-100 bg-stone-50/80 px-4 py-1.5 text-xs text-stone-600 sm:px-6">
-        <span className="font-medium text-stone-500">
-          {currentAgent?.config.workspace_root?.trim()
-            ? '本 Agent 工作区'
-            : '应用默认工作区'}
-        </span>
-        <code
-          className="max-w-[min(100%,48rem)] truncate rounded bg-white px-1.5 py-0.5 font-mono text-[11px] text-stone-800 ring-1 ring-stone-200"
-          title={
-            currentAgent?.config.workspace_root?.trim() ||
-            projectInfo?.path ||
-            ''
-          }
-        >
-          {currentAgent?.config.workspace_root?.trim() ||
-            projectInfo?.path ||
-            '加载中…'}
-        </code>
-        <button
-          type="button"
-          onClick={() => void pickAgentWorkspaceFolder()}
-          className="rounded-md border border-stone-200 bg-white px-2 py-0.5 text-stone-700 hover:bg-stone-100"
-          title="仅影响未配置「专属工作区」的 Agent"
-        >
-          更改应用默认
-        </button>
-        <span className="hidden text-stone-400 sm:inline">
-          （各 Agent 可在「Agent 管理」中设置专属目录覆盖默认；与 RuleGo workDir 无关）
-        </span>
+      <div className="flex flex-shrink-0 flex-col gap-2 border-b border-stone-200 bg-white px-4 py-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:px-6">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-xs text-stone-600">
+          <span className="shrink-0 font-medium text-stone-500">
+            {currentAgent?.config.workspace_root?.trim()
+              ? '本 Agent 工作区'
+              : '应用默认工作区'}
+          </span>
+          <code
+            className="min-w-0 max-w-full flex-1 truncate rounded bg-stone-50 px-1.5 py-0.5 font-mono text-[11px] text-stone-800 ring-1 ring-stone-200 sm:max-w-md"
+            title={
+              currentAgent?.config.workspace_root?.trim() ||
+              projectInfo?.path ||
+              ''
+            }
+          >
+            {currentAgent?.config.workspace_root?.trim() ||
+              projectInfo?.path ||
+              '加载中…'}
+          </code>
+          <button
+            type="button"
+            onClick={() => void pickAgentWorkspaceFolder()}
+            className="shrink-0 rounded-md border border-stone-200 bg-white px-2 py-0.5 text-stone-700 hover:bg-stone-100"
+            title="仅影响未配置「专属工作区」的 Agent"
+          >
+            更改默认
+          </button>
+        </div>
+        <p className="hidden text-[11px] leading-snug text-stone-400 xl:block xl:max-w-xs">
+          各 Agent 可在「Agent 管理」中设置专属目录覆盖默认；与 RuleGo workDir 无关。
+        </p>
       </div>
 
-      <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-stone-200 bg-white px-4 py-2 sm:gap-3 sm:px-6">
+      <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-stone-100 bg-stone-50/90 px-4 py-2 sm:gap-3 sm:px-6">
         <div className="relative flex-shrink-0" ref={agentMenuRef}>
           <button
             type="button"

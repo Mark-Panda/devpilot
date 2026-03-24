@@ -100,26 +100,46 @@ export const StudioListPage: React.FC = () => {
         )}
 
         {loading ? (
-          <p className="text-sm text-stone-500">加载中…</p>
+          <div className="flex items-center gap-3 py-12 text-sm text-stone-500">
+            <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-stone-200 border-t-rose-500" />
+            加载中…
+          </div>
         ) : studios.length === 0 ? (
-          <p className="text-sm text-stone-500">暂无工作室，请点击「新建工作室」。</p>
+          <div className="rounded-2xl border border-dashed border-stone-200 bg-white px-8 py-14 text-center shadow-sm">
+            <p className="text-base font-medium text-stone-800">还没有工作室</p>
+            <p className="mx-auto mt-2 max-w-md text-sm text-stone-500">
+              创建一个工作室，把主 Agent 及其子 Agent 拉进同一协作空间，在左侧看任务进度与 TODO，在右侧与主 Agent 对话。
+            </p>
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className="mt-6 rounded-xl bg-[#e11d48] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#be123c]"
+            >
+              新建工作室
+            </button>
+          </div>
         ) : (
-          <ul className="space-y-2">
+          <ul className="space-y-3">
             {studios.map((s) => (
               <li
                 key={s.id}
-                className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-stone-200 bg-white px-4 py-3 shadow-sm"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3.5 shadow-sm transition-shadow duration-200 hover:border-stone-300 hover:shadow-md"
               >
-                <div>
-                  <Link to={`/studios/${s.id}`} className="font-medium text-rose-700 hover:underline">
-                    {s.name}
-                  </Link>
-                  <p className="text-xs text-stone-500">主 Agent ID: {s.main_agent_id}</p>
-                </div>
-                <div className="flex gap-2">
+                <div className="min-w-0 flex-1">
                   <Link
                     to={`/studios/${s.id}`}
-                    className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm text-stone-700 hover:bg-stone-50"
+                    className="font-medium text-stone-900 hover:text-rose-700"
+                  >
+                    {s.name}
+                  </Link>
+                  <p className="mt-0.5 truncate font-mono text-xs text-stone-500" title={s.main_agent_id}>
+                    主 Agent · {s.main_agent_id}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <Link
+                    to={`/studios/${s.id}`}
+                    className="rounded-lg bg-rose-50 px-3 py-1.5 text-sm font-medium text-rose-700 hover:bg-rose-100"
                   >
                     进入
                   </Link>
@@ -127,7 +147,7 @@ export const StudioListPage: React.FC = () => {
                     type="button"
                     onClick={() => setConfirmDelete(s)}
                     disabled={deletingId !== null}
-                    className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm text-stone-500 hover:border-rose-200 hover:text-rose-600 disabled:opacity-50"
+                    className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm text-stone-500 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
                   >
                     删除
                   </button>

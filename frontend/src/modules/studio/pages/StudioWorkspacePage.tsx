@@ -243,16 +243,24 @@ export const StudioWorkspacePage: React.FC = () => {
   }
 
   return (
-    <div className="flex min-h-0 w-full flex-1 flex-col bg-stone-50">
-      <header className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-stone-200 bg-white px-4 py-2 sm:px-6">
-        <Link to="/studios" className="text-sm text-stone-500 hover:text-stone-800">
-          ← 工作室列表
-        </Link>
-        <span className="text-stone-300">|</span>
-        <h1 className="text-sm font-semibold text-stone-800">{detail.studio.name}</h1>
-        <span className="text-xs text-stone-400">
-          Team 视图：仅主 Agent「{mainName}」收消息；可用 @ 定向子 Agent
-        </span>
+    <div className="studio-workspace-root flex min-h-0 w-full flex-1 flex-col bg-stone-50">
+      <header className="flex flex-shrink-0 flex-col gap-1.5 border-b border-stone-200 bg-white px-4 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-1 sm:px-6">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <Link
+            to="/studios"
+            className="shrink-0 rounded-lg px-2 py-1 text-sm text-stone-500 transition-colors hover:bg-stone-100 hover:text-stone-800"
+          >
+            ← 工作室列表
+          </Link>
+          <span className="hidden text-stone-300 sm:inline" aria-hidden>
+            /
+          </span>
+          <h1 className="min-w-0 truncate text-base font-semibold text-stone-900 sm:text-sm">{detail.studio.name}</h1>
+        </div>
+        <p className="text-xs leading-relaxed text-stone-500 sm:ml-auto sm:max-w-xl sm:text-right">
+          主 Agent「<span className="font-medium text-stone-700">{mainName}</span>」统一收消息；输入框可用 <kbd className="rounded border border-stone-200 bg-stone-50 px-1 font-mono text-[10px]">@</kbd>{' '}
+          定向子 Agent。
+        </p>
       </header>
 
       {error && (
@@ -261,8 +269,8 @@ export const StudioWorkspacePage: React.FC = () => {
         </div>
       )}
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-0 lg:grid-cols-2 lg:divide-x lg:divide-stone-200">
-        <section className="flex min-h-0 flex-col border-b border-stone-200 lg:border-b-0">
+      <div className="studio-workspace-grid grid min-h-0 flex-1 grid-cols-1 gap-0 lg:grid-cols-[minmax(280px,1fr)_minmax(0,1.15fr)] lg:divide-x lg:divide-stone-200">
+        <section className="flex min-h-0 flex-col border-b border-stone-200 lg:min-h-0 lg:border-b-0">
           <div className="flex-shrink-0 border-b border-stone-100 bg-white px-4 py-2">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
@@ -322,125 +330,173 @@ export const StudioWorkspacePage: React.FC = () => {
               </ul>
             )}
           </div>
-          <div className="flex-shrink-0 border-t border-stone-100 bg-white px-4 py-2">
-            <p className="text-[11px] font-medium text-stone-500">TODO 看板（各 Agent 通过工具维护）</p>
-            <div className="mt-1 max-h-40 overflow-y-auto text-[11px] text-stone-600">
-              {todoBoard.length === 0 ? (
-                <p className="text-stone-400">暂无数据；Agent 在工作室对话中会使用 devpilot_studio_todo 写入清单。</p>
-              ) : (
-                <ul className="space-y-2">
-                  {todoBoard.map((row) => {
-                    const items = Array.isArray(row.items) ? row.items : []
-                    const rowKey = row.agent_id || `row_${items.length}`
-                    return (
-                      <li key={rowKey} className="rounded border border-stone-100 bg-stone-50 px-2 py-1.5">
-                        <p className="font-medium text-stone-800">{row.agent_name ?? row.agent_id}</p>
-                        {items.length === 0 ? (
-                          <p className="text-stone-400">未设置 TODO</p>
-                        ) : (
-                          <ul className="mt-0.5 list-none space-y-0.5 pl-0">
-                            {items.map((it, idx) => (
-                              <li key={it.id || `todo_${idx}`} className="flex gap-1.5">
-                                <span className={it.done ? 'text-emerald-600' : 'text-stone-400'}>
-                                  {it.done ? '☑' : '☐'}
-                                </span>
-                                <span className={it.done ? 'text-stone-500 line-through' : ''}>
-                                  <code className="text-[10px] text-stone-400">{it.id}</code> {it.title}
-                                </span>
-                              </li>
-                            ))}
-                          </ul>
-                        )}
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
+          <details className="group border-t border-stone-100 bg-white">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-2.5 text-[11px] font-semibold text-stone-600 marker:content-none [&::-webkit-details-marker]:hidden hover:bg-stone-50">
+              <span>TODO 看板</span>
+              <span className="flex items-center gap-2 text-[10px] font-normal text-stone-400">
+                {todoBoard.length > 0 ? `${todoBoard.length} 名 Agent` : '暂无'}
+                <svg
+                  className="h-3.5 w-3.5 shrink-0 text-stone-400 transition-transform group-open:rotate-180"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </span>
+            </summary>
+            <div className="border-t border-stone-50 px-4 pb-3 pt-1">
+              <p className="mb-2 text-[10px] text-stone-400">
+                各 Agent 通过工具维护；约每 105s 主 Agent 进度巡检，简报出现在右侧对话。
+              </p>
+              <div className="max-h-40 overflow-y-auto text-[11px] text-stone-600">
+                {todoBoard.length === 0 ? (
+                  <p className="text-stone-400">暂无数据；对话中可使用 devpilot_studio_todo 写入清单。</p>
+                ) : (
+                  <ul className="space-y-2">
+                    {todoBoard.map((row) => {
+                      const items = Array.isArray(row.items) ? row.items : []
+                      const rowKey = row.agent_id || `row_${items.length}`
+                      return (
+                        <li key={rowKey} className="rounded-lg border border-stone-100 bg-stone-50 px-2 py-1.5">
+                          <p className="font-medium text-stone-800">{row.agent_name ?? row.agent_id}</p>
+                          {items.length === 0 ? (
+                            <p className="text-stone-400">未设置 TODO</p>
+                          ) : (
+                            <ul className="mt-0.5 list-none space-y-0.5 pl-0">
+                              {items.map((it, idx) => (
+                                <li key={it.id || `todo_${idx}`} className="flex gap-1.5">
+                                  <span className={it.done ? 'text-emerald-600' : 'text-stone-400'}>
+                                    {it.done ? '☑' : '☐'}
+                                  </span>
+                                  <span className={it.done ? 'text-stone-500 line-through' : ''}>
+                                    <code className="text-[10px] text-stone-400">{it.id}</code> {it.title}
+                                  </span>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </li>
+                      )
+                    })}
+                  </ul>
+                )}
+              </div>
             </div>
-            <p className="mt-1.5 text-[10px] text-stone-400">
-              约每 105s 请求主 Agent 进度巡检（90s 后端冷却）；简报出现在右侧对话。
-            </p>
-          </div>
-          <div className="flex-shrink-0 border-t border-stone-100 bg-white px-4 py-2">
-            <p className="text-[11px] font-medium text-stone-500">成员工作区（本工作室独享）</p>
-            <p className="mt-0.5 text-[10px] text-stone-400">
-              在此为每名成员设置文件工具根目录；同一 Agent 在不同工作室可设不同路径。未设置则沿用 Agent 全局「专属工作区」或应用默认。
-            </p>
-            <ul className="mt-2 max-h-36 space-y-2 overflow-y-auto text-[11px]">
-              {detail.member_agents.map((a) => {
-                const id = a.config.id
-                const cur = workspaceByAgent[id] ?? ''
-                const busy = wsSavingAgentId === id
-                return (
-                  <li key={id} className="rounded border border-stone-100 bg-stone-50 px-2 py-1.5">
-                    <div className="font-medium text-stone-800">
-                      {a.config.name}{' '}
-                      <code className="text-[10px] font-normal text-stone-400">{id}</code>
-                    </div>
-                    <p
-                      className="mt-0.5 truncate font-mono text-[10px] text-stone-600"
-                      title={cur || '（未设置）'}
-                    >
-                      {cur || '— 未单独设置 —'}
-                    </p>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      <button
-                        type="button"
-                        disabled={busy}
-                        onClick={() => void pickMemberWorkspace(id)}
-                        className="rounded border border-stone-200 bg-white px-2 py-0.5 text-stone-700 hover:bg-stone-100 disabled:opacity-50"
+          </details>
+
+          <details className="group border-t border-stone-100 bg-white">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-2.5 text-[11px] font-semibold text-stone-600 marker:content-none [&::-webkit-details-marker]:hidden hover:bg-stone-50">
+              <span>成员工作区目录</span>
+              <svg
+                className="h-3.5 w-3.5 shrink-0 text-stone-400 transition-transform group-open:rotate-180"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </summary>
+            <div className="border-t border-stone-50 px-4 pb-3 pt-1">
+              <p className="mb-2 text-[10px] leading-relaxed text-stone-400">
+                本工作室内为每名成员单独设置文件工具根目录；未设置则沿用 Agent 全局「专属工作区」或应用默认。
+              </p>
+              <ul className="max-h-36 space-y-2 overflow-y-auto text-[11px]">
+                {detail.member_agents.map((a) => {
+                  const id = a.config.id
+                  const cur = workspaceByAgent[id] ?? ''
+                  const busy = wsSavingAgentId === id
+                  return (
+                    <li key={id} className="rounded-lg border border-stone-100 bg-stone-50 px-2 py-1.5">
+                      <div className="font-medium text-stone-800">
+                        {a.config.name}{' '}
+                        <code className="text-[10px] font-normal text-stone-400">{id}</code>
+                      </div>
+                      <p
+                        className="mt-0.5 truncate font-mono text-[10px] text-stone-600"
+                        title={cur || '（未设置）'}
                       >
-                        {busy ? '…' : '选择目录'}
-                      </button>
-                      {cur ? (
+                        {cur || '— 未单独设置 —'}
+                      </p>
+                      <div className="mt-1 flex flex-wrap gap-1">
                         <button
                           type="button"
                           disabled={busy}
-                          onClick={() => void setMemberWorkspace(id, '')}
-                          className="rounded border border-stone-200 px-2 py-0.5 text-stone-600 hover:bg-stone-100 disabled:opacity-50"
+                          onClick={() => void pickMemberWorkspace(id)}
+                          className="rounded border border-stone-200 bg-white px-2 py-0.5 text-stone-700 hover:bg-stone-100 disabled:opacity-50"
                         >
-                          清除
+                          {busy ? '…' : '选择目录'}
                         </button>
-                      ) : null}
-                    </div>
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
-          <div className="flex-shrink-0 border-t border-stone-100 bg-stone-50 px-4 py-2">
-            <p className="text-[11px] font-medium text-stone-500">协作成员（当前树）</p>
-            <ul className="mt-1 max-h-28 overflow-y-auto text-[11px] text-stone-600">
-              {detail.member_agents.map((a) => {
-                const isMain = a.config.id === mainId || a.config.type === 'main'
-                return (
-                  <li key={a.config.id}>
-                    <button
-                      type="button"
-                      disabled={isMain}
-                      title={isMain ? '主 Agent 为统一入口，无需 @' : '插入 @ 到输入框'}
-                      className={`text-left ${isMain ? 'cursor-default opacity-70' : 'cursor-pointer hover:text-rose-700 hover:underline'}`}
-                      onClick={() => {
-                        if (isMain) return
-                        const token = /\s/.test(a.config.name) ? a.config.id : a.config.name
-                        setMentionAppend((x) => ({ nonce: x.nonce + 1, text: `@${token} ` }))
-                      }}
-                    >
-                      {a.config.name}{' '}
-                      <span className="text-stone-400">
-                        ({a.config.type}) {a.config.id}
-                      </span>
-                    </button>
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
+                        {cur ? (
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => void setMemberWorkspace(id, '')}
+                            className="rounded border border-stone-200 px-2 py-0.5 text-stone-600 hover:bg-stone-100 disabled:opacity-50"
+                          >
+                            清除
+                          </button>
+                        ) : null}
+                      </div>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          </details>
+
+          <details className="group border-t border-stone-100 bg-stone-50" open>
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-2 px-4 py-2.5 text-[11px] font-semibold text-stone-600 marker:content-none [&::-webkit-details-marker]:hidden hover:bg-stone-100/80">
+              <span>协作成员 · 点击插入 @</span>
+              <svg
+                className="h-3.5 w-3.5 shrink-0 text-stone-400 transition-transform group-open:rotate-180"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </summary>
+            <div className="border-t border-stone-200/60 px-4 pb-3 pt-2">
+              <ul className="max-h-32 space-y-1 overflow-y-auto text-[11px] text-stone-600">
+                {detail.member_agents.map((a) => {
+                  const isMain = a.config.id === mainId || a.config.type === 'main'
+                  return (
+                    <li key={a.config.id}>
+                      <button
+                        type="button"
+                        disabled={isMain}
+                        title={isMain ? '主 Agent 为统一入口，无需 @' : '插入 @ 到输入框'}
+                        className={`w-full rounded-md px-1.5 py-1 text-left transition-colors ${isMain ? 'cursor-default opacity-70' : 'cursor-pointer hover:bg-white hover:text-rose-700'}`}
+                        onClick={() => {
+                          if (isMain) return
+                          const token = /\s/.test(a.config.name) ? a.config.id : a.config.name
+                          setMentionAppend((x) => ({ nonce: x.nonce + 1, text: `@${token} ` }))
+                        }}
+                      >
+                        <span className="font-medium text-stone-800">{a.config.name}</span>{' '}
+                        <span className="text-stone-400">
+                          ({a.config.type})
+                        </span>
+                        <code className="ml-1 text-[10px] text-stone-400">{a.config.id}</code>
+                      </button>
+                    </li>
+                  )
+                })}
+              </ul>
+            </div>
+          </details>
         </section>
 
-        <section className="flex min-h-0 min-h-[50vh] flex-col bg-white lg:min-h-0">
-          <div className="flex-shrink-0 border-b border-stone-100 px-4 py-2">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-stone-500">与主 Agent 对话</h2>
+        <section className="studio-chat-column flex min-h-[50vh] flex-col bg-white lg:min-h-0">
+          <div className="flex flex-shrink-0 items-center justify-between gap-2 border-b border-stone-100 px-4 py-2.5">
+            <div>
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-stone-500">对话</h2>
+              <p className="mt-0.5 text-[11px] text-stone-400">主 Agent：{mainName}</p>
+            </div>
           </div>
           <div className="agent-chat-messages min-h-0 flex-1 overflow-y-auto">
             <ChatMessages
@@ -450,7 +506,7 @@ export const StudioWorkspacePage: React.FC = () => {
               modelName={detail.member_agents.find((x) => x.config.id === mainId)?.config.model_config?.model}
             />
           </div>
-          <footer className="agent-chat-composer border-t border-stone-200">
+          <footer className="agent-chat-composer">
             <div className="agent-chat-composer-inner">
               <StudioTeamChatInput
                 onSend={(display, payload) => void onSend(display, payload)}
