@@ -179,18 +179,20 @@ func (a *agentImpl) executeCreateAgentTeamTool(ctx context.Context, arguments st
 	skills := append([]string(nil), a.config.Skills...)
 	mcpServers := append([]string(nil), a.config.MCPServers...)
 	callerID := a.config.ID
+	wsReadonly := a.config.WorkspaceFileReadOnly
 	a.mu.RUnlock()
 
 	mainCfg := AgentConfig{
-		ID:           mainID,
-		Name:         mainName,
-		Role:         mainRole,
-		Type:         AgentTypeMain,
-		ParentID:     "",
-		ModelConfig:  mc,
-		Skills:       skills,
-		MCPServers:   mcpServers,
-		SystemPrompt: strings.TrimSpace(payload.MainAgent.SystemPrompt),
+		ID:                    mainID,
+		Name:                  mainName,
+		Role:                  mainRole,
+		Type:                  AgentTypeMain,
+		ParentID:              "",
+		ModelConfig:           mc,
+		Skills:                skills,
+		MCPServers:            mcpServers,
+		SystemPrompt:          strings.TrimSpace(payload.MainAgent.SystemPrompt),
+		WorkspaceFileReadOnly: wsReadonly,
 	}
 
 	if _, err := a.createAgentTool(ctx, callerID, mainCfg); err != nil {
@@ -204,15 +206,16 @@ func (a *agentImpl) executeCreateAgentTeamTool(ctx context.Context, arguments st
 			return "", err
 		}
 		subCfg := AgentConfig{
-			ID:           strings.TrimSpace(sub.ID),
-			Name:         strings.TrimSpace(sub.Name),
-			Role:         strings.TrimSpace(sub.Role),
-			Type:         at,
-			ParentID:     mainID,
-			ModelConfig:  mc,
-			Skills:       skills,
-			MCPServers:   mcpServers,
-			SystemPrompt: strings.TrimSpace(sub.SystemPrompt),
+			ID:                    strings.TrimSpace(sub.ID),
+			Name:                  strings.TrimSpace(sub.Name),
+			Role:                  strings.TrimSpace(sub.Role),
+			Type:                  at,
+			ParentID:              mainID,
+			ModelConfig:           mc,
+			Skills:                skills,
+			MCPServers:            mcpServers,
+			SystemPrompt:          strings.TrimSpace(sub.SystemPrompt),
+			WorkspaceFileReadOnly: wsReadonly,
 		}
 		if _, err := a.createAgentTool(ctx, callerID, subCfg); err != nil {
 			return "", fmt.Errorf("已创建主 Agent %q，但在创建 sub_agents[%d]（%q）失败: %w；请在前端检查或删除已创建的 Agent", mainID, i, subCfg.ID, err)

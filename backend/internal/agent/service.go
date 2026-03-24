@@ -70,6 +70,7 @@ func NewService(projectPath string) (*Service, error) {
 		orchestrator.SetStudioProgressHook(func(ev StudioProgressEvent) {
 			s.onStudioProgress(ev)
 		})
+		orchestrator.SetStudioAgentWorkspaceRuntime(s)
 	}
 
 	configs, err := loadAgentRegistry(projectCtx.RootPath())
@@ -311,6 +312,11 @@ func (s *Service) GetProjectConfig(ctx context.Context, key string) (interface{}
 // SetProjectConfig 设置项目配置
 func (s *Service) SetProjectConfig(ctx context.Context, key string, value interface{}) error {
 	return s.projectCtx.SetConfig(ctx, key, value)
+}
+
+// RelocateProjectRoot 切换 Agent 与内置文件工具使用的项目根（默认曾为进程启动时的 cwd）。
+func (s *Service) RelocateProjectRoot(path string) error {
+	return s.projectCtx.RelocateRoot(path)
 }
 
 // Shutdown 关闭服务

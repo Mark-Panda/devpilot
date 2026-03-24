@@ -15,14 +15,17 @@ import (
 const maxProgressEventsPerStudio = 500
 
 type studiosFileDoc struct {
-	Version  int                              `json:"version"`
-	Studios  []Studio                         `json:"studios"`
+	Version int `json:"version"`
+	Studios []Studio `json:"studios"`
+	// Progress 工作室进度时间线
 	Progress map[string][]StudioProgressEvent `json:"progress"`
+	// AgentWorkspaces studio_id -> agent_id -> 文件工具根目录（绝对路径）
+	AgentWorkspaces map[string]map[string]string `json:"agent_workspaces,omitempty"`
 }
 
 // StudioStore 工作室与进度持久化（~/.devpilot/studios.json）
 type StudioStore struct {
-	mu     sync.Mutex
+	mu     sync.RWMutex
 	path   string
 	doc    studiosFileDoc
 	loaded bool
@@ -32,7 +35,11 @@ func NewStudioStore(path string) (*StudioStore, error) {
 	if path == "" {
 		return nil, fmt.Errorf("studios path empty")
 	}
-	s := &StudioStore{path: path, doc: studiosFileDoc{Version: 1, Progress: make(map[string][]StudioProgressEvent)}}
+	s := &StudioStore{path: path, doc: studiosFileDoc{
+		Version:         1,
+		Progress:        make(map[string][]StudioProgressEvent),
+		AgentWorkspaces: make(map[string]map[string]string),
+	}}
 	if err := s.load(); err != nil {
 		return nil, err
 	}
@@ -59,6 +66,9 @@ func (s *StudioStore) load() error {
 	}
 	if doc.Progress == nil {
 		doc.Progress = make(map[string][]StudioProgressEvent)
+	}
+	if doc.AgentWorkspaces == nil {
+		doc.AgentWorkspaces = make(map[string]map[string]string)
 	}
 	s.doc = doc
 	s.loaded = true
@@ -150,6 +160,73 @@ func (s *StudioStore) DeleteStudio(studioID string) error {
 	}
 	s.doc.Studios = append(s.doc.Studios[:idx], s.doc.Studios[idx+1:]...)
 	delete(s.doc.Progress, studioID)
+	delete(s.doc.AgentWorkspaces, studioID)
+	return s.saveLocked()
+}
+
+// GetAgentWorkspace 返回本工作室下该 Agent 的文件工具根（绝对路径）；未配置返回空串
+func (s *StudioStore) GetAgentWorkspace(studioID, agentID string) string {
+	studioID = strings.TrimSpace(studioID)
+	agentID = strings.TrimSpace(agentID)
+	if studioID == "" || agentID == "" {
+		return ""
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	bySt, ok := s.doc.AgentWorkspaces[studioID]
+	if !ok {
+		return ""
+	}
+	return strings.TrimSpace(bySt[agentID])
+}
+
+// ListAgentWorkspaces 返回工作室内全部已配置的成员工作区（拷贝）
+func (s *StudioStore) ListAgentWorkspaces(studioID string) map[string]string {
+	studioID = strings.TrimSpace(studioID)
+	if studioID == "" {
+		return nil
+	}
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	bySt, ok := s.doc.AgentWorkspaces[studioID]
+	if !ok || len(bySt) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(bySt))
+	for k, v := range bySt {
+		out[k] = v
+	}
+	return out
+}
+
+// SetAgentWorkspace 设置或清除（path 空）某成员在本工作室内的文件工具根
+func (s *StudioStore) SetAgentWorkspace(studioID, agentID, path string) error {
+	studioID = strings.TrimSpace(studioID)
+	agentID = strings.TrimSpace(agentID)
+	if studioID == "" || agentID == "" {
+		return fmt.Errorf("studio_id 与 agent_id 不能为空")
+	}
+	path = strings.TrimSpace(path)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.doc.AgentWorkspaces == nil {
+		s.doc.AgentWorkspaces = make(map[string]map[string]string)
+	}
+	room := s.doc.AgentWorkspaces[studioID]
+	if path == "" {
+		if room != nil {
+			delete(room, agentID)
+			if len(room) == 0 {
+				delete(s.doc.AgentWorkspaces, studioID)
+			}
+		}
+		return s.saveLocked()
+	}
+	if room == nil {
+		room = make(map[string]string)
+		s.doc.AgentWorkspaces[studioID] = room
+	}
+	room[agentID] = path
 	return s.saveLocked()
 }
 

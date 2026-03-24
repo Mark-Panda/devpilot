@@ -42,6 +42,9 @@ type Orchestrator struct {
 
 	studioTodoMu      sync.RWMutex
 	studioTodoRuntime StudioTodoRuntime // 工作室 TODO，可为 nil
+
+	studioAgentWsMu      sync.RWMutex
+	studioAgentWorkspace StudioAgentWorkspaceRuntime // 工作室成员文件工具根，可为 nil
 }
 
 // NewOrchestrator 创建编排器
@@ -99,6 +102,19 @@ func (o *Orchestrator) studioTodoRuntimeFn() StudioTodoRuntime {
 	return o.studioTodoRuntime
 }
 
+// SetStudioAgentWorkspaceRuntime 注册工作室成员工作区查询（须在从注册表恢复 Agent 之前调用）
+func (o *Orchestrator) SetStudioAgentWorkspaceRuntime(rt StudioAgentWorkspaceRuntime) {
+	o.studioAgentWsMu.Lock()
+	defer o.studioAgentWsMu.Unlock()
+	o.studioAgentWorkspace = rt
+}
+
+func (o *Orchestrator) studioAgentWorkspaceFn() StudioAgentWorkspaceRuntime {
+	o.studioAgentWsMu.RLock()
+	defer o.studioAgentWsMu.RUnlock()
+	return o.studioAgentWorkspace
+}
+
 func (o *Orchestrator) studioProgressHook() func(StudioProgressEvent) {
 	o.studioMu.RLock()
 	defer o.studioMu.RUnlock()
@@ -134,9 +150,15 @@ func (o *Orchestrator) CreateAgent(ctx context.Context, config AgentConfig) (Age
 		return nil, fmt.Errorf("agent %s already exists", config.ID)
 	}
 
+	ws, err := NormalizeAgentWorkspaceRoot(config.WorkspaceRoot)
+	if err != nil {
+		return nil, err
+	}
+	config.WorkspaceRoot = ws
+
 	lookup := o.peerAgentLookup()
 	hook := o.studioProgressHook()
-	agent, err := NewAgent(ctx, config, o.messageBus, o.projectCtx, lookup, hook, o.createAgentToolFn(), o.studioSubFinishedFn(), o.studioTodoRuntimeFn())
+	agent, err := NewAgent(ctx, config, o.messageBus, o.projectCtx, lookup, hook, o.createAgentToolFn(), o.studioSubFinishedFn(), o.studioTodoRuntimeFn(), o.studioAgentWorkspaceFn())
 	if err != nil {
 		return nil, fmt.Errorf("create agent: %w", err)
 	}
@@ -341,6 +363,11 @@ func (o *Orchestrator) UpdateAgent(ctx context.Context, cfg AgentConfig) error {
 	} else if len(cfg.Metadata) == 0 {
 		cfg.Metadata = nil
 	}
+	ws, err := NormalizeAgentWorkspaceRoot(cfg.WorkspaceRoot)
+	if err != nil {
+		return err
+	}
+	cfg.WorkspaceRoot = ws
 	return impl.UpdateEditableConfig(ctx, cfg)
 }
 

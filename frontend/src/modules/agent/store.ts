@@ -3,6 +3,8 @@
 import { create } from 'zustand'
 import { agentApi } from './api'
 import { errorMessageFromUnknown } from './formatError'
+
+const AGENT_WORKSPACE_STORAGE_KEY = 'devpilot_agent_workspace_root'
 import type {
   AgentInfo,
   AgentConfig,
@@ -49,6 +51,12 @@ interface AgentState {
   clearMessages: () => void
   clearAgentMemory: () => Promise<void>
   loadProjectInfo: () => Promise<void>
+  /** 若 localStorage 中存有上次选择的目录，则切换到该目录并刷新 projectInfo */
+  applyStoredAgentWorkspace: () => Promise<void>
+  /** 设置 Agent 工作区根路径并持久化到 localStorage */
+  setAgentWorkspaceRoot: (path: string) => Promise<void>
+  /** 打开系统目录选择对话框并设为工作区 */
+  pickAgentWorkspaceFolder: () => Promise<void>
   loadAgentTree: (rootId: string) => Promise<void>
   updateAgentModel: (agentId: string, mc: ModelConfig) => Promise<void>
   updateAgent: (config: AgentConfig) => Promise<AgentInfo>
@@ -257,6 +265,45 @@ export const useAgentStore = create<AgentState>((set, get) => ({
     } catch (err) {
       const error =
         err instanceof Error ? err.message : 'Failed to load project info'
+      set({ error })
+    }
+  },
+
+  applyStoredAgentWorkspace: async () => {
+    const p = localStorage.getItem(AGENT_WORKSPACE_STORAGE_KEY)?.trim()
+    if (!p) return
+    try {
+      await agentApi.setAgentWorkspaceRoot(p)
+      const projectInfo = await agentApi.getProjectInfo()
+      set({ projectInfo, error: null })
+    } catch (err) {
+      const msg = errorMessageFromUnknown(err)
+      set({ error: `恢复已保存的工作区失败（${msg}），仍使用启动目录` })
+    }
+  },
+
+  setAgentWorkspaceRoot: async (path: string) => {
+    const p = path.trim()
+    if (!p) return
+    try {
+      await agentApi.setAgentWorkspaceRoot(p)
+      localStorage.setItem(AGENT_WORKSPACE_STORAGE_KEY, p)
+      const projectInfo = await agentApi.getProjectInfo()
+      set({ projectInfo, error: null })
+    } catch (err) {
+      const error = errorMessageFromUnknown(err)
+      set({ error })
+      throw err
+    }
+  },
+
+  pickAgentWorkspaceFolder: async () => {
+    try {
+      const p = (await agentApi.openAgentWorkspaceDialog()).trim()
+      if (!p) return
+      await get().setAgentWorkspaceRoot(p)
+    } catch (err) {
+      const error = errorMessageFromUnknown(err)
       set({ error })
     }
   },

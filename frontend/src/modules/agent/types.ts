@@ -15,6 +15,10 @@ export interface AgentConfig {
   skills: string[]
   mcp_servers: string[]
   system_prompt: string
+  /** 为 true 时仅允许项目内读文件与列目录，不允许写入 / search_replace */
+  workspace_file_readonly?: boolean
+  /** 非空时，内置文件工具仅在此目录下操作；空则使用聊天页「应用默认工作区」 */
+  workspace_root?: string
   metadata?: Record<string, any>
 }
 

@@ -115,7 +115,10 @@ export const AgentChatPage: React.FC = () => {
     currentAgentId,
     messages,
     error,
+    projectInfo,
     loadAgents,
+    applyStoredAgentWorkspace,
+    pickAgentWorkspaceFolder,
     createAgent,
     selectAgent,
     sendMessage,
@@ -141,6 +144,8 @@ export const AgentChatPage: React.FC = () => {
     ;(async () => {
       try {
         await loadAgents()
+        await useAgentStore.getState().loadProjectInfo()
+        await useAgentStore.getState().applyStoredAgentWorkspace()
         const options = await modelManagementApi.getAllModelOptions()
         if (gen !== agentChatInitGeneration) return
         setModelOptions(options)
@@ -251,6 +256,37 @@ export const AgentChatPage: React.FC = () => {
   return (
     <div className="agent-chat-shell">
       <OcTopBar />
+
+      <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-stone-100 bg-stone-50/80 px-4 py-1.5 text-xs text-stone-600 sm:px-6">
+        <span className="font-medium text-stone-500">
+          {currentAgent?.config.workspace_root?.trim()
+            ? '本 Agent 工作区'
+            : '应用默认工作区'}
+        </span>
+        <code
+          className="max-w-[min(100%,48rem)] truncate rounded bg-white px-1.5 py-0.5 font-mono text-[11px] text-stone-800 ring-1 ring-stone-200"
+          title={
+            currentAgent?.config.workspace_root?.trim() ||
+            projectInfo?.path ||
+            ''
+          }
+        >
+          {currentAgent?.config.workspace_root?.trim() ||
+            projectInfo?.path ||
+            '加载中…'}
+        </code>
+        <button
+          type="button"
+          onClick={() => void pickAgentWorkspaceFolder()}
+          className="rounded-md border border-stone-200 bg-white px-2 py-0.5 text-stone-700 hover:bg-stone-100"
+          title="仅影响未配置「专属工作区」的 Agent"
+        >
+          更改应用默认
+        </button>
+        <span className="hidden text-stone-400 sm:inline">
+          （各 Agent 可在「Agent 管理」中设置专属目录覆盖默认；与 RuleGo workDir 无关）
+        </span>
+      </div>
 
       <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-stone-200 bg-white px-4 py-2 sm:gap-3 sm:px-6">
         <div className="relative flex-shrink-0" ref={agentMenuRef}>

@@ -97,7 +97,30 @@ export const studioApi = {
   },
 
   getStudioDetail: async (studioID: string): Promise<StudioDetail> => {
-    return await window.go.main.App.GetStudioDetail(studioID)
+    const v = await window.go.main.App.GetStudioDetail(studioID)
+    const raw = v as StudioDetail & { agent_workspaces?: Record<string, string> }
+    const aw = raw.agent_workspaces
+    return {
+      ...raw,
+      agent_workspaces:
+        aw && typeof aw === 'object' && !Array.isArray(aw)
+          ? Object.fromEntries(
+              Object.entries(aw).filter(([k, val]) => typeof k === 'string' && typeof val === 'string')
+            )
+          : undefined,
+    }
+  },
+
+  setStudioAgentWorkspace: async (
+    studioID: string,
+    agentID: string,
+    path: string
+  ): Promise<void> => {
+    const fn = window.go?.main?.App?.SetStudioAgentWorkspace
+    if (typeof fn !== 'function') {
+      throw new Error('SetStudioAgentWorkspace 未绑定，请 wails build 重新编译')
+    }
+    await fn(studioID, agentID, path)
   },
 
   getStudioProgress: async (studioID: string): Promise<StudioProgressEvent[]> => {

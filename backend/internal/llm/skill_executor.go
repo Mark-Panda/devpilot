@@ -3,6 +3,7 @@ package llm
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"log"
 	"os/exec"
@@ -77,7 +78,11 @@ func (e *skillExecutor) Execute(ctx context.Context, name, arguments string) (st
 	}
 	// 1) 若技能配置了 command，直接执行命令（以技能目录为 cwd，arguments 传 stdin），真正跑脚本并等待结果
 	if cmdStr := strings.TrimSpace(skill.Command); cmdStr != "" {
-		return runSkillCommand(ctx, skill.Dir, cmdStr, userInput)
+		out, err := runSkillCommand(ctx, skill.Dir, cmdStr, userInput)
+		if err != nil && skill.CommandLLMFallbackExit > 0 && exitCodeOf(err) == skill.CommandLLMFallbackExit {
+			return e.client.ChatWithSystem(ctx, skill.Content, userInput)
+		}
+		return out, err
 	}
 	// 2) 若关联了规则链，执行规则链
 	if skill.RuleChainID != "" && RuleChainExecutor != nil {
@@ -118,4 +123,12 @@ func runSkillCommand(ctx context.Context, dir, command, input string) (string, e
 		return strings.TrimSpace(outBuf.String()) + "\n\nerror: " + err.Error(), err
 	}
 	return strings.TrimSpace(outBuf.String()), nil
+}
+
+func exitCodeOf(err error) int {
+	var ee *exec.ExitError
+	if errors.As(err, &ee) {
+		return ee.ExitCode()
+	}
+	return -1
 }

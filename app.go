@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"devpilot/backend"
 
@@ -34,6 +35,24 @@ func (a *App) OpenSkillZipDialog() (string, error) {
 			{DisplayName: "所有文件", Pattern: "*"},
 		},
 	})
+}
+
+// OpenAgentWorkspaceDialog 选择 Agent 工作区目录（内置读/写文件工具相对此根路径）。
+func (a *App) OpenAgentWorkspaceDialog() (string, error) {
+	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "选择 Agent 工作区目录",
+	})
+}
+
+// SetAgentWorkspaceRoot 将 Agent 项目根切换为 path；与 RuleGo 画布上的 workDir 无关。
+func (a *App) SetAgentWorkspaceRoot(path string) error {
+	if strings.TrimSpace(path) == "" {
+		return fmt.Errorf("路径不能为空")
+	}
+	if a.runtime.AgentWrapper() == nil {
+		return fmt.Errorf("agent 服务未就绪")
+	}
+	return a.runtime.AgentWrapper().RelocateProjectRoot(a.ctx, path)
 }
 
 func (a *App) shutdown(ctx context.Context) {
@@ -244,6 +263,14 @@ func (a *App) GetStudioDetail(studioID string) (backend.StudioDetail, error) {
 		return backend.StudioDetail{}, fmt.Errorf("agent 服务未就绪")
 	}
 	return a.runtime.AgentWrapper().GetStudioDetail(a.ctx, studioID)
+}
+
+// SetStudioAgentWorkspace 设置/清除工作室内某成员的文件工具根目录（path 空为清除）
+func (a *App) SetStudioAgentWorkspace(studioID, agentID, path string) error {
+	if a.runtime.AgentWrapper() == nil {
+		return fmt.Errorf("agent 服务未就绪")
+	}
+	return a.runtime.AgentWrapper().SetStudioAgentWorkspace(a.ctx, studioID, agentID, path)
 }
 
 func (a *App) GetStudioProgress(studioID string) []backend.StudioProgressEvent {

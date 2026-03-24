@@ -40,6 +40,9 @@ function normalizeAgentConfig(c: AgentConfig): AgentConfig {
     skills: Array.isArray(c.skills) ? c.skills : [],
     mcp_servers: Array.isArray(c.mcp_servers) ? c.mcp_servers : [],
     model_config: normalizeModelConfig(c.model_config),
+    workspace_file_readonly:
+      typeof c.workspace_file_readonly === 'boolean' ? c.workspace_file_readonly : false,
+    workspace_root: typeof c.workspace_root === 'string' ? c.workspace_root : '',
   }
 }
 
@@ -77,12 +80,15 @@ declare global {
           ListFiles: (pattern: string) => Promise<string[]>
           GetProjectConfig: (key: string) => Promise<any>
           SetProjectConfig: (key: string, value: any) => Promise<void>
+          OpenAgentWorkspaceDialog: () => Promise<string>
+          SetAgentWorkspaceRoot: (path: string) => Promise<void>
           ListStudios: () => Promise<import('../studio/types').Studio[]>
           CreateStudio: (name: string, mainAgentID: string) => Promise<import('../studio/types').Studio>
           DeleteStudio: (studioID: string) => Promise<void>
           GetStudioDetail: (studioID: string) => Promise<import('../studio/types').StudioDetail>
           GetStudioProgress: (studioID: string) => Promise<import('../studio/types').StudioProgressEvent[]>
           ChatInStudio: (studioID: string, agentID: string, message: string) => Promise<string>
+          SetStudioAgentWorkspace: (studioID: string, agentID: string, path: string) => Promise<void>
           GetStudioTodoBoard: (studioID: string) => Promise<import('../studio/types').StudioTodoBoardRow[]>
           StudioMaybeProgressBrief: (studioID: string) => Promise<void>
         }
@@ -195,5 +201,14 @@ export const agentApi = {
 
   setProjectConfig: async (key: string, value: any): Promise<void> => {
     return await window.go.main.App.SetProjectConfig(key, value)
+  },
+
+  openAgentWorkspaceDialog: async (): Promise<string> => {
+    const v = await window.go.main.App.OpenAgentWorkspaceDialog()
+    return typeof v === 'string' ? v : ''
+  },
+
+  setAgentWorkspaceRoot: async (path: string): Promise<void> => {
+    await window.go.main.App.SetAgentWorkspaceRoot(path)
   },
 }

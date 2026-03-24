@@ -123,10 +123,57 @@ func (s *Service) GetStudioDetail(ctx context.Context, studioID string) (StudioD
 	if err != nil {
 		return StudioDetail{}, fmt.Errorf("加载主 Agent 树: %w", err)
 	}
+	var aws map[string]string
+	if s.studioStore != nil {
+		aws = s.studioStore.ListAgentWorkspaces(studioID)
+	}
 	return StudioDetail{
-		Studio:       st,
-		MemberAgents: flattenAgentTreeMembers(tree),
+		Studio:          st,
+		MemberAgents:    flattenAgentTreeMembers(tree),
+		AgentWorkspaces: aws,
 	}, nil
+}
+
+// StudioAgentWorkspaceGet 实现 StudioAgentWorkspaceRuntime（供 Agent 解析工作室内文件工具根）
+func (s *Service) StudioAgentWorkspaceGet(studioID, agentID string) string {
+	if s.studioStore == nil {
+		return ""
+	}
+	return s.studioStore.GetAgentWorkspace(studioID, agentID)
+}
+
+// SetStudioAgentWorkspace 设置或清除（path 为空）工作室内某成员的文件工具根目录
+func (s *Service) SetStudioAgentWorkspace(ctx context.Context, studioID, agentID, path string) error {
+	studioID = strings.TrimSpace(studioID)
+	agentID = strings.TrimSpace(agentID)
+	if studioID == "" || agentID == "" {
+		return fmt.Errorf("studio_id 与 agent_id 不能为空")
+	}
+	if s.studioStore == nil {
+		return fmt.Errorf("工作室存储未初始化")
+	}
+	det, err := s.GetStudioDetail(ctx, studioID)
+	if err != nil {
+		return err
+	}
+	member := false
+	for _, m := range det.MemberAgents {
+		if m.Config.ID == agentID {
+			member = true
+			break
+		}
+	}
+	if !member {
+		return fmt.Errorf("agent %q 不是该工作室成员", agentID)
+	}
+	var norm string
+	if strings.TrimSpace(path) != "" {
+		norm, err = NormalizeAgentWorkspaceRoot(path)
+		if err != nil {
+			return err
+		}
+	}
+	return s.studioStore.SetAgentWorkspace(studioID, agentID, norm)
 }
 
 // GetStudioProgress 工作室进度时间线

@@ -81,10 +81,12 @@ type agentImpl struct {
 	studioSubFinished StudioSubFinishedFunc // 工作室子任务完成时通知，可为 nil
 
 	studioTodoRuntime StudioTodoRuntime // 工作室 TODO 持久化，可为 nil
+
+	studioAgentWorkspace StudioAgentWorkspaceRuntime // 工作室 (studio,agent) 文件工具根，可为 nil
 }
 
-// NewAgent 创建新代理；peerLookup 用于在系统提示中展示子代理等，可为 nil；studioProgress 用于工作室委派进度；createAgentTool 仅对 type=main 生效；studioSubFinished 在子 Agent 完成工作室委派时触发主侧续跑；studioTodoRuntime 工作室内 TODO 工具
-func NewAgent(ctx context.Context, config AgentConfig, messageBus MessageBus, projectCtx ProjectContext, peerLookup PeerAgentLookup, studioProgress func(StudioProgressEvent), createAgentTool CreateAgentToolFunc, studioSubFinished StudioSubFinishedFunc, studioTodoRuntime StudioTodoRuntime) (Agent, error) {
+// NewAgent 创建新代理；studioAgentWorkspace 为工作室内按成员解析文件工具根，可为 nil
+func NewAgent(ctx context.Context, config AgentConfig, messageBus MessageBus, projectCtx ProjectContext, peerLookup PeerAgentLookup, studioProgress func(StudioProgressEvent), createAgentTool CreateAgentToolFunc, studioSubFinished StudioSubFinishedFunc, studioTodoRuntime StudioTodoRuntime, studioAgentWorkspace StudioAgentWorkspaceRuntime) (Agent, error) {
 	// 构建 LLM 配置
 	llmCfg := llm.Config{
 		BaseURL:     config.ModelConfig.BaseURL,
@@ -159,9 +161,10 @@ func NewAgent(ctx context.Context, config AgentConfig, messageBus MessageBus, pr
 		peerLookup:     peerLookup,
 		studioProgress:    studioProgress,
 		createAgentTool:   createAgentTool,
-		studioSubFinished: studioSubFinished,
-		studioTodoRuntime: studioTodoRuntime,
-		memory:            loadedMem,
+		studioSubFinished:    studioSubFinished,
+		studioTodoRuntime:    studioTodoRuntime,
+		studioAgentWorkspace: studioAgentWorkspace,
+		memory:               loadedMem,
 		memoryPath:        memPath,
 		memorySummary:     sumText,
 		memorySummaryPath: sumPath,
@@ -297,12 +300,10 @@ func (a *agentImpl) Process(ctx context.Context, userMessage string) (string, er
 		}
 	}
 
-	root := ""
-	if a.projectCtx != nil {
-		root = a.projectCtx.RootPath()
-	}
-	mcpIDs := resolvedMCPServerIDs(root, agentType, mcpSelected)
-	mcpTools, mcpRoute, mcpCleanup, mcpSetupErr := attachMCPForAgent(ctx, root, mcpIDs)
+	fileRoot := a.effectiveFileWorkspaceRoot(ctx)
+	hasWorkspaceFileTools := a.hasAgentFileWorkspaceTools(ctx)
+	mcpIDs := resolvedMCPServerIDs(fileRoot, agentType, mcpSelected)
+	mcpTools, mcpRoute, mcpCleanup, mcpSetupErr := attachMCPForAgent(ctx, fileRoot, mcpIDs)
 	defer mcpCleanup()
 	if mcpSetupErr != nil {
 		log.Warn().Err(mcpSetupErr).Str("agent_id", a.config.ID).Msg("mcp attach failed")
@@ -331,6 +332,9 @@ func (a *agentImpl) Process(ctx context.Context, userMessage string) (string, er
 			tools = append(tools, studioTodoSnapshotTool())
 		}
 	}
+	if hasWorkspaceFileTools {
+		tools = append(tools, workspaceProjectFileTools(a.config.WorkspaceFileReadOnly)...)
+	}
 
 	var skillEx llm.ToolExecutor
 	if len(enabledSkills) > 0 {
@@ -338,7 +342,7 @@ func (a *agentImpl) Process(ctx context.Context, userMessage string) (string, er
 	}
 	composite := newCompositeToolExecutor(skillEx, mcpRoute)
 
-	useToolRouter := hasChildren || (agentType == AgentTypeMain && a.createAgentTool != nil) || hasStudioTodos
+	useToolRouter := hasChildren || (agentType == AgentTypeMain && a.createAgentTool != nil) || hasStudioTodos || hasWorkspaceFileTools
 	var executor llm.ToolExecutor
 	if useToolRouter {
 		executor = &agentToolRouter{agent: a, inner: composite}
@@ -491,6 +495,8 @@ func (a *agentImpl) UpdateEditableConfig(ctx context.Context, newCfg AgentConfig
 	a.config.Skills = append([]string(nil), newCfg.Skills...)
 	a.config.MCPServers = append([]string(nil), newCfg.MCPServers...)
 	a.config.SystemPrompt = newCfg.SystemPrompt
+	a.config.WorkspaceFileReadOnly = newCfg.WorkspaceFileReadOnly
+	a.config.WorkspaceRoot = newCfg.WorkspaceRoot
 	a.config.Metadata = cloneMetadataMap(newCfg.Metadata)
 	a.mu.Unlock()
 	return nil
@@ -650,14 +656,36 @@ func (a *agentImpl) buildSystemPrompt(ctx context.Context) string {
 		prompt = fmt.Sprintf("【角色】%s\n\n%s", role, prompt)
 	}
 
-	// 添加项目上下文
+	// 应用级项目信息（与「文件工具根」可能不同：后者可由本 Agent workspace_root 覆盖）
 	if a.projectCtx != nil {
 		if info, err := a.projectCtx.GetProjectInfo(ctx); err == nil {
-			prompt += fmt.Sprintf("\n\n当前项目: %s\n路径: %s\n语言: %s",
+			prompt += fmt.Sprintf("\n\n当前应用项目: %s\n路径: %s\n语言: %s",
 				info.Name, info.Path, info.Language)
 			if info.Description != "" {
 				prompt += fmt.Sprintf("\n说明: %s", info.Description)
 			}
+		}
+	}
+	fileRoot := a.effectiveFileWorkspaceRoot(ctx)
+	if fileRoot != "" {
+		prompt += "\n\n【文件工具根目录】\n" + fileRoot + "\n"
+		sid := strings.TrimSpace(StudioIDFromContext(ctx))
+		if sid != "" && a.studioAgentWorkspace != nil {
+			if raw := strings.TrimSpace(a.studioAgentWorkspace.StudioAgentWorkspaceGet(sid, a.config.ID)); raw != "" {
+				prompt += "（本工作室内已为该 Agent 单独设置工作区；与其它工作室或聊天页会话相互独立。）\n"
+			} else if strings.TrimSpace(a.config.WorkspaceRoot) != "" {
+				prompt += "（本 Agent 在全局配置中设有 workspace_root；本工作室未单独覆盖。）\n"
+			}
+		} else if strings.TrimSpace(a.config.WorkspaceRoot) != "" {
+			prompt += "（本 Agent 已配置专属 workspace_root，与上方「应用项目」或聊天页默认工作区可能不同。）\n"
+		}
+		prompt += "可使用 " + WorkspaceListDirToolName + " 浏览子路径，" + WorkspaceReadFileToolName +
+			" 读文件（大文件请用行号分段）。"
+		if a.config.WorkspaceFileReadOnly {
+			prompt += "本 Agent 已设为**仅只读**，不得调用写入类工具。"
+		} else {
+			prompt += "还可使用 " + WorkspaceWriteFileToolName + " / " + WorkspaceSearchReplaceToolName +
+				" 创建或修改文件；path 须位于上述根目录下。"
 		}
 	}
 
@@ -669,9 +697,20 @@ func (a *agentImpl) buildSystemPrompt(ctx context.Context) string {
 				" 实际派发。调用后子 Agent 在后台执行，不会阻塞你与用户的对话：你应在收到「委派已提交后台」类观察后尽快用自然语言回复用户（可说明左侧进度面板会更新），用户可同时继续向你提问。" +
 				"子 Agent 在后台会**多轮调用工具**直至子任务完成；完成后进度面板会出现「返回结果」，系统也可能自动插入一条协调说明。" +
 				"若用户需要整合产出，请在后续轮次根据进度或追问组织答复；若整体需求仍需其它子 Agent，请继续调用委派工具。"
+			if fileRoot != "" {
+				prompt += "\n若需直接修改工作区源码或资源，可使用上方【文件工具根目录】中的内置读写工具完成，勿仅用技能或对话输出代替落盘。"
+			}
 		case AgentTypeSub, AgentTypeWorker:
-			prompt += "\n\n【工作室子任务自主执行】\n你收到的是主 Agent 的委派。请**持续使用工具**（技能、MCP、" + DelegateToSubAgentToolName +
-				" 等）将任务推进到可交付完成态，避免仅输出一段说明就结束。\n当你确认本子任务**已全部完成**时，在回复**第一行单独一行**输出 " + StudioTaskCompleteToken +
+			fileToolHint := ""
+			if fileRoot != "" {
+				fileToolHint = "工作区内置工具：" + WorkspaceListDirToolName + "、" + WorkspaceReadFileToolName
+				if !a.config.WorkspaceFileReadOnly {
+					fileToolHint += "、" + WorkspaceWriteFileToolName + "、" + WorkspaceSearchReplaceToolName
+				}
+				fileToolHint += "；"
+			}
+			prompt += "\n\n【工作室子任务自主执行】\n你收到的是主 Agent 的委派。请**持续使用工具**（" + fileToolHint + "技能、MCP、" + DelegateToSubAgentToolName +
+				" 等）将任务推进到可交付完成态；涉及创建或修改代码/配置时**必须**调用写入类工具落盘，避免仅输出代码块。\n当你确认本子任务**已全部完成**时，在回复**第一行单独一行**输出 " + StudioTaskCompleteToken +
 				" ，然后空一行再写总结。在完成前不要输出该标记。\n若收到「工作室自动续跑」类系统消息，表示需继续执行：必须再次调用工具推进，直至可声明完成。"
 		}
 	}
@@ -733,10 +772,7 @@ func (a *agentImpl) buildSystemPrompt(ctx context.Context) string {
 		prompt += "\n\n【历史对话摘要】\n" + memSummary
 	}
 
-	promptRoot := ""
-	if a.projectCtx != nil {
-		promptRoot = a.projectCtx.RootPath()
-	}
+	promptRoot := a.effectiveFileWorkspaceRoot(ctx)
 	if ids := resolvedMCPServerIDs(promptRoot, agentType, mcpSel); len(ids) > 0 {
 		doc, _ := loadMCPServersDoc(promptRoot)
 		by := mcpDefinitionsByID(doc)

@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>打字练习 - Typing Practice</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- 导航栏 -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <i class="fas fa-keyboard"></i>
+                <span>打字练习</span>
+            </div>
+            <ul class="nav-menu">
+                <li><a href="#home" class="nav-link active">首页</a></li>
+                <li><a href="#leaderboard" class="nav-link">排行榜</a></li>
+                <li><a href="#profile" class="nav-link">个人中心</a></li>
+            </ul>
+            <div class="nav-user">
+                <button id="loginBtn" class="btn btn-primary">登录</button>
+                <div id="userInfo" class="user-info" style="display: none;">
+                    <span id="username"></span>
+                    <button id="logoutBtn" class="btn btn-secondary">退出</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- 主容器 -->
+    <div class="container">
+        <!-- 首页 - 选择模式 -->
+        <section id="homePage" class="page active">
+            <div class="welcome-section">
+                <h1>欢迎来到打字练习</h1>
+                <p>提升你的打字速度和准确率</p>
+            </div>
+
+            <div class="mode-selection">
+                <h2>选择练习模式</h2>
+                <div class="mode-grid">
+                    <div class="mode-card" data-mode="word">
+                        <i class="fas fa-font"></i>
+                        <h3>单词练习</h3>
+                        <p>练习常用单词，提升词汇熟练度</p>
+                    </div>
+                    <div class="mode-card" data-mode="sentence">
+                        <i class="fas fa-align-left"></i>
+                        <h3>句子练习</h3>
+                        <p>练习完整句子，提高连贯性</p>
+                    </div>
+                    <div class="mode-card" data-mode="article">
+                        <i class="fas fa-file-alt"></i>
+                        <h3>文章练习</h3>
+                        <p>练习长文本，增强持久力</p>
+                    </div>
+                    <div class="mode-card" data-mode="code">
+                        <i class="fas fa-code"></i>
+                        <h3>代码练习</h3>
+                        <p>练习编程代码，提升编码速度</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="difficulty-selection" style="display: none;">
+                <h2>选择难度</h2>
+                <div class="difficulty-buttons">
+                    <button class="btn btn-difficulty" data-difficulty="easy">
+                        <i class="fas fa-smile"></i>
+                        简单
+                    </button>
+                    <button class="btn btn-difficulty" data-difficulty="medium">
+                        <i class="fas fa-meh"></i>
+                        中等
+                    </button>
+                    <button class="btn btn-difficulty" data-difficulty="hard">
+                        <i class="fas fa-frown"></i>
+                        困难
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 练习页面 -->
+        <section id="practicePage" class="page">
+            <div class="practice-header">
+                <button id="backBtn" class="btn btn-secondary">
+                    <i class="fas fa-arrow-left"></i> 返回
+                </button>
+                <div class="practice-info">
+                    <span id="practiceMode"></span>
+                    <span id="practiceDifficulty"></span>
+                </div>
+            </div>
+
+            <div class="stats-bar">
+                <div class="stat-item">
+                    <i class="fas fa-tachometer-alt"></i>
+                    <span class="stat-label">速度</span>
+                    <span id="wpm" class="stat-value">0</span>
+                    <span class="stat-unit">WPM</span>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-bullseye"></i>
+                    <span class="stat-label">准确率</span>
+                    <span id="accuracy" class="stat-value">100</span>
+                    <span class="stat-unit">%</span>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-clock"></i>
+                    <span class="stat-label">时间</span>
+                    <span id="timer" class="stat-value">0:00</span>
+                </div>
+                <div class="stat-item">
+                    <i class="fas fa-chart-line"></i>
+                    <span class="stat-label">进度</span>
+                    <span id="progress" class="stat-value">0</span>
+                    <span class="stat-unit">%</span>
+                </div>
+            </div>
+
+            <div class="typing-area">
+                <div id="textDisplay" class="text-display"></div>
+                <textarea id="typingInput" class="typing-input" placeholder="开始打字..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+            </div>
+
+            <div class="practice-controls">
+                <button id="pauseBtn" class="btn btn-warning">
+                    <i class="fas fa-pause"></i> 暂停
+                </button>
+                <button id="restartBtn" class="btn btn-secondary">
+                    <i class="fas fa-redo"></i> 重新开始
+                </button>
+            </div>
+
+            <div class="progress-bar-container">
+                <div id="progressBar" class="progress-bar"></div>
+            </div>
+        </section>
+
+        <!-- 结果页面 -->
+        <section id="resultPage" class="page">
+            <div class="result-container">
+                <div class="result-header">
+                    <i class="fas fa-trophy"></i>
+                    <h2>练习完成！</h2>
+                </div>
+
+                <div class="result-stats">
+                    <div class="result-stat-card">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <h3>打字速度</h3>
+                        <p id="resultWpm" class="result-value">0</p>
+                        <span class="result-unit">WPM</span>
+                    </div>
+                    <div class="result-stat-card">
+                        <i class="fas fa-bullseye"></i>
+                        <h3>准确率</h3>
+                        <p id="resultAccuracy" class="result-value">0</p>
+                        <span class="result-unit">%</span>
+                    </div>
+                    <div class="result-stat-card">
+                        <i class="fas fa-clock"></i>
+                        <h3>用时</h3>
+                        <p id="resultTime" class="result-value">0:00</p>
+                    </div>
+                    <div class="result-stat-card">
+                        <i class="fas fa-keyboard"></i>
+                        <h3>总字符</h3>
+                        <p id="resultChars" class="result-value">0</p>
+                    </div>
+                </div>
+
+                <div class="result-chart">
+                    <h3>速度曲线</h3>
+                    <canvas id="speedChart"></canvas>
+                </div>
+
+                <div class="result-history">
+                    <h3>历史记录</h3>
+                    <div id="historyList" class="history-list"></div>
+                </div>
+
+                <div class="result-actions">
+                    <button id="retryBtn" class="btn btn-primary">
+                        <i class="fas fa-redo"></i> 再来一次
+                    </button>
+                    <button id="homeBtn" class="btn btn-secondary">
+                        <i class="fas fa-home"></i> 返回首页
+                    </button>
+                </div>
+            </div>
+        </section>
+
+        <!-- 排行榜页面 -->
+        <section id="leaderboardPage" class="page">
+            <div class="leaderboard-container">
+                <h2>全球排行榜</h2>
+                
+                <div class="leaderboard-filters">
+                    <select id="leaderboardMode" class="filter-select">
+                        <option value="all">全部模式</option>
+                        <option value="word">单词</option>
+                        <option value="sentence">句子</option>
+                        <option value="article">文章</option>
+                        <option value="code">代码</option>
+                    </select>
+                    <select id="leaderboardPeriod" class="filter-select">
+                        <option value="all">全部时间</option>
+                        <option value="today">今日</option>
+                        <option value="week">本周</option>
+                        <option value="month">本月</option>
+                    </select>
+                </div>
+
+                <div id="leaderboardList" class="leaderboard-list"></div>
+            </div>
+        </section>
+
+        <!-- 个人中心页面 -->
+        <section id="profilePage" class="page">
+            <div class="profile-container">
+                <!-- 未登录状态 -->
+                <div id="loginSection" class="auth-section">
+                    <div class="auth-tabs">
+                        <button class="auth-tab active" data-tab="login">登录</button>
+                        <button class="auth-tab" data-tab="register">注册</button>
+                    </div>
+
+                    <div id="loginForm" class="auth-form active">
+                        <h2>登录</h2>
+                        <input type="text" id="loginUsername" placeholder="用户名" class="form-input">
+                        <input type="password" id="loginPassword" placeholder="密码" class="form-input">
+                        <button id="loginSubmit" class="btn btn-primary btn-block">登录</button>
+                    </div>
+
+                    <div id="registerForm" class="auth-form">
+                        <h2>注册</h2>
+                        <input type="text" id="registerUsername" placeholder="用户名" class="form-input">
+                        <input type="email" id="registerEmail" placeholder="邮箱" class="form-input">
+                        <input type="password" id="registerPassword" placeholder="密码" class="form-input">
+                        <input type="password" id="registerConfirm" placeholder="确认密码" class="form-input">
+                        <button id="registerSubmit" class="btn btn-primary btn-block">注册</button>
+                    </div>
+                </div>
+
+                <!-- 已登录状态 -->
+                <div id="profileSection" class="profile-content" style="display: none;">
+                    <div class="profile-header">
+                        <div class="profile-avatar">
+                            <i class="fas fa-user-circle"></i>
+                        </div>
+                        <div class="profile-info">
+                            <h2 id="profileUsername"></h2>
+                            <p id="profileEmail"></p>
+                        </div>
+                    </div>
+
+                    <div class="profile-stats">
+                        <h3>个人统计</h3>
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <i class="fas fa-keyboard"></i>
+                                <h4>练习次数</h4>
+                                <p id="totalPractices">0</p>
+                            </div>
+                            <div class="stat-card">
+                                <i class="fas fa-tachometer-alt"></i>
+                                <h4>平均速度</h4>
+                                <p id="avgWpm">0 WPM</p>
+                            </div>
+                            <div class="stat-card">
+                                <i class="fas fa-bullseye"></i>
+                                <h4>平均准确率</h4>
+                                <p id="avgAccuracy">0%</p>
+                            </div>
+                            <div class="stat-card">
+                                <i class="fas fa-clock"></i>
+                                <h4>总练习时间</h4>
+                                <p id="totalTime">0 分钟</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="profile-chart">
+                        <h3>进步曲线</h3>
+                        <canvas id="progressChart"></canvas>
+                    </div>
+
+                    <div class="profile-history">
+                        <h3>最近记录</h3>
+                        <div id="profileHistoryList" class="history-list"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </div>
+
+    <!-- Toast 通知 -->
+    <div id="toast" class="toast"></div>
+
+    <!-- 加载指示器 -->
+    <div id="loading" class="loading" style="display: none;">
+        <div class="loading-spinner"></div>
+    </div>
+
+    <!-- JavaScript -->
+    <script src="js/api.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/typing.js"></script>
+    <script src="js/stats.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

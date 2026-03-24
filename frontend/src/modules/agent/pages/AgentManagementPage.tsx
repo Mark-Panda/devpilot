@@ -34,6 +34,8 @@ function emptyForm(model: ModelOption | null): AgentConfig {
     skills: [],
     mcp_servers: [],
     system_prompt: '',
+    workspace_file_readonly: false,
+    workspace_root: '',
     metadata: {},
   }
 }
@@ -50,6 +52,8 @@ function configFromAgent(info: AgentInfo): AgentConfig {
     skills: [...(c.skills ?? [])],
     mcp_servers: [...(c.mcp_servers ?? [])],
     system_prompt: c.system_prompt ?? '',
+    workspace_file_readonly: c.workspace_file_readonly === true,
+    workspace_root: typeof c.workspace_root === 'string' ? c.workspace_root : '',
     metadata: { ...(c.metadata ?? {}) },
   }
 }
@@ -486,6 +490,58 @@ export const AgentManagementPage: React.FC = () => {
                     className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm"
                     placeholder="可选；留空则使用默认助手说明"
                   />
+                </div>
+                <label className="flex cursor-pointer items-start gap-2 text-sm text-stone-700">
+                  <input
+                    type="checkbox"
+                    className="mt-1"
+                    checked={form.workspace_file_readonly === true}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, workspace_file_readonly: e.target.checked }))
+                    }
+                  />
+                  <span>
+                    <span className="font-medium">项目文件仅只读</span>
+                    <span className="mt-0.5 block text-xs text-stone-500">
+                      勾选后，在已打开项目时仅可使用读文件与列目录工具，不能写入或 search_replace。
+                    </span>
+                  </span>
+                </label>
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-stone-700">专属工作区（可选）</label>
+                  <p className="mb-2 text-xs text-stone-500">
+                    留空则使用聊天页「应用默认工作区」；填写后本 Agent 的读/写文件工具与 MCP 解析均相对该目录。
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    <input
+                      type="text"
+                      readOnly
+                      value={form.workspace_root ?? ''}
+                      placeholder="未设置（跟随应用默认）"
+                      className="min-w-[12rem] flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 font-mono text-xs text-stone-800"
+                    />
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        try {
+                          const p = (await agentApi.openAgentWorkspaceDialog()).trim()
+                          if (p) setForm((f) => ({ ...f, workspace_root: p }))
+                        } catch {
+                          /* 对话框取消或绑定未生成 */
+                        }
+                      }}
+                      className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 hover:bg-stone-50"
+                    >
+                      选择目录
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setForm((f) => ({ ...f, workspace_root: '' }))}
+                      className="rounded-lg border border-stone-200 px-3 py-2 text-sm text-stone-600 hover:bg-stone-50"
+                    >
+                      清除
+                    </button>
+                  </div>
                 </div>
                 <div>
                   <div className="mb-2 text-sm font-medium text-stone-700">技能（全局 ~/.devpilot/skills）</div>

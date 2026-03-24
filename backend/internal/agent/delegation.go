@@ -69,6 +69,18 @@ func (r *agentToolRouter) Execute(ctx context.Context, name, arguments string) (
 	if name == StudioTodoSnapshotToolName {
 		return r.agent.executeStudioTodoSnapshotTool(ctx, arguments)
 	}
+	if name == WorkspaceReadFileToolName {
+		return r.agent.executeWorkspaceReadFile(ctx, arguments)
+	}
+	if name == WorkspaceWriteFileToolName {
+		return r.agent.executeWorkspaceWriteFile(ctx, arguments)
+	}
+	if name == WorkspaceSearchReplaceToolName {
+		return r.agent.executeWorkspaceSearchReplace(ctx, arguments)
+	}
+	if name == WorkspaceListDirToolName {
+		return r.agent.executeWorkspaceListDir(ctx, arguments)
+	}
 	if r.inner != nil {
 		return r.inner.Execute(ctx, name, arguments)
 	}

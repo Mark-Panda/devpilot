@@ -1,11 +1,20 @@
 ---
 name: skill-creator
 description: Create, edit, improve, or audit AgentSkills. Use when creating a new skill from scratch or when asked to improve, review, audit, tidy up, or clean up an existing skill or SKILL.md file. Also use when editing or restructuring a skill directory (moving files to references/ or scripts/, removing stale content, validating against the AgentSkills spec). Triggers on phrases like "create a skill", "author a skill", "tidy up a skill", "improve this skill", "review the skill", "clean up the skill", "audit the skill".
+command: python3 scripts/skill_creator_apply.py
+command_llm_fallback_exit: 3
 ---
 
 # Skill Creator
 
 This skill provides guidance for creating effective skills.
+
+## DevPilot：工具如何落盘与回退
+
+在 DevPilot 中，本技能配置了可选 `command`（`scripts/skill_creator_apply.py`）与 `command_llm_fallback_exit: 3`：
+
+- **要在磁盘上新建技能**：以 **JSON** 作为工具参数（可放在 `input` 字段里的 JSON 字符串）。必填：`name`、`description`（trim 后非空）。可选：`body`（SKILL.md 正文，省略则用占位说明）、`rule_chain_id`、`overwrite`（为 `true` 时可覆盖已有 `SKILL.md`）、`skills_base`（技能根目录，否则用环境变量 `DEVPILOT_SKILLS_DIR` 或默认 `~/.devpilot/skills`）。目录名由 `name` 规范化（小写、连字符）得到。
+- **审核、讨论、改写建议等不需要写文件**：直接传自然语言；脚本以退出码 3 退出，运行时会回退为使用本技能正文做一轮子轮 LLM（与未配置 `command` 时行为一致）。
 
 ## About Skills
 

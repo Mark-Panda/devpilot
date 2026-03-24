@@ -186,6 +186,14 @@ func (w *AgentServiceWrapper) SetProjectConfig(ctx context.Context, key string, 
 	return w.svc.SetProjectConfig(ctx, key, value)
 }
 
+func (w *AgentServiceWrapper) RelocateProjectRoot(ctx context.Context, path string) error {
+	_ = ctx
+	if w == nil || w.svc == nil {
+		return fmt.Errorf("agent 服务未就绪")
+	}
+	return w.svc.RelocateProjectRoot(path)
+}
+
 func (w *AgentServiceWrapper) ListStudios(ctx context.Context) []Studio {
 	if w == nil || w.svc == nil {
 		return []Studio{}
@@ -216,6 +224,13 @@ func (w *AgentServiceWrapper) GetStudioDetail(ctx context.Context, studioID stri
 		return StudioDetail{}, fmt.Errorf("agent 服务未就绪")
 	}
 	return w.svc.GetStudioDetail(ctx, studioID)
+}
+
+func (w *AgentServiceWrapper) SetStudioAgentWorkspace(ctx context.Context, studioID, agentID, path string) error {
+	if w == nil || w.svc == nil {
+		return fmt.Errorf("agent 服务未就绪")
+	}
+	return w.svc.SetStudioAgentWorkspace(ctx, studioID, agentID, path)
 }
 
 func (w *AgentServiceWrapper) GetStudioProgress(ctx context.Context, studioID string) []StudioProgressEvent {

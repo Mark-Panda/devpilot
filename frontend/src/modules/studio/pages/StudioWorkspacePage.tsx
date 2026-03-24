@@ -50,6 +50,7 @@ export const StudioWorkspacePage: React.FC = () => {
     text: '',
   })
   const [todoBoard, setTodoBoard] = useState<StudioTodoBoardRow[]>([])
+  const [wsSavingAgentId, setWsSavingAgentId] = useState<string | null>(null)
 
   const mainId = detail?.studio.main_agent_id ?? ''
   const mainName = useMemo(() => {
@@ -153,6 +154,38 @@ export const StudioWorkspacePage: React.FC = () => {
         ev.agent_id === progressFilterAgentId || ev.parent_agent_id === progressFilterAgentId
     )
   }, [progress, progressFilterAgentId])
+
+  const workspaceByAgent = detail?.agent_workspaces ?? {}
+
+  const refreshDetail = useCallback(async () => {
+    if (!studioId) return
+    const d = await studioApi.getStudioDetail(studioId)
+    setDetail(d)
+  }, [studioId])
+
+  const setMemberWorkspace = async (agentId: string, path: string) => {
+    if (!studioId) return
+    setWsSavingAgentId(agentId)
+    setError(null)
+    try {
+      await studioApi.setStudioAgentWorkspace(studioId, agentId, path)
+      await refreshDetail()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setWsSavingAgentId(null)
+    }
+  }
+
+  const pickMemberWorkspace = async (agentId: string) => {
+    try {
+      const p = (await agentApi.openAgentWorkspaceDialog()).trim()
+      if (!p) return
+      await setMemberWorkspace(agentId, p)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    }
+  }
 
   const onSend = async (displayContent: string, textForMain: string) => {
     if (!studioId || !mainId || !textForMain.trim()) return
@@ -327,6 +360,53 @@ export const StudioWorkspacePage: React.FC = () => {
             <p className="mt-1.5 text-[10px] text-stone-400">
               约每 105s 请求主 Agent 进度巡检（90s 后端冷却）；简报出现在右侧对话。
             </p>
+          </div>
+          <div className="flex-shrink-0 border-t border-stone-100 bg-white px-4 py-2">
+            <p className="text-[11px] font-medium text-stone-500">成员工作区（本工作室独享）</p>
+            <p className="mt-0.5 text-[10px] text-stone-400">
+              在此为每名成员设置文件工具根目录；同一 Agent 在不同工作室可设不同路径。未设置则沿用 Agent 全局「专属工作区」或应用默认。
+            </p>
+            <ul className="mt-2 max-h-36 space-y-2 overflow-y-auto text-[11px]">
+              {detail.member_agents.map((a) => {
+                const id = a.config.id
+                const cur = workspaceByAgent[id] ?? ''
+                const busy = wsSavingAgentId === id
+                return (
+                  <li key={id} className="rounded border border-stone-100 bg-stone-50 px-2 py-1.5">
+                    <div className="font-medium text-stone-800">
+                      {a.config.name}{' '}
+                      <code className="text-[10px] font-normal text-stone-400">{id}</code>
+                    </div>
+                    <p
+                      className="mt-0.5 truncate font-mono text-[10px] text-stone-600"
+                      title={cur || '（未设置）'}
+                    >
+                      {cur || '— 未单独设置 —'}
+                    </p>
+                    <div className="mt-1 flex flex-wrap gap-1">
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void pickMemberWorkspace(id)}
+                        className="rounded border border-stone-200 bg-white px-2 py-0.5 text-stone-700 hover:bg-stone-100 disabled:opacity-50"
+                      >
+                        {busy ? '…' : '选择目录'}
+                      </button>
+                      {cur ? (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void setMemberWorkspace(id, '')}
+                          className="rounded border border-stone-200 px-2 py-0.5 text-stone-600 hover:bg-stone-100 disabled:opacity-50"
+                        >
+                          清除
+                        </button>
+                      ) : null}
+                    </div>
+                  </li>
+                )
+              })}
+            </ul>
           </div>
           <div className="flex-shrink-0 border-t border-stone-100 bg-stone-50 px-4 py-2">
             <p className="text-[11px] font-medium text-stone-500">协作成员（当前树）</p>

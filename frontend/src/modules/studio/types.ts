@@ -10,6 +10,8 @@ export interface Studio {
 export interface StudioDetail {
   studio: Studio
   member_agents: AgentInfo[]
+  /** 本工作室内各 Agent 的文件工具根（绝对路径）；与其它工作室独立 */
+  agent_workspaces?: Record<string, string>
 }
 
 export interface StudioProgressEvent {

@@ -12,8 +12,9 @@ type Studio struct {
 
 // StudioDetail 工作室 + 当前主 Agent 树下全部成员（含主 Agent，深度优先）
 type StudioDetail struct {
-	Studio       Studio      `json:"studio"`
-	MemberAgents []AgentInfo `json:"member_agents"`
+	Studio          Studio            `json:"studio"`
+	MemberAgents    []AgentInfo       `json:"member_agents"`
+	AgentWorkspaces map[string]string `json:"agent_workspaces,omitempty"` // agent_id -> 绝对路径；仅本工作室内覆盖文件工具根
 }
 
 // StudioProgressEvent 工作室任务进度（委派、子 Agent 接单与完成）

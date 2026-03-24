@@ -54,8 +54,12 @@ type AgentConfig struct {
 	ModelConfig  ModelConfig            `json:"model_config"`
 	Skills       []string               `json:"skills"`        // 启用的技能名称列表（从全局技能目录勾选）
 	MCPServers   []string               `json:"mcp_servers"`   // 启用的 MCP 预设 id 列表
-	SystemPrompt string                 `json:"system_prompt"` // 自定义系统提示
-	Metadata     map[string]interface{} `json:"metadata,omitempty"`
+	SystemPrompt string `json:"system_prompt"` // 自定义系统提示
+	// WorkspaceFileReadOnly 为 true 时，已打开项目下仅暴露读文件与列目录工具，不暴露写入与 search_replace
+	WorkspaceFileReadOnly bool `json:"workspace_file_readonly,omitempty"`
+	// WorkspaceRoot 非空时，本 Agent 的内置文件工具仅在此目录下操作，且 MCP 预设解析相对此路径；空则使用应用级项目根（启动 cwd 或 SetAgentWorkspaceRoot）
+	WorkspaceRoot string `json:"workspace_root,omitempty"`
+	Metadata      map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // MCPServerPreset 全局可选 MCP 能力项（供 Agent 勾选；条目来自 ~/.devpilot/mcp.json）
@@ -122,6 +126,11 @@ type StudioTodoRuntime interface {
 	StudioTodoSnapshotJSON(studioID string) (string, error)
 }
 
+// StudioAgentWorkspaceRuntime 工作室会话下按 (studio_id, agent_id) 解析文件工具根目录（由 Service 实现）
+type StudioAgentWorkspaceRuntime interface {
+	StudioAgentWorkspaceGet(studioID, agentID string) string
+}
+
 // Agent 代理接口
 type Agent interface {
 	// ID 返回代理唯一标识
@@ -183,6 +192,10 @@ type ProjectContext interface {
 
 	// SetConfig 设置项目配置
 	SetConfig(ctx context.Context, key string, value interface{}) error
+
+	// RelocateRoot 将项目根切换为已存在的目录；清空文件缓存与内存中的项目配置，并重新统计项目信息。
+	// 所有 Agent 共享同一 ProjectContext 实例时，调用一次即可全局生效。
+	RelocateRoot(path string) error
 }
 
 // ProjectInfo 项目信息

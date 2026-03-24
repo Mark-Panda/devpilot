@@ -237,21 +237,27 @@ func (p *projectContextImpl) SetConfig(ctx context.Context, key string, value in
 	return nil
 }
 
-// loadProjectInfo 加载项目信息
+// loadProjectInfo 加载项目信息（创建上下文时调用，无并发要求）
 func (p *projectContextImpl) loadProjectInfo() error {
-	info := ProjectInfo{
-		Name:     filepath.Base(p.projectPath),
-		Path:     p.projectPath,
-		Language: detectLanguage(p.projectPath),
+	info, err := p.computeProjectInfo(p.projectPath)
+	if err != nil {
+		return err
 	}
+	p.projectInfo = info
+	return nil
+}
 
-	// 统计文件和行数
+func (p *projectContextImpl) computeProjectInfo(root string) (ProjectInfo, error) {
+	info := ProjectInfo{
+		Name:     filepath.Base(root),
+		Path:     root,
+		Language: detectLanguage(root),
+	}
 	totalLines := 0
-	err := filepath.WalkDir(p.projectPath, func(path string, d fs.DirEntry, err error) error {
+	err := filepath.WalkDir(root, func(path string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return nil
 		}
-
 		if d.IsDir() {
 			name := d.Name()
 			if name == ".git" || name == "node_modules" || name == "vendor" {
@@ -259,23 +265,48 @@ func (p *projectContextImpl) loadProjectInfo() error {
 			}
 			return nil
 		}
-
 		if isTextFile(path) {
 			if content, err := os.ReadFile(path); err == nil {
 				totalLines += strings.Count(string(content), "\n")
 			}
 		}
-
 		return nil
 	})
+	if err != nil {
+		return ProjectInfo{}, err
+	}
+	info.TotalLines = totalLines
+	return info, nil
+}
 
+// RelocateRoot 切换项目根目录；与进程启动时的 cwd 无关，供前端「Agent 工作区」使用。
+func (p *projectContextImpl) RelocateRoot(path string) error {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return fmt.Errorf("路径为空")
+	}
+	fi, err := os.Stat(path)
+	if err != nil {
+		return fmt.Errorf("路径不可用: %w", err)
+	}
+	if !fi.IsDir() {
+		return fmt.Errorf("须选择目录，不是文件")
+	}
+	abs, err := filepath.Abs(path)
 	if err != nil {
 		return err
 	}
-
-	info.TotalLines = totalLines
+	info, err := p.computeProjectInfo(abs)
+	if err != nil {
+		return fmt.Errorf("扫描项目: %w", err)
+	}
+	p.mu.Lock()
+	p.projectPath = abs
+	p.fileCache = make(map[string]string)
+	p.config = make(map[string]interface{})
 	p.projectInfo = info
-
+	p.mu.Unlock()
+	log.Info().Str("path", abs).Msg("project root relocated")
 	return nil
 }
 

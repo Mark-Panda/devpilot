@@ -13,13 +13,16 @@ import (
 // 启动时仅加载 name/description 做匹配，激活后再加载完整内容以节省 token。
 // 若 frontmatter 含 rule_chain_id，表示该技能为“规则链技能”，执行时调用规则链而非 LLM。
 // 若含 command，表示直接执行该命令（以技能目录为工作目录），将 tool 的 arguments 作为标准输入传入，返回标准输出。
+// 若 command_llm_fallback_exit 为正整数 N，且命令以退出码 N 结束，则忽略命令错误并回退为
+// 用 Content 作为系统提示对 userInput 做一次子轮 LLM（用于「可脚本落盘 / 可纯对话」双模式技能）。
 type Skill struct {
-	Name         string `yaml:"name" json:"name"`
-	Description  string `yaml:"description" json:"description"`   // 用于触发加载，建议 ≤1024 字符
-	RuleChainID  string `yaml:"rule_chain_id" json:"rule_chain_id"` // 可选，关联规则链 ID，非空时执行规则链
-	Command      string `yaml:"command" json:"command"`           // 可选，直接执行的命令（如 scripts/trace_api.sh），以 Dir 为工作目录，arguments 传 stdin
-	Content      string `json:"content"`                          // 完整 SKILL.md 正文（含 frontmatter 后的 markdown）
-	Dir          string `json:"dir"`                              // 技能所在目录（含 SKILL.md 的目录），加载时填充，用于 command 的 cwd
+	Name                   string `yaml:"name" json:"name"`
+	Description            string `yaml:"description" json:"description"` // 用于触发加载，建议 ≤1024 字符
+	RuleChainID            string `yaml:"rule_chain_id" json:"rule_chain_id"` // 可选，关联规则链 ID，非空时执行规则链
+	Command                string `yaml:"command" json:"command"`             // 可选，直接执行的命令（如 scripts/trace_api.sh），以 Dir 为工作目录，arguments 传 stdin
+	CommandLLMFallbackExit int    `yaml:"command_llm_fallback_exit" json:"command_llm_fallback_exit"` // 可选，命令退出码 N 时回退 LLM；0 表示禁用
+	Content                string `json:"content"`                            // 完整 SKILL.md 正文（含 frontmatter 后的 markdown）
+	Dir                    string `json:"dir"`                                // 技能所在目录（含 SKILL.md 的目录），加载时填充，用于 command 的 cwd
 }
 
 const skillFileName = "SKILL.md"
