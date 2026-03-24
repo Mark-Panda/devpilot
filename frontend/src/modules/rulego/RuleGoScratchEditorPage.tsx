@@ -3027,6 +3027,11 @@ export default function RuleGoScratchEditorPage() {
   const [debugDraftInModal, setDebugDraftInModal] = useState(false);
   const [nameModalError, setNameModalError] = useState<string | null>(null);
   const [viewDslOpen, setViewDslOpen] = useState(false);
+  const [dslCopyFeedback, setDslCopyFeedback] = useState<string | null>(null);
+  const [importDslOpen, setImportDslOpen] = useState(false);
+  const [importDslText, setImportDslText] = useState("");
+  const [importDslError, setImportDslError] = useState<string | null>(null);
+  const importDslFileRef = useRef<HTMLInputElement>(null);
   const [testModalOpen, setTestModalOpen] = useState(false);
   const [testMessageType, setTestMessageType] = useState("default");
   const [testMetadataJson, setTestMetadataJson] = useState("{}");
@@ -3717,8 +3722,13 @@ export default function RuleGoScratchEditorPage() {
           input.connection.connect(toPrev as ScratchBlocks.Connection);
         }
       } else if (fromBlock.nextConnection) {
-        fromBlock.setFieldValue(type, "LINK_TYPE");
-        if (connection.label) fromBlock.setFieldValue(String(connection.label), "LINK_LABEL");
+        // 多分支块（如 restApiCall）Success 走 nextStatement，但 CONFIG 里没有 LINK_TYPE（与 buildMinimalNodeInit 块不同）
+        if (fromBlock.getField("LINK_TYPE")) {
+          fromBlock.setFieldValue(type, "LINK_TYPE");
+          if (connection.label && fromBlock.getField("LINK_LABEL")) {
+            fromBlock.setFieldValue(String(connection.label), "LINK_LABEL");
+          }
+        }
         fromBlock.nextConnection.connect(toPrev as ScratchBlocks.Connection);
       }
 
@@ -3946,6 +3956,64 @@ export default function RuleGoScratchEditorPage() {
     );
   };
 
+  const handleApplyImportDsl = () => {
+    setImportDslError(null);
+    const ws = workspaceRef.current;
+    if (!ws) {
+      setImportDslError("工作区未就绪");
+      return;
+    }
+    const raw = importDslText.trim();
+    if (!raw) {
+      setImportDslError("请粘贴或选择包含规则链 DSL 的 JSON");
+      return;
+    }
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      setImportDslError("JSON 解析失败，请检查格式");
+      return;
+    }
+    if (!parsed || typeof parsed !== "object" || !(parsed as { metadata?: unknown }).metadata) {
+      setImportDslError("DSL 无效：缺少 metadata");
+      return;
+    }
+    const ruleDsl = parsed as {
+      ruleChain?: { name?: string; debugMode?: boolean; root?: boolean };
+      metadata: unknown;
+    };
+    try {
+      loadWorkspaceFromRuleGoDsl(ruleDsl, ws);
+    } catch (err) {
+      setImportDslError((err as Error).message || "加载 DSL 到画布失败");
+      return;
+    }
+    ensureRuleGoNodeIdsAreUuid(ws);
+    const chain = ruleDsl.ruleChain;
+    const importedName =
+      typeof chain?.name === "string" && chain.name.trim() ? chain.name.trim() : "";
+    const nextName = importedName || name;
+    if (importedName) setName(importedName);
+    const nextDebug = Boolean(chain?.debugMode);
+    const nextRoot = chain?.root !== false;
+    setDebugMode(nextDebug);
+    setRoot(nextRoot);
+    const dslStr = JSON.stringify(parsed);
+    const nextEnabled = getEnabledFromDefinition(dslStr);
+    setEnabled(nextEnabled);
+    const loadedDsl = buildRuleGoDsl(ws, nextName, nextDebug, nextRoot, nextEnabled);
+    setDsl(loadedDsl);
+    setSavedDsl(loadedDsl);
+    setJson(JSON.stringify(ScratchBlocks.serialization.workspaces.save(ws), null, 2));
+    setSelectedBlockId(null);
+    setError(null);
+    setTriggerLayoutError(validateRuleGoTriggerLayout(ws));
+    setBlockCount(ws.getTopBlocks(true).length);
+    setImportDslOpen(false);
+    setImportDslText("");
+  };
+
   const workspaceWs = workspaceRef.current as (WorkspaceSvg & { undo?: () => void; redo?: () => void }) | null;
   const blockLibraryCount = useMemo(() => {
     const contents = rulegoToolbox.contents;
@@ -4049,6 +4117,36 @@ export default function RuleGoScratchEditorPage() {
           <button className="rulego-toolbar-btn text" type="button" onClick={() => navigate("/rulego")}>
             返回列表
           </button>
+          <input
+            ref={importDslFileRef}
+            type="file"
+            accept=".json,application/json"
+            style={{ display: "none" }}
+            aria-hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (!f) return;
+              const reader = new FileReader();
+              reader.onload = () => {
+                setImportDslText(String(reader.result ?? ""));
+                setImportDslError(null);
+              };
+              reader.onerror = () => setImportDslError("读取文件失败");
+              reader.readAsText(f, "UTF-8");
+              e.target.value = "";
+            }}
+          />
+          <button
+            className="rulego-toolbar-btn text"
+            type="button"
+            title="从 JSON 导入规则链到画布（将替换当前画布内容）"
+            onClick={() => {
+              setImportDslError(null);
+              setImportDslOpen(true);
+            }}
+          >
+            导入
+          </button>
           <button
             className="rulego-toolbar-btn text"
             type="button"
@@ -4138,17 +4236,127 @@ export default function RuleGoScratchEditorPage() {
         ) : null}
       </div>
 
-      {viewDslOpen && (
-        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setViewDslOpen(false)}>
+      {importDslOpen && (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => {
+            setImportDslOpen(false);
+            setImportDslError(null);
+          }}
+        >
           <div className="modal" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <h3>规则链 DSL</h3>
-              <button type="button" className="text-button" onClick={() => setViewDslOpen(false)} aria-label="关闭">
+              <h3>导入规则链 DSL</h3>
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => {
+                  setImportDslOpen(false);
+                  setImportDslError(null);
+                }}
+                aria-label="关闭"
+              >
                 ×
               </button>
             </div>
             <div className="modal-body">
+              <p className="form-hint" style={{ marginBottom: 10 }}>
+                粘贴完整的规则链 JSON（含 ruleChain 与 metadata）。导入后将替换当前画布内容；若 DSL 中含 ruleChain.name，将同步为当前规则名称。
+              </p>
+              {importDslError ? <div className="form-error" style={{ marginBottom: 8 }}>{importDslError}</div> : null}
+              <textarea
+                value={importDslText}
+                onChange={(e) => {
+                  setImportDslText(e.target.value);
+                  if (importDslError) setImportDslError(null);
+                }}
+                rows={18}
+                style={{ width: "100%", fontFamily: "monospace", fontSize: 13 }}
+                placeholder='{"ruleChain":{...},"metadata":{...}}'
+                spellCheck={false}
+              />
+              <div className="modal-actions" style={{ marginTop: 12 }}>
+                <button type="button" className="text-button" onClick={() => importDslFileRef.current?.click()}>
+                  选择文件
+                </button>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => {
+                    setImportDslOpen(false);
+                    setImportDslError(null);
+                  }}
+                >
+                  取消
+                </button>
+                <button type="button" className="primary-button" onClick={handleApplyImportDsl}>
+                  导入到画布
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewDslOpen && (
+        <div
+          className="modal-overlay"
+          role="dialog"
+          aria-modal="true"
+          onClick={() => {
+            setDslCopyFeedback(null);
+            setViewDslOpen(false);
+          }}
+        >
+          <div className="modal" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>规则链 DSL</h3>
+              <button
+                type="button"
+                className="text-button"
+                onClick={() => {
+                  setDslCopyFeedback(null);
+                  setViewDslOpen(false);
+                }}
+                aria-label="关闭"
+              >
+                ×
+              </button>
+            </div>
+            <div className="modal-body">
+              {dslCopyFeedback ? (
+                <p className="form-hint" style={{ marginBottom: 8 }} role="status">
+                  {dslCopyFeedback}
+                </p>
+              ) : null}
               <textarea readOnly value={dsl} rows={20} style={{ width: "100%", fontFamily: "monospace", fontSize: 13 }} />
+              <div className="modal-actions" style={{ marginTop: 12 }}>
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={() => {
+                    const text = dsl.trim();
+                    if (!text) {
+                      setDslCopyFeedback("当前 DSL 为空");
+                      window.setTimeout(() => setDslCopyFeedback(null), 2000);
+                      return;
+                    }
+                    void (async () => {
+                      try {
+                        await navigator.clipboard.writeText(dsl);
+                        setDslCopyFeedback("已复制到剪贴板");
+                      } catch {
+                        setDslCopyFeedback("复制失败，请手动选择文本复制");
+                      }
+                      window.setTimeout(() => setDslCopyFeedback(null), 2000);
+                    })();
+                  }}
+                >
+                  复制
+                </button>
+              </div>
             </div>
           </div>
         </div>
