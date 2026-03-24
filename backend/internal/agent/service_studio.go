@@ -30,6 +30,23 @@ func flattenAgentTreeMembers(root *AgentTreeNode) []AgentInfo {
 	return out
 }
 
+// agentTreeContainsMember 判断 agentID 是否出现在主 Agent 树（含根）中
+func agentTreeContainsMember(root *AgentTreeNode, agentID string) bool {
+	agentID = strings.TrimSpace(agentID)
+	if root == nil || agentID == "" {
+		return false
+	}
+	if strings.TrimSpace(root.Agent.Config.ID) == agentID {
+		return true
+	}
+	for _, c := range root.Children {
+		if agentTreeContainsMember(c, agentID) {
+			return true
+		}
+	}
+	return false
+}
+
 // SetStudioProgressEmitter 由 App 注入，用于 Wails EventsEmit（可为 nil）
 func (s *Service) SetStudioProgressEmitter(fn func(StudioProgressEvent)) {
 	s.studioEmitMu.Lock()
@@ -123,10 +140,7 @@ func (s *Service) GetStudioDetail(ctx context.Context, studioID string) (StudioD
 	if err != nil {
 		return StudioDetail{}, fmt.Errorf("加载主 Agent 树: %w", err)
 	}
-	var aws map[string]string
-	if s.studioStore != nil {
-		aws = s.studioStore.ListAgentWorkspaces(studioID)
-	}
+	aws := s.studioStore.ListAgentWorkspaces(studioID)
 	return StudioDetail{
 		Studio:          st,
 		MemberAgents:    flattenAgentTreeMembers(tree),
@@ -152,18 +166,15 @@ func (s *Service) SetStudioAgentWorkspace(ctx context.Context, studioID, agentID
 	if s.studioStore == nil {
 		return fmt.Errorf("工作室存储未初始化")
 	}
-	det, err := s.GetStudioDetail(ctx, studioID)
+	st, err := s.studioStore.GetStudio(studioID)
 	if err != nil {
 		return err
 	}
-	member := false
-	for _, m := range det.MemberAgents {
-		if m.Config.ID == agentID {
-			member = true
-			break
-		}
+	tree, err := s.GetAgentTree(ctx, st.MainAgentID)
+	if err != nil {
+		return fmt.Errorf("加载主 Agent 树: %w", err)
 	}
-	if !member {
+	if !agentTreeContainsMember(tree, agentID) {
 		return fmt.Errorf("agent %q 不是该工作室成员", agentID)
 	}
 	var norm string
@@ -174,6 +185,23 @@ func (s *Service) SetStudioAgentWorkspace(ctx context.Context, studioID, agentID
 		}
 	}
 	return s.studioStore.SetAgentWorkspace(studioID, agentID, norm)
+}
+
+// buildStudioTodoBoardRows 按成员列表聚合各 Agent TODO（无 todo 存储时返回 nil）
+func (s *Service) buildStudioTodoBoardRows(studioID string, members []AgentInfo) []StudioTodoBoardRow {
+	if s.studioTodoStore == nil {
+		return nil
+	}
+	studioID = strings.TrimSpace(studioID)
+	rows := make([]StudioTodoBoardRow, 0, len(members))
+	for _, m := range members {
+		rows = append(rows, StudioTodoBoardRow{
+			AgentID:   m.Config.ID,
+			AgentName: m.Config.Name,
+			Items:     s.studioTodoStore.Get(studioID, m.Config.ID),
+		})
+	}
+	return rows
 }
 
 // GetStudioProgress 工作室进度时间线
@@ -298,14 +326,7 @@ func (s *Service) StudioTodoSnapshotJSON(studioID string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	rows := make([]StudioTodoBoardRow, 0, len(det.MemberAgents))
-	for _, m := range det.MemberAgents {
-		rows = append(rows, StudioTodoBoardRow{
-			AgentID:   m.Config.ID,
-			AgentName: m.Config.Name,
-			Items:     s.studioTodoStore.Get(studioID, m.Config.ID),
-		})
-	}
+	rows := s.buildStudioTodoBoardRows(studioID, det.MemberAgents)
 	b, err := json.MarshalIndent(rows, "", "  ")
 	if err != nil {
 		return "", err
@@ -327,13 +348,9 @@ func (s *Service) GetStudioTodoBoard(ctx context.Context, studioID string) ([]St
 	if err != nil {
 		return nil, err
 	}
-	rows := make([]StudioTodoBoardRow, 0, len(det.MemberAgents))
-	for _, m := range det.MemberAgents {
-		rows = append(rows, StudioTodoBoardRow{
-			AgentID:   m.Config.ID,
-			AgentName: m.Config.Name,
-			Items:     s.studioTodoStore.Get(studioID, m.Config.ID),
-		})
+	rows := s.buildStudioTodoBoardRows(studioID, det.MemberAgents)
+	if rows == nil {
+		return []StudioTodoBoardRow{}, nil
 	}
 	return rows, nil
 }

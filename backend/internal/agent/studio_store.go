@@ -253,8 +253,8 @@ func (s *StudioStore) AppendProgress(ev StudioProgressEvent) error {
 
 // GetProgress 返回某工作室进度（时间正序，拷贝）
 func (s *StudioStore) GetProgress(studioID string) []StudioProgressEvent {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.mu.RLock()
+	defer s.mu.RUnlock()
 	list := s.doc.Progress[studioID]
 	out := make([]StudioProgressEvent, len(list))
 	copy(out, list)
