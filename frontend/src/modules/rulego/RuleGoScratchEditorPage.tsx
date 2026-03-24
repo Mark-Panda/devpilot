@@ -250,6 +250,14 @@ function BlockConfigModal({
       next.REST_TIMEOUT = get("REST_TIMEOUT");
       next.REST_MAX_PARALLEL = get("REST_MAX_PARALLEL");
     }
+    if (block.type === "rulego_feishuImMessage") {
+      next.FS_APP_ID = get("FS_APP_ID");
+      next.FS_APP_SECRET = get("FS_APP_SECRET");
+      next.FS_RECEIVE_ID_TYPE = get("FS_RECEIVE_ID_TYPE") || "open_id";
+      next.FS_RECEIVE_ID = get("FS_RECEIVE_ID");
+      next.FS_TEXT = get("FS_TEXT") || "${data}";
+      next.FS_TIMEOUT_SEC = get("FS_TIMEOUT_SEC") || "30";
+    }
     if (block.type === "rulego_apiRouteTracer_gitPrepare") {
       next.WORK_DIR = get("WORK_DIR");
     }
@@ -1188,7 +1196,7 @@ function BlockConfigModal({
             <input
               value={String(form.DELAY_MS ?? "60000")}
               onChange={(e) => setForm((f) => ({ ...f, DELAY_MS: e.target.value }))}
-              placeholder="60000 或 ${metadata.delay}"
+              placeholder={`60000 或 \${metadata.delay}`}
             />
           </label>
           <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -1947,6 +1955,80 @@ function BlockConfigModal({
           </p>
         </>
       )}
+      {block.type === "rulego_feishuImMessage" && (
+        <>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>App ID（飞书开放平台应用）</span>
+            <input
+              value={String(form.FS_APP_ID ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, FS_APP_ID: e.target.value }))}
+              placeholder="cli_xxxxxxxx"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>App Secret</span>
+            <input
+              type="password"
+              value={String(form.FS_APP_SECRET ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, FS_APP_SECRET: e.target.value }))}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field">
+            <span>接收者 ID 类型 (receive_id_type)</span>
+            <select
+              value={String(form.FS_RECEIVE_ID_TYPE ?? "open_id")}
+              onChange={(e) => setForm((f) => ({ ...f, FS_RECEIVE_ID_TYPE: e.target.value }))}
+            >
+              <option value="open_id">open_id</option>
+              <option value="union_id">union_id</option>
+              <option value="user_id">user_id</option>
+              <option value="email">email</option>
+            </select>
+          </label>
+          <label className="form-field">
+            <span>超时 (秒)</span>
+            <input
+              type="number"
+              min={5}
+              value={String(form.FS_TIMEOUT_SEC ?? "30")}
+              onChange={(e) => setForm((f) => ({ ...f, FS_TIMEOUT_SEC: e.target.value }))}
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>{`接收者 ID (receiveId，支持模板如 \${metadata.xxx})`}</span>
+            <input
+              value={String(form.FS_RECEIVE_ID ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, FS_RECEIVE_ID: e.target.value }))}
+              placeholder={`ou_xxxxxxxx 或 \${metadata.feishu_open_id}`}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>正文模板 (text，msg_type 固定为 text)</span>
+            <input
+              value={String(form.FS_TEXT ?? "${data}")}
+              onChange={(e) => setForm((f) => ({ ...f, FS_TEXT: e.target.value }))}
+              placeholder={`\${data}`}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
+            调用 <code>auth/v3/tenant_access_token/internal</code> 与 <code>im/v1/messages</code>。应用需开通「以应用身份发消息」及对应用户权限。
+            消息 data 可为纯文本（覆盖正文），或 JSON{" "}
+            <code>{'{"receiveId":"ou_xxx","text":"你好"}'}</code> 覆盖接收者与正文。成功时下游 data 为飞书原始 JSON 响应。
+          </p>
+        </>
+      )}
       {block.type === "rulego_fileRead" && (
         <>
           <label className="form-field" style={{ gridColumn: "1 / -1" }}>
@@ -2001,7 +2083,7 @@ function BlockConfigModal({
               rows={4}
               value={String(form.FILE_CONTENT ?? "")}
               onChange={(e) => setForm((f) => ({ ...f, FILE_CONTENT: e.target.value }))}
-              placeholder="${data}"
+              placeholder={`\${data}`}
               style={{ width: "100%", minHeight: 80, resize: "vertical" }}
               autoCapitalize="off"
               autoCorrect="off"

@@ -13,6 +13,7 @@ import "./blocks/fork";
 import "./blocks/for";
 import "./blocks/groupAction";
 import "./blocks/restApiCall";
+import "./blocks/feishuImMessage";
 import "./blocks/volcTlsSearchLogs";
 import "./blocks/opensearchSearch";
 import "./blocks/fileNodes";
@@ -66,6 +67,7 @@ export const toolbox = {
       categorystyle: "rulego_action",
       contents: [
         { kind: "block" as const, type: "rulego_restApiCall" },
+        { kind: "block" as const, type: "rulego_feishuImMessage" },
         { kind: "block" as const, type: "rulego_volcTlsSearchLogs" },
         { kind: "block" as const, type: "rulego_opensearchSearch" },
         { kind: "block" as const, type: "rulego_llm" },

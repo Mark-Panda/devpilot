@@ -27,6 +27,7 @@ const BLOCK_LABELS: Record<string, string> = {
   rulego_endpoint_schedule: "触发·定时",
   rulego_endpoint_net: "触发·TCP/UDP",
   rulego_restApiCall: "HTTP客户端",
+  rulego_feishuImMessage: "飞书单聊消息",
   rulego_volcTlsSearchLogs: "火山 TLS 查日志",
   rulego_opensearchSearch: "OpenSearch 查日志",
   rulego_llm: "大模型 LLM",

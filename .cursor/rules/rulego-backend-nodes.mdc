@@ -22,6 +22,7 @@ alwaysApply: false
 - exec
 - exprFilter
 - exprTransform
+- feishu/imMessage
 - fetchNodeOutput
 - fieldFilter
 - flow
