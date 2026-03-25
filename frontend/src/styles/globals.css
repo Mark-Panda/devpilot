@@ -33,7 +33,17 @@
 }
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
+  /* 应用全局主题（与工作室 .studio-pixel 一致） */
+  --studio-deep: #08080e;
+  --studio-bg: #0f0f18;
+  --studio-panel: #18182a;
+  --studio-panel-2: #222236;
+  --studio-border: #4a4d6a;
+  --studio-hot: #e94560;
+  --studio-text: #e8e8f0;
+  --studio-muted: #8b8ba4;
+  --studio-code: #12121c;
 }
 
 * {
@@ -49,8 +59,8 @@ body {
   margin: 0;
   height: 100%;
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-  background: #f7f8fb;
-  color: #1f2937;
+  background: var(--studio-deep);
+  color: var(--studio-text);
 }
 
 #root {
@@ -74,13 +84,13 @@ body {
 }
 
 .app-sidebar {
-  width: 240px;
+  width: 200px;
   flex-shrink: 0;
   background: #0f172a;
   color: #e2e8f0;
   display: flex;
   flex-direction: column;
-  padding: 24px 16px;
+  padding: 20px 12px;
   gap: 16px;
   min-height: 0;
 }
@@ -130,7 +140,8 @@ body {
   width: 100%;
   display: grid;
   grid-template-rows: auto auto auto minmax(0, 1fr) auto;
-  background: #fafafa;
+  background: var(--studio-bg);
+  color: var(--studio-text);
 }
 
 .agent-chat-shell--welcome {
@@ -142,12 +153,13 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   padding: 12px 24px 8px;
+  background: var(--studio-deep);
 }
 
 .agent-chat-composer {
   flex-shrink: 0;
-  background: #ffffff;
-  border-top: 1px solid #e7e5e4;
+  background: var(--studio-panel);
+  border-top: 2px solid var(--studio-border);
   padding: 16px 24px 20px;
 }
 
@@ -160,6 +172,368 @@ body {
 /* 工作室双栏：两列同高且可收缩，避免 WebView 中右侧对话区高度塌陷 */
 .studio-workspace-grid > section {
   min-height: 0;
+}
+
+/* ---------- 工作室 · 像素风（列表 + 工作区根节点挂 .studio-pixel） ---------- */
+.studio-pixel {
+  --sp-bg-deep: #08080e;
+  --sp-bg: #0f0f18;
+  --sp-panel: #18182a;
+  --sp-panel-2: #222236;
+  --sp-border: #4a4d6a;
+  --sp-border-hot: #e94560;
+  --sp-accent: #ff3d6e;
+  --sp-accent-dim: #b83255;
+  --sp-text: #e8e8f0;
+  --sp-muted: #8b8ba4;
+  --sp-code: #12121c;
+  --sp-error-bg: #2a1520;
+  --sp-error-border: #c94b6b;
+  --sp-error-text: #ffb3c6;
+  --sp-pixel-shadow: 3px 3px 0 #000;
+  --sp-pixel-shadow-sm: 2px 2px 0 #000;
+  font-family: 'VT323', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', ui-sans-serif, monospace;
+  font-size: 20px;
+  line-height: 1.35;
+  color: var(--sp-text);
+  -webkit-font-smoothing: antialiased;
+}
+
+.studio-pixel ::selection {
+  background: var(--sp-border-hot);
+  color: #fff;
+}
+
+.studio-pixel kbd {
+  font-family: inherit;
+  font-size: 0.85em;
+  border-radius: 0;
+  border: 2px solid var(--sp-border);
+  background: var(--sp-code);
+  box-shadow: var(--sp-pixel-shadow-sm);
+  padding: 0 0.2em;
+}
+
+.studio-pixel .agent-chat-composer {
+  background: var(--sp-panel) !important;
+  border-top: 3px solid var(--sp-border) !important;
+  padding-top: 12px !important;
+  padding-bottom: 16px !important;
+}
+
+.studio-pixel .agent-chat-messages {
+  background: var(--sp-bg-deep);
+  padding-top: 10px;
+}
+
+.studio-pixel .agent-chat-composer-inner {
+  max-width: 100%;
+}
+
+/* ---------- Star-Office-UI 式工作室布局（上场景 + 下 HUD，无第三方美术素材） ---------- */
+.studio-pixel.studio-office-layout {
+  --so-red: #e63946;
+  --so-red-glow: rgba(230, 57, 70, 0.35);
+  --so-charcoal: #121212;
+  --so-dashboard: #1a1a1a;
+  --so-paper: #ede0c8;
+  --so-paper-ink: #3d2914;
+  /* 与原有像素变量对齐，便于对话区继承 */
+  --sp-border-hot: var(--so-red);
+  --sp-accent: #ff4757;
+}
+
+.studio-office-scene {
+  image-rendering: pixelated;
+}
+
+.studio-office-scene-hud-btn {
+  font-family: system-ui, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+}
+
+.studio-office-scene--night .studio-office-brick-wall {
+  opacity: 0.28;
+  filter: brightness(0.5) saturate(0.8);
+}
+
+.studio-office-scene--night .studio-office-scene-inner {
+  filter: brightness(0.9) saturate(0.92);
+}
+
+.studio-office-scene-inner--vision-pan {
+  transform: translate3d(-16px, 0, 0) scale(1.07);
+  transform-origin: 50% 100%;
+  transition: transform 0.45s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.studio-office-onair-led {
+  animation: studio-office-onair-pulse 0.9s steps(2) infinite;
+  box-shadow: 0 0 6px #ef4444;
+}
+
+@keyframes studio-office-onair-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+
+.studio-office-star {
+  animation: studio-office-star-twinkle 2.4s ease-in-out infinite;
+}
+
+@keyframes studio-office-star-twinkle {
+  0%,
+  100% {
+    opacity: 0.9;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.studio-office-floor {
+  background:
+    linear-gradient(135deg, rgba(107, 79, 58, 0.35) 25%, transparent 25%) 0 0 / 24px 24px,
+    linear-gradient(225deg, rgba(107, 79, 58, 0.28) 25%, transparent 25%) 0 0 / 24px 24px,
+    linear-gradient(315deg, rgba(90, 67, 48, 0.4) 25%, transparent 25%) 12px 12px / 24px 24px,
+    linear-gradient(45deg, rgba(90, 67, 48, 0.32) 25%, transparent 25%) 12px 12px / 24px 24px,
+    radial-gradient(ellipse 120% 80% at 50% 100%, #4a3728 0%, #2a2218 55%, #1a1510 100%);
+  transform: perspective(420px) rotateX(12deg);
+  transform-origin: 50% 100%;
+}
+
+.studio-office-brick-wall {
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 10px,
+      rgba(42, 32, 24, 0.45) 10px,
+      rgba(42, 32, 24, 0.45) 11px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      #3d2e26 0px,
+      #3d2e26 7px,
+      #4a3a30 7px,
+      #4a3a30 15px
+    );
+  border-bottom: 2px solid rgba(26, 18, 12, 0.6);
+}
+
+.studio-office-rug {
+  background:
+    radial-gradient(ellipse at 50% 40%, rgba(120, 53, 15, 0.35), transparent 65%),
+    repeating-linear-gradient(90deg, #5c4033 0px, #5c4033 3px, #6b4f3e 3px, #6b4f3e 6px);
+  border: 2px solid #3d2818;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06), 2px 3px 0 rgba(0, 0, 0, 0.35);
+  transform: perspective(320px) rotateX(8deg);
+  transform-origin: 50% 100%;
+}
+
+.studio-office-monitor-screen {
+  animation: studio-office-screen-glow 3.5s ease-in-out infinite;
+}
+
+@keyframes studio-office-screen-glow {
+  0%,
+  100% {
+    filter: brightness(0.95);
+  }
+  50% {
+    filter: brightness(1.08);
+  }
+}
+
+.studio-office-rack-vents {
+  background: repeating-linear-gradient(
+    0deg,
+    #0f172a 0px,
+    #0f172a 2px,
+    #334155 2px,
+    #334155 3px
+  );
+}
+
+.studio-office-led {
+  display: inline-block;
+  width: 3px;
+  height: 3px;
+  background: #4ade80;
+  box-shadow: 0 0 3px #22c55e;
+  animation: studio-office-led-pulse 1.1s steps(2) infinite;
+}
+
+.studio-office-led--delay {
+  animation-delay: 0.35s;
+}
+
+.studio-office-led--delay2 {
+  animation-delay: 0.65s;
+}
+
+.studio-office-led-alt {
+  display: inline-block;
+  width: 3px;
+  height: 3px;
+  background: #38bdf8;
+  box-shadow: 0 0 3px #0ea5e9;
+  animation: studio-office-led-pulse 0.9s steps(2) infinite;
+  animation-delay: 0.2s;
+}
+
+@keyframes studio-office-led-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.25;
+  }
+}
+
+.studio-office-actor-feet-shadow {
+  position: absolute;
+  bottom: -3px;
+  left: 50%;
+  width: 16px;
+  height: 4px;
+  margin-left: -8px;
+  background: rgba(0, 0, 0, 0.4);
+  border-radius: 50%;
+  filter: blur(0.5px);
+}
+
+.studio-office-dashboard {
+  font-family: system-ui, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-size: 13px;
+}
+
+.studio-office-card--paper {
+  background: var(--so-paper);
+  box-shadow: inset 0 0 0 1px rgba(61, 41, 20, 0.08);
+}
+
+@keyframes studio-office-marquee {
+  from {
+    transform: translate3d(0, 0, 0);
+  }
+  to {
+    transform: translate3d(-50%, 0, 0);
+  }
+}
+
+.studio-office-marquee-inner {
+  animation: studio-office-marquee 22s linear infinite;
+}
+
+/* 场景内像素小人：待机上下微动 / 移动时快摆 */
+@keyframes studio-office-actor-idle {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+@keyframes studio-office-actor-walk {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-4px) rotate(2deg);
+  }
+}
+
+@keyframes studio-office-head-alarm {
+  0%,
+  100% {
+    filter: brightness(1);
+    box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6);
+  }
+  50% {
+    filter: brightness(1.25);
+    box-shadow: 0 0 6px 2px rgba(239, 68, 68, 0.85);
+  }
+}
+
+@keyframes studio-office-alarm-blink {
+  0%,
+  100% {
+    background-color: #dc2626;
+    box-shadow: 0 0 4px #f87171;
+  }
+  50% {
+    background-color: #fbbf24;
+    box-shadow: 0 0 8px #fde047;
+  }
+}
+
+.studio-office-actor--idle {
+  animation: studio-office-actor-idle 0.85s ease-in-out infinite;
+}
+
+.studio-office-actor--walk {
+  animation: studio-office-actor-walk 0.22s linear infinite;
+}
+
+.studio-office-actor-head-alarm {
+  animation: studio-office-head-alarm 0.5s ease-in-out infinite;
+}
+
+.studio-office-alarm-lamp {
+  animation: studio-office-alarm-blink 0.45s steps(2) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .studio-office-actor--idle,
+  .studio-office-actor--walk {
+    animation: none;
+  }
+
+  .studio-office-actor-head-alarm,
+  .studio-office-alarm-lamp {
+    animation: none;
+  }
+
+  .studio-office-marquee-inner {
+    animation: none;
+  }
+
+  .studio-office-actor {
+    transition: none !important;
+  }
+
+  .studio-office-monitor-screen {
+    animation: none;
+  }
+
+  .studio-office-led,
+  .studio-office-led-alt {
+    animation: none;
+    opacity: 1;
+  }
+
+  .studio-office-scene-inner--vision-pan {
+    transform: none;
+    transition: none;
+  }
+
+  .studio-office-onair-led {
+    animation: none;
+  }
+
+  .studio-office-star {
+    animation: none;
+    opacity: 0.85;
+  }
 }
 
 .app-nav-group {
@@ -213,46 +587,46 @@ body {
   color: #ffffff;
 }
 
-/* ========== OpenClaw 参考：浅色壳 + 侧栏红色选中条（规则链全屏编辑器除外）========== */
+/* ========== 与工作室像素风一致的深色壳 + 侧栏高亮（规则链全屏编辑器除外）========== */
 .app-shell--openclaw {
-  background: #fafafa;
+  background: var(--studio-bg);
 }
 
 .app-sidebar.app-sidebar--openclaw {
-  background: #f5f5f5;
-  border-right: 1px solid #e7e5e4;
-  color: #44403c;
+  background: var(--studio-panel);
+  border-right: 2px solid var(--studio-border);
+  color: var(--studio-text);
 }
 
 .app-sidebar--openclaw .app-nav-group-label {
-  color: #78716c;
+  color: var(--studio-muted);
 }
 
 .app-sidebar--openclaw .app-nav-item {
-  color: #57534e;
+  color: var(--studio-muted);
 }
 
 .app-sidebar--openclaw .app-nav-item:hover {
-  background: rgba(0, 0, 0, 0.06);
-  color: #1c1917;
+  background: rgba(233, 69, 96, 0.12);
+  color: var(--studio-text);
 }
 
 .app-sidebar--openclaw .app-nav-item.is-active {
-  background: #ffe4e6;
-  color: #be123c;
-  border-left: 3px solid #e11d48;
+  background: rgba(233, 69, 96, 0.2);
+  color: #ffb3c6;
+  border-left: 3px solid var(--studio-hot);
   padding-left: 9px;
   border-radius: 0 10px 10px 0;
 }
 
 .app-sidebar--openclaw .app-version {
-  color: #78716c;
-  border-top: 1px solid #e7e5e4;
+  color: var(--studio-muted);
+  border-top: 1px solid var(--studio-border);
   padding-top: 16px;
 }
 
 .app-shell--openclaw .app-content {
-  background: #fafafa;
+  background: var(--studio-bg);
 }
 
 .app-content {
@@ -262,6 +636,7 @@ body {
   flex-direction: column;
   min-height: 0;
   overflow: hidden;
+  background: var(--studio-bg);
 }
 
 /* 聊天页：主区全幅铺高，避免 padding 导致 flex 子项高度错觉；由内层 agent-chat-shell 控制边距 */
@@ -290,6 +665,7 @@ body {
 .page-header h2 {
   margin: 0 0 6px;
   font-size: 20px;
+  color: var(--studio-text);
 }
 
 .page-actions {
@@ -299,32 +675,32 @@ body {
 
 .page-subtitle {
   margin: 0;
-  color: #6b7280;
+  color: var(--studio-muted);
   font-size: 14px;
 }
 
 .skill-repo-dropzone {
-  border: 2px dashed #cbd5e1;
+  border: 2px dashed var(--studio-border);
   border-radius: 12px;
   padding: 24px;
   text-align: center;
-  background: #f8fafc;
+  background: var(--studio-code);
   transition: border-color 0.15s, background-color 0.15s;
 }
 
 .skill-repo-dropzone.is-dragover {
-  border-color: #2563eb;
-  background: #eff6ff;
+  border-color: var(--studio-hot);
+  background: rgba(233, 69, 96, 0.12);
 }
 
 .skill-repo-dropzone-text {
   margin: 0;
-  color: #64748b;
+  color: var(--studio-muted);
   font-size: 14px;
 }
 
 .skill-repo-dropzone.is-dragover .skill-repo-dropzone-text {
-  color: #2563eb;
+  color: #ffb3c6;
 }
 
 .skill-repo-table .table-head,
@@ -350,17 +726,18 @@ body {
 }
 
 .skill-repo-detail-path code {
-  background: #f1f5f9;
+  background: var(--studio-code);
   padding: 2px 6px;
   border-radius: 4px;
   font-size: 12px;
+  color: var(--studio-text);
 }
 
 .skill-repo-detail-label {
   margin: 0;
   font-size: 13px;
   font-weight: 600;
-  color: #475569;
+  color: var(--studio-muted);
 }
 
 .skill-repo-detail-files {
@@ -429,11 +806,12 @@ body {
 .skill-repo-file-content {
   margin: 0;
   padding: 12px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: var(--studio-code);
+  border: 1px solid var(--studio-border);
   border-radius: 8px;
   font-size: 12px;
   line-height: 1.5;
+  color: var(--studio-text);
   white-space: pre-wrap;
   word-break: break-all;
   overflow: auto;
@@ -443,19 +821,19 @@ body {
 }
 
 .primary-button {
-  background: #2563eb;
+  background: var(--studio-hot);
   color: #ffffff;
   border: none;
   padding: 10px 16px;
   border-radius: 10px;
   font-size: 14px;
   cursor: pointer;
-  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.25);
+  box-shadow: 0 4px 14px rgba(233, 69, 96, 0.35);
 }
 
 .primary-button.danger {
-  background: #dc2626;
-  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.2);
+  background: #b83255;
+  box-shadow: 0 4px 14px rgba(184, 50, 85, 0.35);
 }
 
 .primary-button:disabled {
@@ -464,10 +842,11 @@ body {
 }
 
 .table-card {
-  background: #ffffff;
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-border);
   border-radius: 12px;
   padding: 16px;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
 }
 
 .table-head {
@@ -476,9 +855,9 @@ body {
   gap: 12px;
   font-size: 13px;
   font-weight: 600;
-  color: #475569;
+  color: var(--studio-muted);
   padding-bottom: 12px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid var(--studio-border);
 }
 
 .table-body {
@@ -495,7 +874,7 @@ body {
   align-items: center;
   padding: 10px 8px;
   border-radius: 8px;
-  background: #f8fafc;
+  background: var(--studio-code);
 }
 
 .table-cell {
@@ -583,7 +962,7 @@ body {
 .text-button {
   border: none;
   background: transparent;
-  color: #2563eb;
+  color: #ff8fab;
   cursor: pointer;
   font-size: 13px;
   padding: 0;
@@ -604,15 +983,15 @@ body {
   justify-content: center;
   padding: 4px 8px;
   border-radius: 999px;
-  background: rgba(37, 99, 235, 0.1);
-  color: #1d4ed8;
+  background: rgba(233, 69, 96, 0.2);
+  color: #ffb3c6;
   font-size: 12px;
   font-weight: 600;
 }
 
 .table-empty {
   padding: 24px 0;
-  color: #94a3b8;
+  color: var(--studio-muted);
   font-size: 14px;
 }
 
@@ -625,7 +1004,7 @@ body {
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(15, 23, 42, 0.5);
+  background: rgba(0, 0, 0, 0.65);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -636,9 +1015,11 @@ body {
 .modal {
   width: min(420px, 100%);
   max-height: 90vh;
-  background: #ffffff;
+  background: var(--studio-panel);
+  border: 2px solid var(--studio-border);
   border-radius: 16px;
-  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.2);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+  color: var(--studio-text);
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -656,6 +1037,7 @@ body {
 .modal-header h3 {
   margin: 0;
   font-size: 18px;
+  color: var(--studio-text);
 }
 
 .modal-body {
@@ -684,12 +1066,12 @@ body {
   flex-shrink: 0;
   padding-top: 16px;
   margin-top: 0;
-  border-top: 1px solid #e2e8f0;
+  border-top: 1px solid var(--studio-border);
 }
 
 .confirm-text {
   margin: 0;
-  color: #475569;
+  color: var(--studio-muted);
   font-size: 14px;
 }
 
@@ -703,7 +1085,7 @@ body {
   flex-direction: column;
   gap: 6px;
   font-size: 13px;
-  color: #475569;
+  color: var(--studio-muted);
 }
 
 .form-field-full {
@@ -718,35 +1100,40 @@ body {
 
 .form-row-with-action input {
   flex: 1;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--studio-border);
   border-radius: 10px;
   padding: 10px 12px;
   font-size: 14px;
+  background: var(--studio-code);
+  color: var(--studio-text);
 }
 
 .form-row-with-action input:focus {
-  outline: 2px solid rgba(37, 99, 235, 0.2);
-  border-color: #2563eb;
+  outline: 2px solid rgba(233, 69, 96, 0.35);
+  border-color: var(--studio-hot);
 }
 
 .form-field input,
 .form-field select,
 .form-field textarea {
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--studio-border);
   border-radius: 10px;
   padding: 10px 12px;
   font-size: 14px;
+  background: var(--studio-code);
+  color: var(--studio-text);
 }
 
 .form-field input:focus,
-.form-field select:focus {
-  outline: 2px solid rgba(37, 99, 235, 0.2);
-  border-color: #2563eb;
+.form-field select:focus,
+.form-field textarea:focus {
+  outline: 2px solid rgba(233, 69, 96, 0.35);
+  border-color: var(--studio-hot);
 }
 
 .form-field input.readonly-input {
-  background: #f1f5f9;
-  color: #64748b;
+  background: var(--studio-panel-2);
+  color: var(--studio-muted);
   cursor: default;
 }
 
@@ -767,7 +1154,7 @@ body {
 }
 
 .form-hint {
-  color: #94a3b8;
+  color: var(--studio-muted);
   font-size: 12px;
 }
 
@@ -801,16 +1188,18 @@ body {
   width: 100%;
   min-height: 320px;
   padding: 12px 14px;
-  border: 1px solid #e2e8f0;
+  border: 1px solid var(--studio-border);
   border-radius: 10px;
   font-size: 14px;
   line-height: 1.5;
   resize: vertical;
   font-family: inherit;
+  background: var(--studio-code);
+  color: var(--studio-text);
 }
 .system-prompt-editor-textarea:focus {
-  outline: 2px solid rgba(37, 99, 235, 0.2);
-  border-color: #2563eb;
+  outline: 2px solid rgba(233, 69, 96, 0.35);
+  border-color: var(--studio-hot);
 }
 
 /* LLM 块配置：顺序单列、统一背景、大模型参数默认折叠 */

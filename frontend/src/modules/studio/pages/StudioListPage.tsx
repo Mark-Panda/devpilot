@@ -76,12 +76,16 @@ export const StudioListPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-0 flex-1 overflow-auto bg-stone-50 px-4 py-6 sm:px-8">
+    <div className="studio-pixel studio-office-layout min-h-0 flex-1 overflow-auto bg-[var(--sp-bg)] px-4 py-6 sm:px-8">
       <div className="mx-auto max-w-4xl">
+        <div
+          className="mb-4 h-2 w-full border border-[var(--so-red)] bg-gradient-to-r from-[#2a2218] via-[#6b4f3a] to-[#2a2218]"
+          aria-hidden
+        />
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-bold text-stone-900">工作室</h1>
-            <p className="mt-1 text-sm text-stone-500">
+            <h1 className="text-2xl font-bold text-[var(--sp-text)]">工作室</h1>
+            <p className="mt-1 text-sm text-[var(--sp-muted)]">
               每个工作室绑定一个主 Agent；创建时会以当前主 Agent 下属树作为协作成员。对话仅与主 Agent 进行，子任务由主 Agent
               委派，进度在工作室页实时展示。
             </p>
@@ -89,31 +93,33 @@ export const StudioListPage: React.FC = () => {
           <button
             type="button"
             onClick={() => setModalOpen(true)}
-            className="rounded-xl bg-[#e11d48] px-4 py-2 text-sm font-medium text-white hover:bg-[#be123c]"
+            className="border-2 border-black bg-[var(--sp-accent)] px-4 py-2 text-sm font-medium text-white shadow-[var(--sp-pixel-shadow)] hover:bg-[var(--sp-border-hot)]"
           >
             新建工作室
           </button>
         </div>
 
         {error && (
-          <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</div>
+          <div className="mb-4 border-2 border-[var(--sp-error-border)] bg-[var(--sp-error-bg)] px-4 py-3 text-sm text-[var(--sp-error-text)]">
+            {error}
+          </div>
         )}
 
         {loading ? (
-          <div className="flex items-center gap-3 py-12 text-sm text-stone-500">
-            <span className="inline-block h-5 w-5 animate-spin rounded-full border-2 border-stone-200 border-t-rose-500" />
+          <div className="flex items-center gap-3 py-12 text-sm text-[var(--sp-muted)]">
+            <span className="inline-block h-5 w-5 animate-spin border-2 border-[var(--sp-border)] border-t-[var(--sp-border-hot)]" />
             加载中…
           </div>
         ) : studios.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-stone-200 bg-white px-8 py-14 text-center shadow-sm">
-            <p className="text-base font-bold text-stone-900">还没有工作室</p>
-            <p className="mx-auto mt-2 max-w-md text-sm text-stone-500">
+          <div className="border-2 border-dashed border-[var(--sp-border)] bg-[var(--sp-panel)] px-8 py-14 text-center shadow-[var(--sp-pixel-shadow)]">
+            <p className="text-base font-bold text-[var(--sp-text)]">还没有工作室</p>
+            <p className="mx-auto mt-2 max-w-md text-sm text-[var(--sp-muted)]">
               创建一个工作室，把主 Agent 及其子 Agent 拉进同一协作空间，在左侧看任务进度与 TODO，在右侧与主 Agent 对话。
             </p>
             <button
               type="button"
               onClick={() => setModalOpen(true)}
-              className="mt-6 rounded-xl bg-[#e11d48] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#be123c]"
+              className="mt-6 border-2 border-black bg-[var(--sp-accent)] px-5 py-2.5 text-sm font-medium text-white shadow-[var(--sp-pixel-shadow)] hover:bg-[var(--sp-border-hot)]"
             >
               新建工作室
             </button>
@@ -123,23 +129,23 @@ export const StudioListPage: React.FC = () => {
             {studios.map((s) => (
               <li
                 key={s.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-stone-200 bg-white px-4 py-3.5 shadow-sm transition-shadow duration-200 hover:border-stone-300 hover:shadow-md"
+                className="flex flex-wrap items-center justify-between gap-3 border-2 border-[var(--sp-border)] bg-[var(--sp-panel)] px-4 py-3.5 shadow-[var(--sp-pixel-shadow-sm)] transition-colors hover:border-[var(--sp-border-hot)]"
               >
                 <div className="min-w-0 flex-1">
                   <Link
                     to={`/studios/${s.id}`}
-                    className="font-medium text-stone-900 hover:text-rose-700"
+                    className="font-medium text-[var(--sp-text)] hover:text-[var(--sp-border-hot)]"
                   >
                     {s.name}
                   </Link>
-                  <p className="mt-0.5 truncate font-mono text-xs text-stone-500" title={s.main_agent_id}>
+                  <p className="mt-0.5 truncate font-mono text-xs text-[var(--sp-muted)]" title={s.main_agent_id}>
                     主 Agent · {s.main_agent_id}
                   </p>
                 </div>
                 <div className="flex shrink-0 gap-2">
                   <Link
                     to={`/studios/${s.id}`}
-                    className="rounded-lg bg-rose-50 px-3 py-1.5 text-sm font-medium text-rose-700 hover:bg-rose-100"
+                    className="border-2 border-[var(--sp-border)] bg-[var(--sp-panel-2)] px-3 py-1.5 text-sm font-medium text-[var(--sp-border-hot)] hover:border-[var(--sp-border-hot)]"
                   >
                     进入
                   </Link>
@@ -147,7 +153,7 @@ export const StudioListPage: React.FC = () => {
                     type="button"
                     onClick={() => setConfirmDelete(s)}
                     disabled={deletingId !== null}
-                    className="rounded-lg border border-stone-200 px-3 py-1.5 text-sm text-stone-500 hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50"
+                    className="border-2 border-[var(--sp-border)] px-3 py-1.5 text-sm text-[var(--sp-muted)] hover:border-[var(--sp-error-border)] hover:text-[var(--sp-error-text)] disabled:opacity-50"
                   >
                     删除
                   </button>
@@ -160,16 +166,16 @@ export const StudioListPage: React.FC = () => {
 
       {confirmDelete && (
         <div
-          className="fixed inset-0 z-[130] flex items-center justify-center bg-black/40 p-4"
+          className="studio-pixel fixed inset-0 z-[130] flex items-center justify-center bg-black/70 p-4"
           role="dialog"
           aria-modal="true"
           aria-labelledby="studio-delete-title"
         >
-          <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl">
-            <h2 id="studio-delete-title" className="text-lg font-bold text-stone-900">
+          <div className="w-full max-w-md border-4 border-[var(--sp-border)] bg-[var(--sp-panel-2)] p-6 shadow-[var(--sp-pixel-shadow)]">
+            <h2 id="studio-delete-title" className="text-lg font-bold text-[var(--sp-text)]">
               删除工作室
             </h2>
-            <p className="mt-2 text-sm text-stone-600">
+            <p className="mt-2 text-sm text-[var(--sp-muted)]">
               确定删除「{confirmDelete.name || confirmDelete.id}」？进度记录与工作室 TODO 将一并清理。
             </p>
             <div className="mt-6 flex justify-end gap-2">
@@ -177,7 +183,7 @@ export const StudioListPage: React.FC = () => {
                 type="button"
                 disabled={deletingId !== null}
                 onClick={() => setConfirmDelete(null)}
-                className="rounded-lg border border-stone-200 px-4 py-2 text-sm text-stone-700 disabled:opacity-50"
+                className="border-2 border-[var(--sp-border)] px-4 py-2 text-sm text-[var(--sp-text)] disabled:opacity-50"
               >
                 取消
               </button>
@@ -185,7 +191,7 @@ export const StudioListPage: React.FC = () => {
                 type="button"
                 disabled={deletingId !== null}
                 onClick={() => void runDelete(confirmDelete)}
-                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                className="border-2 border-black bg-[var(--sp-accent)] px-4 py-2 text-sm font-medium text-white shadow-[var(--sp-pixel-shadow-sm)] disabled:opacity-50"
               >
                 {deletingId ? '删除中…' : '确定删除'}
               </button>
@@ -195,30 +201,34 @@ export const StudioListPage: React.FC = () => {
       )}
 
       {modalOpen && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
+        <div
+          className="studio-pixel fixed inset-0 z-[120] flex items-center justify-center bg-black/70 p-4"
+          role="dialog"
+          aria-modal="true"
+        >
           <form
             onSubmit={(e) => void handleCreate(e)}
-            className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl"
+            className="w-full max-w-md border-4 border-[var(--sp-border)] bg-[var(--sp-panel-2)] p-6 shadow-[var(--sp-pixel-shadow)]"
           >
-            <h2 className="text-lg font-bold text-stone-900">新建工作室</h2>
-            <p className="mt-1 text-xs text-stone-500">将同步纳入当前主 Agent 下的全部子 Agent（以运行时树为准）。</p>
+            <h2 className="text-lg font-bold text-[var(--sp-text)]">新建工作室</h2>
+            <p className="mt-1 text-xs text-[var(--sp-muted)]">将同步纳入当前主 Agent 下的全部子 Agent（以运行时树为准）。</p>
             <div className="mt-4 space-y-3">
               <div>
-                <label className="mb-1 block text-sm font-medium text-stone-700">名称</label>
+                <label className="mb-1 block text-sm font-medium text-[var(--sp-text)]">名称</label>
                 <input
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="留空则使用主 Agent 名称"
-                  className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm"
+                  className="w-full border-2 border-[var(--sp-border)] bg-[var(--sp-code)] px-3 py-2 text-sm text-[var(--sp-text)] placeholder:text-[var(--sp-muted)]"
                 />
               </div>
               <div>
-                <label className="mb-1 block text-sm font-medium text-stone-700">主 Agent</label>
+                <label className="mb-1 block text-sm font-medium text-[var(--sp-text)]">主 Agent</label>
                 <select
                   required
                   value={mainId}
                   onChange={(e) => setMainId(e.target.value)}
-                  className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm"
+                  className="w-full border-2 border-[var(--sp-border)] bg-[var(--sp-code)] px-3 py-2 text-sm text-[var(--sp-text)]"
                 >
                   <option value="">请选择 main 类型 Agent</option>
                   {mains.map((a) => (
@@ -233,14 +243,14 @@ export const StudioListPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="rounded-lg border border-stone-200 px-4 py-2 text-sm text-stone-700"
+                className="border-2 border-[var(--sp-border)] px-4 py-2 text-sm text-[var(--sp-text)]"
               >
                 取消
               </button>
               <button
                 type="submit"
                 disabled={saving || !mainId}
-                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                className="border-2 border-black bg-[var(--sp-accent)] px-4 py-2 text-sm font-medium text-white shadow-[var(--sp-pixel-shadow-sm)] disabled:opacity-50"
               >
                 {saving ? '创建中…' : '创建'}
               </button>

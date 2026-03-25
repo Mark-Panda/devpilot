@@ -16,7 +16,7 @@ export function AgentTree({
 }: AgentTreeProps) {
   if (!tree) {
     return (
-      <div className="p-4 text-gray-500 text-center">
+      <div className="p-4 text-center text-studio-muted">
         <p>暂无 Agent</p>
       </div>
     )
@@ -64,8 +64,8 @@ function TreeNode({
   return (
     <div style={{ marginLeft: level * 20 }}>
       <div
-        className={`flex items-center justify-between p-2 rounded hover:bg-gray-100 cursor-pointer ${
-          isSelected ? 'bg-blue-50 border-l-4 border-blue-500' : ''
+        className={`flex cursor-pointer items-center justify-between rounded p-2 hover:bg-studio-panel-2 ${
+          isSelected ? 'border-l-4 border-studio-hot bg-studio-hot/10' : ''
         }`}
         onClick={() => onSelect(agent.config.id)}
       >
@@ -76,15 +76,15 @@ function TreeNode({
                 e.stopPropagation()
                 setExpanded(!expanded)
               }}
-              className="w-5 h-5 flex items-center justify-center hover:bg-gray-200 rounded"
+              className="flex h-5 w-5 items-center justify-center rounded hover:bg-studio-border"
             >
               {expanded ? '▼' : '▶'}
             </button>
           )}
           <div className={`w-2 h-2 rounded-full ${statusColor}`} />
           <div className="flex-1">
-            <div className="font-medium text-sm">{agent.config.name}</div>
-            <div className="text-xs text-gray-500">
+            <div className="text-sm font-medium text-studio-text">{agent.config.name}</div>
+            <div className="text-xs text-studio-muted">
               {agent.config.type} · {agent.message_count} 条消息
             </div>
           </div>
@@ -99,7 +99,7 @@ function TreeNode({
                 onDestroy(agent.config.id)
               }
             }}
-            className="text-red-500 hover:text-red-700 px-2 py-1 text-xs"
+            className="px-2 py-1 text-xs text-studio-hot hover:text-white"
           >
             删除
           </button>

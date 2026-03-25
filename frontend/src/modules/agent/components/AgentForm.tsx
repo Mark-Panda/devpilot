@@ -33,24 +33,24 @@ export function AgentForm({ onSubmit, onCancel }: AgentFormProps) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4 p-6 bg-white rounded-lg">
-      <h3 className="text-lg font-semibold mb-4">创建新 Agent</h3>
+    <form onSubmit={handleSubmit} className="space-y-4 p-6 bg-studio-panel rounded-lg">
+      <h3 className="mb-4 text-lg font-semibold text-studio-text">创建新 Agent</h3>
 
       <div>
-        <label className="block text-sm font-medium mb-1">
-          名称 <span className="text-red-500">*</span>
+        <label className="mb-1 block text-sm font-medium text-studio-text">
+          名称 <span className="text-studio-hot">*</span>
         </label>
         <input
           type="text"
           value={config.name}
           onChange={(e) => setConfig({ ...config, name: e.target.value })}
-          className="w-full border border-gray-300 rounded px-3 py-2"
+          className="w-full rounded border border-studio-border bg-studio-code px-3 py-2 text-studio-text"
           placeholder="我的 AI 助手"
         />
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-1">类型</label>
+        <label className="mb-1 block text-sm font-medium text-studio-text">类型</label>
         <select
           value={config.type}
           onChange={(e) =>
@@ -59,7 +59,7 @@ export function AgentForm({ onSubmit, onCancel }: AgentFormProps) {
               type: e.target.value as AgentConfig['type'],
             })
           }
-          className="w-full border border-gray-300 rounded px-3 py-2"
+          className="w-full rounded border border-studio-border bg-studio-code px-3 py-2 text-studio-text"
         >
           <option value="main">主代理</option>
           <option value="sub">子代理</option>
@@ -67,12 +67,12 @@ export function AgentForm({ onSubmit, onCancel }: AgentFormProps) {
         </select>
       </div>
 
-      <div className="border-t pt-4">
-        <h4 className="font-medium mb-2">模型配置</h4>
+      <div className="border-t border-studio-border pt-4">
+        <h4 className="mb-2 font-medium text-studio-text">模型配置</h4>
 
         <div className="space-y-3">
           <div>
-            <label className="block text-sm font-medium mb-1">Base URL</label>
+            <label className="mb-1 block text-sm font-medium text-studio-text">Base URL</label>
             <input
               type="text"
               value={config.model_config.base_url}
@@ -85,13 +85,13 @@ export function AgentForm({ onSubmit, onCancel }: AgentFormProps) {
                   },
                 })
               }
-              className="w-full border border-gray-300 rounded px-3 py-2"
+              className="w-full rounded border border-studio-border bg-studio-code px-3 py-2 text-studio-text"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">
-              API Key <span className="text-red-500">*</span>
+            <label className="mb-1 block text-sm font-medium text-studio-text">
+              API Key <span className="text-studio-hot">*</span>
             </label>
             <input
               type="password"
@@ -105,13 +105,13 @@ export function AgentForm({ onSubmit, onCancel }: AgentFormProps) {
                   },
                 })
               }
-              className="w-full border border-gray-300 rounded px-3 py-2"
+              className="w-full rounded border border-studio-border bg-studio-code px-3 py-2 text-studio-text"
               placeholder="sk-..."
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">模型</label>
+            <label className="mb-1 block text-sm font-medium text-studio-text">模型</label>
             <input
               type="text"
               value={config.model_config.model}
@@ -124,13 +124,13 @@ export function AgentForm({ onSubmit, onCancel }: AgentFormProps) {
                   },
                 })
               }
-              className="w-full border border-gray-300 rounded px-3 py-2"
+              className="w-full rounded border border-studio-border bg-studio-code px-3 py-2 text-studio-text"
             />
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-sm font-medium mb-1">
+              <label className="mb-1 block text-sm font-medium text-studio-text">
                 Max Tokens
               </label>
               <input
@@ -145,12 +145,12 @@ export function AgentForm({ onSubmit, onCancel }: AgentFormProps) {
                     },
                   })
                 }
-                className="w-full border border-gray-300 rounded px-3 py-2"
+                className="w-full rounded border border-studio-border bg-studio-code px-3 py-2 text-studio-text"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">
+              <label className="mb-1 block text-sm font-medium text-studio-text">
                 Temperature
               </label>
               <input
@@ -168,7 +168,7 @@ export function AgentForm({ onSubmit, onCancel }: AgentFormProps) {
                     },
                   })
                 }
-                className="w-full border border-gray-300 rounded px-3 py-2"
+                className="w-full rounded border border-studio-border bg-studio-code px-3 py-2 text-studio-text"
               />
             </div>
           </div>
@@ -176,13 +176,13 @@ export function AgentForm({ onSubmit, onCancel }: AgentFormProps) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium mb-1">系统提示</label>
+        <label className="mb-1 block text-sm font-medium text-studio-text">系统提示</label>
         <textarea
           value={config.system_prompt}
           onChange={(e) =>
             setConfig({ ...config, system_prompt: e.target.value })
           }
-          className="w-full border border-gray-300 rounded px-3 py-2 h-24"
+          className="w-full rounded border border-studio-border bg-studio-code px-3 py-2 text-studio-text h-24"
           placeholder="你是一个专业的编程助手..."
         />
       </div>
@@ -191,13 +191,13 @@ export function AgentForm({ onSubmit, onCancel }: AgentFormProps) {
         <button
           type="button"
           onClick={onCancel}
-          className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+          className="rounded border border-studio-border px-4 py-2 text-studio-text hover:bg-studio-panel-2"
         >
           取消
         </button>
         <button
           type="submit"
-          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+          className="rounded bg-studio-hot px-4 py-2 text-white hover:opacity-90"
         >
           创建
         </button>

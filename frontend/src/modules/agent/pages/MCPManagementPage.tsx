@@ -156,14 +156,14 @@ export const MCPManagementPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-0 flex-1 overflow-auto bg-stone-50 px-4 py-6 sm:px-8">
+    <div className="min-h-0 flex-1 overflow-auto bg-studio-code px-4 py-6 sm:px-8">
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl font-semibold text-stone-800">MCP 配置</h1>
-            <p className="mt-1 text-sm text-stone-500">
+            <h1 className="text-xl font-semibold text-studio-text">MCP 配置</h1>
+            <p className="mt-1 text-sm text-studio-muted">
               配置持久化到{' '}
-              <code className="rounded bg-stone-200 px-1">~/.devpilot/mcp.json</code>
+              <code className="rounded bg-studio-panel-2 px-1 text-studio-text">~/.devpilot/mcp.json</code>
               （全局；与当前打开的工程无关。旧版按项目分目录的配置会在首次读取时迁移至此）。
               主 Agent 会自动连接所有<strong>已启用</strong>的 MCP；其他 Agent 在 Agent 管理中勾选所需项。
             </p>
@@ -171,21 +171,21 @@ export const MCPManagementPage: React.FC = () => {
           <div className="flex flex-wrap gap-2">
             <Link
               to="/settings/agents"
-              className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+              className="rounded-xl border border-studio-border bg-studio-panel px-4 py-2 text-sm font-medium text-studio-text hover:bg-studio-code"
             >
               Agent 管理
             </Link>
             <button
               type="button"
               onClick={() => void refresh()}
-              className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+              className="rounded-xl border border-studio-border bg-studio-panel px-4 py-2 text-sm font-medium text-studio-text hover:bg-studio-code"
             >
               重新加载
             </button>
             <button
               type="button"
               onClick={addRow}
-              className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+              className="rounded-xl border border-studio-border bg-studio-panel px-4 py-2 text-sm font-medium text-studio-text hover:bg-studio-code"
             >
               添加一行
             </button>
@@ -201,17 +201,17 @@ export const MCPManagementPage: React.FC = () => {
         </div>
 
         {error && (
-          <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</div>
+          <div className="mb-4 rounded-xl border border-studio-hot/50 bg-studio-hot/10 px-4 py-3 text-sm text-studio-hot">{error}</div>
         )}
 
         {loading ? (
-          <p className="text-sm text-stone-500">加载中…</p>
+          <p className="text-sm text-studio-muted">加载中…</p>
         ) : servers.length === 0 ? (
-          <div className="rounded-xl border border-stone-200 bg-white p-8 text-center text-sm text-stone-500">
+          <div className="rounded-xl border border-studio-border bg-studio-panel p-8 text-center text-sm text-studio-muted">
             暂无 MCP 条目。点击「添加一行」后填写并保存。
-            <div className="mt-3 text-left text-xs text-stone-400">
+            <div className="mt-3 text-left text-xs text-studio-muted">
               <p className="mb-2">stdio 示例（server_command JSON）：</p>
-              <pre className="overflow-x-auto rounded-lg bg-stone-100 p-3 font-mono text-[11px]">
+              <pre className="overflow-x-auto rounded-lg bg-studio-panel-2 p-3 font-mono text-[11px]">
                 {`["npx", "-y", "@modelcontextprotocol/server-filesystem", "/path/to/dir"]`}
               </pre>
               <p className="mt-3">远程 MCP：填写「SSE URL」，stdio 命令可填 []。</p>
@@ -222,42 +222,42 @@ export const MCPManagementPage: React.FC = () => {
             {servers.map((s, i) => {
               const dr = drafts[i] ?? { cmd: '[]', env: '', tools: '' }
               return (
-                <div key={i} className="rounded-xl border border-stone-200 bg-white p-4 shadow-sm">
+                <div key={i} className="rounded-xl border border-studio-border bg-studio-panel p-4 shadow-sm">
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <span className="text-sm font-medium text-stone-700">MCP #{i + 1}</span>
+                    <span className="text-sm font-medium text-studio-text">MCP #{i + 1}</span>
                     <button
                       type="button"
                       onClick={() => removeRow(i)}
-                      className="text-sm text-stone-500 hover:text-rose-600"
+                      className="text-sm text-studio-muted hover:text-studio-hot"
                     >
                       删除此行
                     </button>
                   </div>
                   <div className="grid gap-3 sm:grid-cols-2">
                     <label className="block text-sm">
-                      <span className="mb-1 block font-medium text-stone-700">ID（唯一）</span>
+                      <span className="mb-1 block font-medium text-studio-text">ID（唯一）</span>
                       <input
                         value={s.id}
                         onChange={(e) => updateRow(i, { id: e.target.value })}
-                        className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm font-mono"
+                        className="w-full rounded-lg border border-studio-border px-3 py-2 text-sm font-mono"
                         placeholder="例如 filesystem"
                       />
                     </label>
                     <label className="block text-sm">
-                      <span className="mb-1 block font-medium text-stone-700">显示名称</span>
+                      <span className="mb-1 block font-medium text-studio-text">显示名称</span>
                       <input
                         value={s.name}
                         onChange={(e) => updateRow(i, { name: e.target.value })}
-                        className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm"
+                        className="w-full rounded-lg border border-studio-border px-3 py-2 text-sm"
                         placeholder="文件系统"
                       />
                     </label>
                     <label className="block text-sm sm:col-span-2">
-                      <span className="mb-1 block font-medium text-stone-700">说明</span>
+                      <span className="mb-1 block font-medium text-studio-text">说明</span>
                       <input
                         value={s.description ?? ''}
                         onChange={(e) => updateRow(i, { description: e.target.value })}
-                        className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm"
+                        className="w-full rounded-lg border border-studio-border px-3 py-2 text-sm"
                       />
                     </label>
                     <label className="flex items-center gap-2 text-sm sm:col-span-2">
@@ -266,42 +266,42 @@ export const MCPManagementPage: React.FC = () => {
                         checked={s.enabled}
                         onChange={(e) => updateRow(i, { enabled: e.target.checked })}
                       />
-                      <span className="font-medium text-stone-700">已启用</span>
+                      <span className="font-medium text-studio-text">已启用</span>
                     </label>
                     <label className="block text-sm sm:col-span-2">
-                      <span className="mb-1 block font-medium text-stone-700">stdio 命令（JSON 字符串数组）</span>
+                      <span className="mb-1 block font-medium text-studio-text">stdio 命令（JSON 字符串数组）</span>
                       <textarea
                         value={dr.cmd}
                         onChange={(e) => updateDraft(i, { cmd: e.target.value })}
                         rows={4}
-                        className="w-full rounded-lg border border-stone-200 px-3 py-2 font-mono text-xs"
+                        className="w-full rounded-lg border border-studio-border px-3 py-2 font-mono text-xs"
                         placeholder='["npx", "-y", "@scope/pkg", "arg"]'
                       />
                     </label>
                     <label className="block text-sm sm:col-span-2">
-                      <span className="mb-1 block font-medium text-stone-700">SSE / HTTP URL（可选）</span>
+                      <span className="mb-1 block font-medium text-studio-text">SSE / HTTP URL（可选）</span>
                       <input
                         value={s.server_url ?? ''}
                         onChange={(e) => updateRow(i, { server_url: e.target.value })}
-                        className="w-full rounded-lg border border-stone-200 px-3 py-2 font-mono text-sm"
+                        className="w-full rounded-lg border border-studio-border px-3 py-2 font-mono text-sm"
                         placeholder="https://..."
                       />
                     </label>
                     <label className="block text-sm sm:col-span-2">
-                      <span className="mb-1 block font-medium text-stone-700">环境变量（每行 KEY=VALUE）</span>
+                      <span className="mb-1 block font-medium text-studio-text">环境变量（每行 KEY=VALUE）</span>
                       <textarea
                         value={dr.env}
                         onChange={(e) => updateDraft(i, { env: e.target.value })}
                         rows={3}
-                        className="w-full rounded-lg border border-stone-200 px-3 py-2 font-mono text-xs"
+                        className="w-full rounded-lg border border-studio-border px-3 py-2 font-mono text-xs"
                       />
                     </label>
                     <label className="block text-sm sm:col-span-2">
-                      <span className="mb-1 block font-medium text-stone-700">仅允许的工具名（可选，逗号分隔）</span>
+                      <span className="mb-1 block font-medium text-studio-text">仅允许的工具名（可选，逗号分隔）</span>
                       <input
                         value={dr.tools}
                         onChange={(e) => updateDraft(i, { tools: e.target.value })}
-                        className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm"
+                        className="w-full rounded-lg border border-studio-border px-3 py-2 text-sm"
                         placeholder="read_file, list_dir"
                       />
                     </label>

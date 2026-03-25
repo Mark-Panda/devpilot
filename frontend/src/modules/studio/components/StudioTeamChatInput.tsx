@@ -12,6 +12,8 @@ interface StudioTeamChatInputProps {
   mainAgentId: string
   /** 父组件触发：nonce 变化时在光标处或末尾追加 text（如点击成员列表） */
   externalAppend?: { text: string; nonce: number }
+  /** 与工作室 .studio-pixel 根节点配套的像素风输入区 */
+  pixelStyle?: boolean
 }
 
 /** 从用户原文解析 @token，生成发给主 Agent 的带前缀消息（仍只走主 Agent 入口） */
@@ -51,6 +53,7 @@ export function StudioTeamChatInput({
   members,
   mainAgentId,
   externalAppend,
+  pixelStyle = false,
 }: StudioTeamChatInputProps) {
   const [message, setMessage] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -178,7 +181,11 @@ export function StudioTeamChatInput({
     <form onSubmit={handleSubmit} className="relative w-full">
       {mentionOpen && filteredMentions.length > 0 && (
         <ul
-          className="absolute bottom-full left-0 right-0 z-20 mb-1 max-h-40 overflow-y-auto rounded-lg border border-stone-200 bg-white py-1 text-left text-sm shadow-lg"
+          className={
+            pixelStyle
+              ? 'absolute bottom-full left-0 right-0 z-20 mb-1 max-h-40 overflow-y-auto border-2 border-[var(--sp-border)] bg-[var(--sp-panel)] py-1 text-left text-sm shadow-[var(--sp-pixel-shadow)]'
+              : 'absolute bottom-full left-0 right-0 z-20 mb-1 max-h-40 overflow-y-auto rounded-lg border border-studio-border bg-studio-panel py-1 text-left text-sm shadow-lg'
+          }
           role="listbox"
         >
           {filteredMentions.map((m, idx) => (
@@ -186,14 +193,20 @@ export function StudioTeamChatInput({
               <button
                 type="button"
                 role="option"
-                className={`w-full px-3 py-1.5 text-left hover:bg-stone-100 ${
-                  idx === mentionHighlight ? 'bg-rose-50 text-rose-900' : 'text-stone-800'
+                className={`w-full px-3 py-1.5 text-left ${
+                  pixelStyle
+                    ? idx === mentionHighlight
+                      ? 'bg-[var(--sp-panel-2)] text-[var(--sp-border-hot)]'
+                      : 'text-[var(--sp-text)] hover:bg-[var(--sp-panel-2)]'
+                    : idx === mentionHighlight
+                      ? 'bg-rose-50 text-rose-900'
+                      : 'text-studio-text hover:bg-studio-panel-2'
                 }`}
                 onMouseDown={(ev) => ev.preventDefault()}
                 onClick={() => insertMention(m)}
               >
                 <span className="font-medium">{m.config.name}</span>
-                <span className="ml-2 text-xs text-stone-400">
+                <span className="ml-2 text-xs text-studio-muted">
                   {m.config.type} · {m.config.id}
                 </span>
               </button>
@@ -201,14 +214,36 @@ export function StudioTeamChatInput({
           ))}
         </ul>
       )}
-      <div className="flex items-end gap-2 rounded-2xl border border-stone-200 bg-white p-2 shadow-md transition-all hover:border-stone-300 focus-within:border-rose-300 focus-within:ring-2 focus-within:ring-rose-100">
+      <div
+        className={
+          pixelStyle
+            ? 'flex items-end gap-2 border-2 border-[var(--sp-border)] bg-[var(--sp-code)] p-2 shadow-[var(--sp-pixel-shadow)] transition-all focus-within:border-[var(--sp-border-hot)]'
+            : 'flex items-end gap-2 rounded-2xl border border-studio-border bg-studio-panel p-2 shadow-md transition-all hover:border-studio-hot focus-within:border-studio-hot focus-within:ring-2 focus-within:ring-studio-hot/25'
+        }
+      >
         <div className="flex flex-shrink-0 items-center gap-0.5">
-          <button type="button" className="rounded-lg p-2 text-stone-500 hover:bg-stone-100" title="附件">
+          <button
+            type="button"
+            className={
+              pixelStyle
+                ? 'p-2 text-[var(--sp-muted)] hover:bg-[var(--sp-panel)]'
+                : 'rounded-lg p-2 text-studio-muted hover:bg-studio-panel-2'
+            }
+            title="附件"
+          >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
             </svg>
           </button>
-          <button type="button" className="rounded-lg p-2 text-stone-500 hover:bg-stone-100" title="语音输入">
+          <button
+            type="button"
+            className={
+              pixelStyle
+                ? 'p-2 text-[var(--sp-muted)] hover:bg-[var(--sp-panel)]'
+                : 'rounded-lg p-2 text-studio-muted hover:bg-studio-panel-2'
+            }
+            title="语音输入"
+          >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v6m3-13a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
@@ -229,17 +264,37 @@ export function StudioTeamChatInput({
           placeholder={placeholder}
           disabled={isLoading || disabled}
           rows={1}
-          className="min-h-[44px] flex-1 resize-none border-0 bg-transparent px-2 py-2.5 text-sm text-stone-800 placeholder-stone-400 focus:outline-none focus:ring-0 disabled:opacity-60"
+          className={
+            pixelStyle
+              ? 'min-h-[44px] flex-1 resize-none border-0 bg-transparent px-2 py-2.5 text-sm text-[var(--sp-text)] placeholder-[var(--sp-muted)] focus:outline-none focus:ring-0 disabled:opacity-60'
+              : 'min-h-[44px] flex-1 resize-none border-0 bg-transparent px-2 py-2.5 text-sm text-studio-text placeholder-studio-muted focus:outline-none focus:ring-0 disabled:opacity-60'
+          }
           style={{ minHeight: '40px', maxHeight: '160px' }}
         />
 
         <div className="flex flex-shrink-0 items-center gap-0.5">
-          <button type="button" className="rounded-lg p-2 text-stone-500 hover:bg-stone-100" title="添加">
+          <button
+            type="button"
+            className={
+              pixelStyle
+                ? 'p-2 text-[var(--sp-muted)] hover:bg-[var(--sp-panel)]'
+                : 'rounded-lg p-2 text-studio-muted hover:bg-studio-panel-2'
+            }
+            title="添加"
+          >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
           </button>
-          <button type="button" className="rounded-lg p-2 text-stone-500 hover:bg-stone-100" title="下载">
+          <button
+            type="button"
+            className={
+              pixelStyle
+                ? 'p-2 text-[var(--sp-muted)] hover:bg-[var(--sp-panel)]'
+                : 'rounded-lg p-2 text-studio-muted hover:bg-studio-panel-2'
+            }
+            title="下载"
+          >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>
@@ -247,7 +302,11 @@ export function StudioTeamChatInput({
           <button
             type="submit"
             disabled={!message.trim() || isLoading || disabled}
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-[#e11d48] text-white shadow-sm transition-colors hover:bg-[#be123c] disabled:cursor-not-allowed disabled:opacity-40"
+            className={
+              pixelStyle
+                ? 'flex h-11 w-11 flex-shrink-0 items-center justify-center border-2 border-black bg-[var(--sp-accent)] text-white shadow-[var(--sp-pixel-shadow)] transition-colors hover:bg-[var(--sp-border-hot)] disabled:cursor-not-allowed disabled:opacity-40'
+                : 'flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-[#e11d48] text-white shadow-sm transition-colors hover:bg-[#be123c] disabled:cursor-not-allowed disabled:opacity-40'
+            }
             title="发送"
           >
             {isLoading ? (
@@ -261,8 +320,13 @@ export function StudioTeamChatInput({
         </div>
       </div>
       {mentionTargets.length > 0 ? (
-        <p className="mt-1.5 text-[11px] text-stone-400">
-          输入 <kbd className="rounded bg-stone-200 px-1">@</kbd> 可定向子 Agent；消息仍由主 Agent 统一接收与委派。
+        <p
+          className={
+            pixelStyle ? 'mt-1.5 text-[11px] text-[var(--sp-muted)]' : 'mt-1.5 text-[11px] text-studio-muted'
+          }
+        >
+          输入 <kbd className={pixelStyle ? '' : 'rounded bg-studio-border px-1'}>@</kbd>{' '}
+          可定向子 Agent；消息仍由主 Agent 统一接收与委派。
         </p>
       ) : null}
     </form>

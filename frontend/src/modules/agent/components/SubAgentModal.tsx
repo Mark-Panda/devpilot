@@ -40,30 +40,30 @@ export function SubAgentModal({ parentAgent, onSubmit, onClose }: SubAgentModalP
 
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true">
-      <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white shadow-xl">
-        <div className="border-b border-stone-100 px-5 py-4">
-          <h2 className="text-lg font-semibold text-stone-800">创建子 Agent</h2>
-          <p className="mt-1 text-sm text-stone-500">
+      <div className="w-full max-w-md rounded-2xl border border-studio-border bg-studio-panel shadow-xl">
+        <div className="border-b border-studio-border px-5 py-4">
+          <h2 className="text-lg font-semibold text-studio-text">创建子 Agent</h2>
+          <p className="mt-1 text-sm text-studio-muted">
             继承「{parentAgent.config.name}」的模型与技能，独立会话记忆。
           </p>
         </div>
         <form onSubmit={handleSubmit} className="space-y-4 px-5 py-4">
           <div>
-            <label htmlFor="sub-agent-name" className="mb-1 block text-sm font-medium text-stone-700">
-              名称 <span className="text-rose-500">*</span>
+            <label htmlFor="sub-agent-name" className="mb-1 block text-sm font-medium text-studio-text">
+              名称 <span className="text-studio-hot">*</span>
             </label>
             <input
               id="sub-agent-name"
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none ring-rose-500/30 focus:border-rose-400 focus:ring-2"
+              className="w-full rounded-xl border border-studio-border bg-studio-code px-3 py-2 text-sm text-studio-text outline-none ring-studio-hot/30 focus:border-studio-hot focus:ring-2"
               placeholder="例如：代码审查"
               autoFocus
             />
           </div>
           <div>
-            <label htmlFor="sub-agent-prompt" className="mb-1 block text-sm font-medium text-stone-700">
+            <label htmlFor="sub-agent-prompt" className="mb-1 block text-sm font-medium text-studio-text">
               系统提示（可选）
             </label>
             <textarea
@@ -71,7 +71,7 @@ export function SubAgentModal({ parentAgent, onSubmit, onClose }: SubAgentModalP
               value={systemPrompt}
               onChange={(e) => setSystemPrompt(e.target.value)}
               rows={4}
-              className="w-full resize-none rounded-xl border border-stone-200 px-3 py-2 text-sm outline-none ring-rose-500/30 focus:border-rose-400 focus:ring-2"
+              className="w-full resize-none rounded-xl border border-studio-border bg-studio-code px-3 py-2 text-sm text-studio-text outline-none ring-studio-hot/30 focus:border-studio-hot focus:ring-2"
               placeholder="留空则使用默认子代理说明"
             />
           </div>
@@ -79,7 +79,7 @@ export function SubAgentModal({ parentAgent, onSubmit, onClose }: SubAgentModalP
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-stone-200 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+              className="rounded-xl border border-studio-border px-4 py-2 text-sm font-medium text-studio-text hover:bg-studio-code"
             >
               取消
             </button>

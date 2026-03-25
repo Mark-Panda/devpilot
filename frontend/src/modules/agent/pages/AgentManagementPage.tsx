@@ -210,18 +210,18 @@ export const AgentManagementPage: React.FC = () => {
   const mainAgents = agents.filter((a) => a.config.type === 'main')
 
   return (
-    <div className="min-h-0 flex-1 overflow-auto bg-stone-50 px-4 py-6 sm:px-8">
+    <div className="min-h-0 flex-1 overflow-auto bg-studio-code px-4 py-6 sm:px-8">
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h1 className="text-xl font-semibold text-stone-800">Agent 管理</h1>
-            <p className="mt-1 text-sm text-stone-500">
+            <h1 className="text-xl font-semibold text-studio-text">Agent 管理</h1>
+            <p className="mt-1 text-sm text-studio-muted">
               为每个 Agent 配置角色，并从全局技能目录与{' '}
-              <Link to="/settings/mcp" className="font-medium text-rose-700 underline">
+              <Link to="/settings/mcp" className="font-medium text-studio-hot underline">
                 MCP 配置
               </Link>
               中已启用的服务里勾选子集（<strong>主 Agent</strong> 会自动加载全部已启用 MCP）。聊天页顶部可切换 Agent。
-              <span className="mt-1 block text-stone-400">
+              <span className="mt-1 block text-studio-muted">
                 子 Agent（sub）、工作 Agent（worker）及<strong>额外的</strong>主 Agent（main）均可删除；须至少保留一个
                 main；若某 main 仍被工作室绑定，请先删除或调整工作室。删除父节点时其下属子树会一并销毁。
               </span>
@@ -230,7 +230,7 @@ export const AgentManagementPage: React.FC = () => {
           <div className="flex flex-wrap gap-2">
             <Link
               to="/agent"
-              className="rounded-xl border border-stone-200 bg-white px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-50"
+              className="rounded-xl border border-studio-border bg-studio-panel px-4 py-2 text-sm font-medium text-studio-text hover:bg-studio-code"
             >
               返回聊天
             </Link>
@@ -256,15 +256,15 @@ export const AgentManagementPage: React.FC = () => {
         )}
 
         {error && (
-          <div className="mb-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-800">{error}</div>
+          <div className="mb-4 rounded-xl border border-studio-hot/50 bg-studio-hot/10 px-4 py-3 text-sm text-studio-hot">{error}</div>
         )}
 
         {loading ? (
-          <p className="text-sm text-stone-500">加载中…</p>
+          <p className="text-sm text-studio-muted">加载中…</p>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm">
+          <div className="overflow-hidden rounded-xl border border-studio-border bg-studio-panel shadow-sm">
             <table className="w-full text-left text-sm">
-              <thead className="border-b border-stone-100 bg-stone-50 text-stone-600">
+              <thead className="border-b border-studio-border bg-studio-code text-studio-muted">
                 <tr>
                   <th className="px-4 py-3 font-medium">名称</th>
                   <th className="px-4 py-3 font-medium">角色</th>
@@ -277,22 +277,22 @@ export const AgentManagementPage: React.FC = () => {
               </thead>
               <tbody>
                 {agents.map((a) => (
-                  <tr key={a.config.id} className="border-b border-stone-50 last:border-0">
-                    <td className="px-4 py-3 font-medium text-stone-800">{a.config.name}</td>
-                    <td className="max-w-[200px] truncate px-4 py-3 text-stone-600" title={a.config.role}>
+                  <tr key={a.config.id} className="border-b border-studio-border/40 last:border-0">
+                    <td className="px-4 py-3 font-medium text-studio-text">{a.config.name}</td>
+                    <td className="max-w-[200px] truncate px-4 py-3 text-studio-muted" title={a.config.role}>
                       {a.config.role || '—'}
                     </td>
-                    <td className="px-4 py-3 text-stone-600">{a.config.type}</td>
-                    <td className="max-w-[180px] truncate px-4 py-3 font-mono text-xs text-stone-600">
+                    <td className="px-4 py-3 text-studio-muted">{a.config.type}</td>
+                    <td className="max-w-[180px] truncate px-4 py-3 font-mono text-xs text-studio-muted">
                       {a.config.model_config.model}
                     </td>
-                    <td className="px-4 py-3 text-stone-600">{(a.config.skills ?? []).length}</td>
-                    <td className="px-4 py-3 text-stone-600">{(a.config.mcp_servers ?? []).length}</td>
+                    <td className="px-4 py-3 text-studio-muted">{(a.config.skills ?? []).length}</td>
+                    <td className="px-4 py-3 text-studio-muted">{(a.config.mcp_servers ?? []).length}</td>
                     <td className="px-4 py-3 text-right">
                       <button
                         type="button"
                         onClick={() => openEdit(a)}
-                        className="mr-2 text-rose-600 hover:underline"
+                        className="mr-2 text-studio-hot hover:underline"
                       >
                         编辑
                       </button>
@@ -300,7 +300,7 @@ export const AgentManagementPage: React.FC = () => {
                         type="button"
                         onClick={() => setConfirmDeleteAgent(a)}
                         disabled={deletingAgentId !== null}
-                        className="text-stone-500 hover:text-rose-600 disabled:opacity-50"
+                        className="text-studio-muted hover:text-studio-hot disabled:opacity-50"
                       >
                         删除
                       </button>
@@ -310,7 +310,7 @@ export const AgentManagementPage: React.FC = () => {
               </tbody>
             </table>
             {agents.length === 0 && (
-              <p className="px-4 py-8 text-center text-sm text-stone-500">暂无 Agent，请点击「新建 Agent」</p>
+              <p className="px-4 py-8 text-center text-sm text-studio-muted">暂无 Agent，请点击「新建 Agent」</p>
             )}
           </div>
         )}
@@ -323,23 +323,23 @@ export const AgentManagementPage: React.FC = () => {
           aria-modal="true"
           aria-labelledby="agent-delete-title"
         >
-          <div className="w-full max-w-md rounded-2xl border border-stone-200 bg-white p-6 shadow-xl">
-            <h2 id="agent-delete-title" className="text-lg font-semibold text-stone-800">
+          <div className="w-full max-w-md rounded-2xl border border-studio-border bg-studio-panel p-6 shadow-xl">
+            <h2 id="agent-delete-title" className="text-lg font-semibold text-studio-text">
               删除 Agent
             </h2>
-            <p className="mt-2 text-sm text-stone-600">
+            <p className="mt-2 text-sm text-studio-muted">
               确定删除「{confirmDeleteAgent.config.name}」
-              <span className="text-stone-400">（{confirmDeleteAgent.config.type} · </span>
-              <code className="text-xs text-stone-500">{confirmDeleteAgent.config.id}</code>
-              <span className="text-stone-400">）</span>？
+              <span className="text-studio-muted">（{confirmDeleteAgent.config.type} · </span>
+              <code className="text-xs text-studio-muted">{confirmDeleteAgent.config.id}</code>
+              <span className="text-studio-muted">）</span>？
             </p>
-            <p className="mt-2 text-sm text-stone-600">{deleteConfirmDescription(confirmDeleteAgent)}</p>
+            <p className="mt-2 text-sm text-studio-muted">{deleteConfirmDescription(confirmDeleteAgent)}</p>
             <div className="mt-6 flex justify-end gap-2">
               <button
                 type="button"
                 disabled={deletingAgentId !== null}
                 onClick={() => setConfirmDeleteAgent(null)}
-                className="rounded-lg border border-stone-200 px-4 py-2 text-sm text-stone-700 disabled:opacity-50"
+                className="rounded-lg border border-studio-border px-4 py-2 text-sm text-studio-text disabled:opacity-50"
               >
                 取消
               </button>
@@ -362,35 +362,35 @@ export const AgentManagementPage: React.FC = () => {
           role="dialog"
           aria-modal="true"
         >
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-stone-200 bg-white shadow-xl">
+          <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-2xl border border-studio-border bg-studio-panel shadow-xl">
             <form onSubmit={(e) => void handleSubmit(e)} className="p-6">
-              <h2 className="text-lg font-semibold text-stone-800">
+              <h2 className="text-lg font-semibold text-studio-text">
                 {editingId ? '编辑 Agent' : '新建 Agent'}
               </h2>
               <div className="mt-4 space-y-4">
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-stone-700">名称</label>
+                  <label className="mb-1 block text-sm font-medium text-studio-text">名称</label>
                   <input
                     value={form.name}
                     onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-                    className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-studio-border px-3 py-2 text-sm"
                     required
                   />
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-stone-700">角色</label>
+                  <label className="mb-1 block text-sm font-medium text-studio-text">角色</label>
                   <textarea
                     value={form.role}
                     onChange={(e) => setForm((f) => ({ ...f, role: e.target.value }))}
                     rows={2}
                     placeholder="例如：负责代码审查与重构建议"
-                    className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-studio-border px-3 py-2 text-sm"
                   />
                 </div>
                 {!editingId && (
                   <>
                     <div>
-                      <label className="mb-1 block text-sm font-medium text-stone-700">类型</label>
+                      <label className="mb-1 block text-sm font-medium text-studio-text">类型</label>
                       <select
                         value={form.type}
                         onChange={(e) =>
@@ -406,7 +406,7 @@ export const AgentManagementPage: React.FC = () => {
                             }
                           })
                         }
-                        className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm"
+                        className="w-full rounded-lg border border-studio-border px-3 py-2 text-sm"
                       >
                         <option value="main">主 Agent</option>
                         <option value="sub">子 Agent</option>
@@ -415,13 +415,13 @@ export const AgentManagementPage: React.FC = () => {
                     </div>
                     {(form.type === 'sub' || form.type === 'worker') && (
                       <div>
-                        <label className="mb-1 block text-sm font-medium text-stone-700">
+                        <label className="mb-1 block text-sm font-medium text-studio-text">
                           所属主 Agent
                         </label>
                         <select
                           value={form.parent_id}
                           onChange={(e) => setForm((f) => ({ ...f, parent_id: e.target.value }))}
-                          className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm"
+                          className="w-full rounded-lg border border-studio-border px-3 py-2 text-sm"
                           required
                         >
                           <option value="">请选择 main 类型 Agent</option>
@@ -436,12 +436,12 @@ export const AgentManagementPage: React.FC = () => {
                   </>
                 )}
                 {editingId && (
-                  <p className="text-xs text-stone-500">
+                  <p className="text-xs text-studio-muted">
                     类型与父子关系创建后不可在此修改；模型与密钥可在下方调整。
                   </p>
                 )}
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-stone-700">模型</label>
+                  <label className="mb-1 block text-sm font-medium text-studio-text">模型</label>
                   <select
                     value={
                       modelOptions.find(
@@ -471,7 +471,7 @@ export const AgentManagementPage: React.FC = () => {
                         }))
                       }
                     }}
-                    className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-studio-border px-3 py-2 text-sm"
                   >
                     <option value="">选择已配置模型</option>
                     {modelOptions.map((o, i) => (
@@ -482,16 +482,16 @@ export const AgentManagementPage: React.FC = () => {
                   </select>
                 </div>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-stone-700">系统提示</label>
+                  <label className="mb-1 block text-sm font-medium text-studio-text">系统提示</label>
                   <textarea
                     value={form.system_prompt}
                     onChange={(e) => setForm((f) => ({ ...f, system_prompt: e.target.value }))}
                     rows={4}
-                    className="w-full rounded-lg border border-stone-200 px-3 py-2 text-sm"
+                    className="w-full rounded-lg border border-studio-border px-3 py-2 text-sm"
                     placeholder="可选；留空则使用默认助手说明"
                   />
                 </div>
-                <label className="flex cursor-pointer items-start gap-2 text-sm text-stone-700">
+                <label className="flex cursor-pointer items-start gap-2 text-sm text-studio-text">
                   <input
                     type="checkbox"
                     className="mt-1"
@@ -502,14 +502,14 @@ export const AgentManagementPage: React.FC = () => {
                   />
                   <span>
                     <span className="font-medium">项目文件仅只读</span>
-                    <span className="mt-0.5 block text-xs text-stone-500">
+                    <span className="mt-0.5 block text-xs text-studio-muted">
                       勾选后，在已打开项目时仅可使用读文件与列目录工具，不能写入或 search_replace。
                     </span>
                   </span>
                 </label>
                 <div>
-                  <label className="mb-1 block text-sm font-medium text-stone-700">专属工作区（可选）</label>
-                  <p className="mb-2 text-xs text-stone-500">
+                  <label className="mb-1 block text-sm font-medium text-studio-text">专属工作区（可选）</label>
+                  <p className="mb-2 text-xs text-studio-muted">
                     留空则使用聊天页「应用默认工作区」；填写后本 Agent 的读/写文件工具与 MCP 解析均相对该目录。
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -518,7 +518,7 @@ export const AgentManagementPage: React.FC = () => {
                       readOnly
                       value={form.workspace_root ?? ''}
                       placeholder="未设置（跟随应用默认）"
-                      className="min-w-[12rem] flex-1 rounded-lg border border-stone-200 bg-stone-50 px-3 py-2 font-mono text-xs text-stone-800"
+                      className="min-w-[12rem] flex-1 rounded-lg border border-studio-border bg-studio-code px-3 py-2 font-mono text-xs text-studio-text"
                     />
                     <button
                       type="button"
@@ -530,24 +530,24 @@ export const AgentManagementPage: React.FC = () => {
                           /* 对话框取消或绑定未生成 */
                         }
                       }}
-                      className="rounded-lg border border-stone-200 bg-white px-3 py-2 text-sm text-stone-700 hover:bg-stone-50"
+                      className="rounded-lg border border-studio-border bg-studio-panel px-3 py-2 text-sm text-studio-text hover:bg-studio-code"
                     >
                       选择目录
                     </button>
                     <button
                       type="button"
                       onClick={() => setForm((f) => ({ ...f, workspace_root: '' }))}
-                      className="rounded-lg border border-stone-200 px-3 py-2 text-sm text-stone-600 hover:bg-stone-50"
+                      className="rounded-lg border border-studio-border px-3 py-2 text-sm text-studio-muted hover:bg-studio-code"
                     >
                       清除
                     </button>
                   </div>
                 </div>
                 <div>
-                  <div className="mb-2 text-sm font-medium text-stone-700">技能（全局 ~/.devpilot/skills）</div>
-                  <div className="max-h-40 space-y-2 overflow-y-auto rounded-lg border border-stone-100 bg-stone-50 p-3">
+                  <div className="mb-2 text-sm font-medium text-studio-text">技能（全局 ~/.devpilot/skills）</div>
+                  <div className="max-h-40 space-y-2 overflow-y-auto rounded-lg border border-studio-border bg-studio-code p-3">
                     {skillsCatalog.length === 0 ? (
-                      <p className="text-xs text-stone-500">暂无技能，请使用技能仓库同步</p>
+                      <p className="text-xs text-studio-muted">暂无技能，请使用技能仓库同步</p>
                     ) : (
                       skillsCatalog.map((s) => (
                         <label key={s.name} className="flex cursor-pointer items-start gap-2 text-sm">
@@ -558,8 +558,8 @@ export const AgentManagementPage: React.FC = () => {
                             className="mt-1"
                           />
                           <span>
-                            <span className="font-medium text-stone-800">{s.name}</span>
-                            <span className="block text-xs text-stone-500">{s.description}</span>
+                            <span className="font-medium text-studio-text">{s.name}</span>
+                            <span className="block text-xs text-studio-muted">{s.description}</span>
                           </span>
                         </label>
                       ))
@@ -567,8 +567,8 @@ export const AgentManagementPage: React.FC = () => {
                   </div>
                 </div>
                 <div>
-                  <div className="mb-2 text-sm font-medium text-stone-700">MCP（~/.devpilot/mcp.json 中已启用的条目）</div>
-                  <div className="max-h-36 space-y-2 overflow-y-auto rounded-lg border border-stone-100 bg-stone-50 p-3">
+                  <div className="mb-2 text-sm font-medium text-studio-text">MCP（~/.devpilot/mcp.json 中已启用的条目）</div>
+                  <div className="max-h-36 space-y-2 overflow-y-auto rounded-lg border border-studio-border bg-studio-code p-3">
                     {mcpCatalog.map((m) => (
                       <label key={m.id} className="flex cursor-pointer items-start gap-2 text-sm">
                         <input
@@ -578,19 +578,19 @@ export const AgentManagementPage: React.FC = () => {
                           className="mt-1"
                         />
                         <span>
-                          <span className="font-medium text-stone-800">{m.name}</span>
-                          <span className="block text-xs text-stone-500">{m.description}</span>
+                          <span className="font-medium text-studio-text">{m.name}</span>
+                          <span className="block text-xs text-studio-muted">{m.description}</span>
                         </span>
                       </label>
                     ))}
                   </div>
                 </div>
               </div>
-              <div className="mt-6 flex justify-end gap-2 border-t border-stone-100 pt-4">
+              <div className="mt-6 flex justify-end gap-2 border-t border-studio-border pt-4">
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="rounded-xl border border-stone-200 px-4 py-2 text-sm font-medium text-stone-700"
+                  className="rounded-xl border border-studio-border px-4 py-2 text-sm font-medium text-studio-text"
                 >
                   取消
                 </button>
