@@ -86,7 +86,7 @@ export function StudioOfficeWallInteractives({
             </div>
           )}
         </div>
-        <span className="mt-0.5 block text-center font-[system-ui] text-[8px] text-[#d6c4a8]">
+        <span className="mt-0.5 block text-center text-[10px] text-[#d6c4a8]">
           {nightMode ? '夜景' : '白昼'}
         </span>
       </button>
@@ -100,8 +100,8 @@ export function StudioOfficeWallInteractives({
         className="pointer-events-auto absolute left-[18%] top-[18%] w-[100px] -rotate-6 border border-[#ca8a04]/60 bg-[#fef9c3] px-1.5 py-1 text-left shadow-[2px_3px_0_rgba(0,0,0,0.25)] transition-transform hover:rotate-0 hover:shadow-[3px_4px_0_rgba(0,0,0,0.2)] active:scale-95"
       >
         <div className="mb-0.5 h-2 w-2 rounded-full bg-[#facc15]/80 shadow-sm" />
-        <p className="font-[system-ui] text-[9px] leading-snug text-[#422006]">{STICKY_TIPS[stickyIdx]}</p>
-        <span className="mt-0.5 block text-[7px] text-[#78716c]">再点换下一条</span>
+        <p className="text-xs leading-snug text-[#422006]">{STICKY_TIPS[stickyIdx]}</p>
+        <span className="mt-0.5 block text-[10px] text-[#78716c]">再点换下一条</span>
       </button>
 
       {/* 小白板 */}
@@ -112,11 +112,11 @@ export function StudioOfficeWallInteractives({
         aria-label="工作室白板"
         className="pointer-events-auto absolute left-1/2 top-[13%] w-[120px] -translate-x-1/2 border-4 border-[#57534e] bg-[#ecfdf5] px-2 py-1.5 shadow-[2px_3px_0_#000] transition-transform hover:scale-[1.02] active:scale-[0.98]"
       >
-        <div className="mb-0.5 font-[system-ui] text-[8px] font-bold uppercase tracking-wide text-[#57534e]">
+        <div className="mb-0.5 text-[10px] font-bold uppercase tracking-wide text-[#57534e]">
           白板
         </div>
-        <p className="font-mono text-[10px] font-semibold text-[#134e4a]">{BOARD_LINES[boardIdx]}</p>
-        <span className="mt-0.5 block text-[7px] text-[#64748b]">点击切换</span>
+        <p className="font-mono text-xs font-semibold text-[#134e4a]">{BOARD_LINES[boardIdx]}</p>
+        <span className="mt-0.5 block text-[10px] text-[#64748b]">点击切换</span>
       </button>
 
       {/* 时钟 */}
@@ -134,7 +134,7 @@ export function StudioOfficeWallInteractives({
         <div className="mt-1 font-mono text-[15px] font-bold leading-none tracking-wider text-[#fbbf24]">
           {h}:{m}:{s}
         </div>
-        <div className="mt-0.5 font-[system-ui] text-[8px] text-[#a8a29e]">
+        <div className="mt-0.5 text-[10px] text-[#a8a29e]">
           {mon}月{day}日
         </div>
       </button>
@@ -151,7 +151,7 @@ export function StudioOfficeWallInteractives({
         <span
           className={`h-2.5 w-2.5 border border-[#7f1d1d] ${onAir ? 'studio-office-onair-led bg-red-500' : 'bg-[#450a0a]'}`}
         />
-        <span className="font-[system-ui] text-[8px] font-bold tracking-widest text-[#d6d3d1]">REC</span>
+        <span className="text-[10px] font-bold tracking-widest text-[#d6d3d1]">REC</span>
       </button>
     </div>
   )

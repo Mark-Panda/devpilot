@@ -35,10 +35,11 @@ func agentMemoryFilePath(agentID string) string {
 	return agentMemoryFilePathForSession(agentID, "")
 }
 
-// agentMemoryFilePathForSession studioID 为空为「聊天」页全局会话；非空为某工作室内该 Agent 的独立会话（与 OpenClaw 多 session 一致）
-func agentMemoryFilePathForSession(agentID, studioID string) string {
+// legacyGlobalStudioMemoryPath 旧版工作室内会话：~/.devpilot/agent-memory/studio_<studio>_<agent>.json（迁移用）
+func legacyGlobalStudioMemoryPath(agentID, studioID string) string {
 	studioID = strings.TrimSpace(studioID)
-	if agentID == "" {
+	agentID = strings.TrimSpace(agentID)
+	if studioID == "" || agentID == "" {
 		return ""
 	}
 	dir := globalAgentMemoryDir()
@@ -46,11 +47,28 @@ func agentMemoryFilePathForSession(agentID, studioID string) string {
 		return ""
 	}
 	safeAgent := sanitizeAgentIDForFile(agentID)
-	if studioID == "" {
-		return filepath.Join(dir, safeAgent+".json")
-	}
 	safeStudio := sanitizeAgentIDForFile(studioID)
 	return filepath.Join(dir, "studio_"+safeStudio+"_"+safeAgent+".json")
+}
+
+// agentMemoryFilePathForSession studioID 为空为「聊天」页全局会话；非空为 ~/.devpilot/workspace/<studio>/agents/<agent>/memory.json
+func agentMemoryFilePathForSession(agentID, studioID string) string {
+	studioID = strings.TrimSpace(studioID)
+	if agentID == "" {
+		return ""
+	}
+	if studioID == "" {
+		dir := globalAgentMemoryDir()
+		if dir == "" {
+			return ""
+		}
+		safeAgent := sanitizeAgentIDForFile(agentID)
+		return filepath.Join(dir, safeAgent+".json")
+	}
+	if p := studioAgentMemoryPath(agentID, studioID); p != "" {
+		return p
+	}
+	return legacyGlobalStudioMemoryPath(agentID, studioID)
 }
 
 // DeleteAllSessionMemoryFilesForAgent 删除该 Agent 的全局会话与所有 studio_*_<agent>.json 及摘要
@@ -71,6 +89,15 @@ func DeleteAllSessionMemoryFilesForAgent(agentID string) {
 	for _, m := range matches {
 		deleteAgentMemoryFile(m)
 		deleteMemorySummaryFile(memorySummaryFilePath(m))
+	}
+	home, err := os.UserHomeDir()
+	if err == nil {
+		wsPattern := filepath.Join(home, ".devpilot", "workspace", "*", "agents", safe, "memory.json")
+		wsMatches, _ := filepath.Glob(wsPattern)
+		for _, m := range wsMatches {
+			deleteAgentMemoryFile(m)
+			deleteMemorySummaryFile(memorySummaryFilePath(m))
+		}
 	}
 }
 

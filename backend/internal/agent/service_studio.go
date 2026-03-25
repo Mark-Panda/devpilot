@@ -102,6 +102,9 @@ func (s *Service) CreateStudio(ctx context.Context, name, mainAgentID string) (S
 	if err := s.studioStore.AddStudio(st); err != nil {
 		return Studio{}, err
 	}
+	if err := writeStudioPartitionMetadata(st); err != nil {
+		log.Warn().Err(err).Str("studio_id", st.ID).Msg("write studio partition metadata failed")
+	}
 	return st, nil
 }
 

@@ -12,7 +12,7 @@ import (
 
 // AgentGlobalDataDir 返回 ~/.devpilot。
 // agents.json、mcp.json、agent-memory/ 等 Agent 全局数据均在此目录下（与 Pebble、skills 并列）。
-// 未来「工作室 / workspace」可将多 Agent 空间放在例如 ~/.devpilot/workspaces/<id>/（另行实现）。
+// 工作室分区数据在 ~/.devpilot/workspace/<studio_id>/（见 studio_partition.go）。
 func AgentGlobalDataDir() (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {

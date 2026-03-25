@@ -70,7 +70,7 @@ func (a *agentImpl) effectiveFileWorkspaceRootGlobal() string {
 	return ""
 }
 
-// effectiveFileWorkspaceRoot 会话内文件工具与 MCP 根路径：工作室 (studio,agent) 覆盖 > Agent workspace_root > 应用默认工作区根
+// effectiveFileWorkspaceRoot 会话内文件工具与 MCP 根路径：工作室显式覆盖 > 分区下 agents/<id>/workData > Agent workspace_root > 应用默认工作区根
 func (a *agentImpl) effectiveFileWorkspaceRoot(ctx context.Context) string {
 	sid := strings.TrimSpace(StudioIDFromContext(ctx))
 	if sid != "" && a.studioAgentWorkspace != nil {
@@ -83,7 +83,14 @@ func (a *agentImpl) effectiveFileWorkspaceRoot(ctx context.Context) string {
 				Str("agent_id", a.config.ID).
 				Str("studio_id", sid).
 				Str("path", stored).
-				Msg("工作室成员工作区路径无效，回退到 Agent/应用默认")
+				Msg("工作室成员工作区路径无效，回退到分区 workData 或 Agent/应用默认")
+		}
+		wd, werr := StudioAgentWorkDataDir(sid, a.config.ID)
+		if werr == nil && wd != "" {
+			return wd
+		}
+		if werr != nil {
+			log.Warn().Err(werr).Str("agent_id", a.config.ID).Str("studio_id", sid).Msg("studio default workData unavailable")
 		}
 	}
 	return a.effectiveFileWorkspaceRootGlobal()

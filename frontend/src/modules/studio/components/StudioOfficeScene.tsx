@@ -156,7 +156,7 @@ function PixelActor({
         </div>
         <div className="studio-office-actor-feet-shadow" />
       </div>
-      <span className="mt-0.5 max-w-[76px] truncate rounded-sm bg-[#1a1510]/90 px-1 text-[9px] leading-tight text-[#f5e6d3] ring-1 ring-[#4a3728]">
+      <span className="mt-0.5 max-w-[76px] truncate rounded-sm bg-[#1a1510]/90 px-1 text-[10px] leading-tight text-[#f5e6d3] ring-1 ring-[#4a3728]">
         {label}
       </span>
     </div>
@@ -268,14 +268,14 @@ export function StudioOfficeScene({
         onClick={() => setVisionPanned((v) => !v)}
         title={visionPanned ? '恢复默认视野' : '横向略放大场景'}
         aria-pressed={visionPanned}
-        className="studio-office-scene-hud-btn absolute left-2 top-2 z-[12] border border-[var(--so-red)] bg-[#1a1510] px-2 py-1 text-[11px] text-[#f5e6d3] hover:bg-[#2a2218]"
+        className="studio-office-scene-hud-btn absolute left-2 top-2 z-[12] border border-[var(--so-red)] bg-[#1a1510] px-2 py-1 text-sm text-[#f5e6d3] hover:bg-[#2a2218]"
       >
         {visionPanned ? '默认视野' : '移动视野'}
       </button>
       <button
         type="button"
         onClick={() => setShowCoords((v) => !v)}
-        className="studio-office-scene-hud-btn absolute right-2 top-2 z-[12] border border-[var(--so-red)] bg-[#1a1510] px-2 py-1 text-[11px] text-[#f5e6d3] hover:bg-[#2a2218]"
+        className="studio-office-scene-hud-btn absolute right-2 top-2 z-[12] border border-[var(--so-red)] bg-[#1a1510] px-2 py-1 text-sm text-[#f5e6d3] hover:bg-[#2a2218]"
       >
         {showCoords ? '隐藏坐标' : '显示坐标'}
       </button>
@@ -328,7 +328,7 @@ export function StudioOfficeScene({
         />
 
         {showCoords ? (
-          <div className="absolute bottom-2 right-3 z-10 font-mono text-[10px] text-[#a0aec0]">
+          <div className="absolute bottom-2 right-3 z-10 font-mono text-xs text-[var(--sp-muted)]">
             tile (0,0) — (24,16)
           </div>
         ) : null}
@@ -337,7 +337,7 @@ export function StudioOfficeScene({
           <span className="text-[13px] font-bold tracking-wider text-[#f6e05e]">✦</span>
           <span className="mx-2 text-sm font-bold text-[#f5e6d3]">{studioName || '工作室'}</span>
           <span className="text-[13px] font-bold tracking-wider text-[#f6e05e]">✦</span>
-          <div className="text-[10px] text-[#a89968]">DevPilot · 协作空间</div>
+          <div className="text-xs text-[#a89968]">DevPilot · 协作空间</div>
         </div>
       </div>
     </div>

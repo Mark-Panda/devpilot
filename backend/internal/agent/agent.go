@@ -58,7 +58,7 @@ type agentImpl struct {
 	// 多轮对话记忆（仅 user/assistant 文本；与 OpenClaw 类 session 一致，供模型上下文）
 	memory     []llms.MessageContent
 	memoryPath string
-	// 当前载入的记忆所属工作室：空串 = 聊天页全局会话；非空 = ~/.devpilot/agent-memory/studio_<id>_<agent>.json
+	// 当前载入的记忆所属工作室：空串 = 聊天页全局会话；非空 = ~/.devpilot/workspace/<studio>/agents/<agent>/memory.json
 	memorySessionStudioID string
 	// 超长记忆压缩后的滚动摘要（注入系统提示；持久化 *-summary.txt）
 	memorySummary     string
@@ -196,6 +196,11 @@ func (a *agentImpl) ensureMemorySession(ctx context.Context) {
 		_ = saveChatHistoryToFile(a.memoryPath, a.memory)
 		_ = saveMemorySummaryFile(a.memorySummaryPath, a.memorySummary)
 	}
+	if strings.TrimSpace(sid) != "" {
+		if err := EnsureStudioPartition(sid); err != nil {
+			log.Warn().Err(err).Str("studio_id", sid).Msg("ensure studio partition failed")
+		}
+	}
 	newPath := agentMemoryFilePathForSession(a.config.ID, sid)
 	newSumPath := memorySummaryFilePath(newPath)
 	loadedMem, err := loadChatHistoryFromFile(newPath)
@@ -203,11 +208,33 @@ func (a *agentImpl) ensureMemorySession(ctx context.Context) {
 		log.Warn().Err(err).Str("agent_id", a.config.ID).Str("studio_id", sid).Msg("load session memory failed, starting empty")
 		loadedMem = nil
 	}
+	if len(loadedMem) == 0 && strings.TrimSpace(sid) != "" {
+		leg := legacyGlobalStudioMemoryPath(a.config.ID, sid)
+		if leg != "" && leg != newPath {
+			if lm, e2 := loadChatHistoryFromFile(leg); e2 == nil && len(lm) > 0 {
+				loadedMem = lm
+				if newPath != "" {
+					_ = saveChatHistoryToFile(newPath, loadedMem)
+					legSum := memorySummaryFilePath(leg)
+					if st := loadMemorySummaryFromFile(legSum); st != "" {
+						_ = saveMemorySummaryFile(newSumPath, st)
+					}
+					deleteAgentMemoryFile(leg)
+					deleteMemorySummaryFile(legSum)
+				}
+			}
+		}
+	}
 	a.memory = loadedMem
 	a.memoryPath = newPath
 	a.memorySummaryPath = newSumPath
 	a.memorySummary = loadMemorySummaryFromFile(newSumPath)
 	a.memorySessionStudioID = sid
+	if strings.TrimSpace(sid) != "" {
+		if err := saveStudioAgentConfigSnapshot(sid, a.config); err != nil {
+			log.Warn().Err(err).Str("studio_id", sid).Str("agent_id", a.config.ID).Msg("write studio agent-config snapshot failed")
+		}
+	}
 }
 
 // ID 返回代理 ID
@@ -673,8 +700,11 @@ func (a *agentImpl) buildSystemPrompt(ctx context.Context) string {
 		if sid != "" && a.studioAgentWorkspace != nil {
 			if raw := strings.TrimSpace(a.studioAgentWorkspace.StudioAgentWorkspaceGet(sid, a.config.ID)); raw != "" {
 				prompt += "（本工作室内已为该 Agent 单独设置工作区；与其它工作室或聊天页会话相互独立。）\n"
-			} else if strings.TrimSpace(a.config.WorkspaceRoot) != "" {
-				prompt += "（本 Agent 在全局配置中设有 workspace_root；本工作室未单独覆盖。）\n"
+			} else {
+				prompt += "（本工作室默认使用 ~/.devpilot/workspace/<工作室ID>/agents/<本Agent>/workData 作为文件工具根；与聊天页或其它工作室隔离。）\n"
+				if strings.TrimSpace(a.config.WorkspaceRoot) != "" {
+					prompt += "（该 Agent 在全局仍有 workspace_root，但在本工作室对话中以上方分区 workData 为准。）\n"
+				}
 			}
 		} else if strings.TrimSpace(a.config.WorkspaceRoot) != "" {
 			prompt += "（本 Agent 已配置专属 workspace_root，与上方「应用项目」或聊天页默认工作区可能不同。）\n"

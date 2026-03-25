@@ -322,7 +322,7 @@ export function StudioTeamChatInput({
       {mentionTargets.length > 0 ? (
         <p
           className={
-            pixelStyle ? 'mt-1.5 text-[11px] text-[var(--sp-muted)]' : 'mt-1.5 text-[11px] text-studio-muted'
+            pixelStyle ? 'mt-1.5 text-xs text-[var(--sp-muted)]' : 'mt-1.5 text-xs text-studio-muted'
           }
         >
           输入 <kbd className={pixelStyle ? '' : 'rounded bg-studio-border px-1'}>@</kbd>{' '}
