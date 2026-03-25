@@ -130,6 +130,17 @@ func (x *RestApiCallNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) {
 		req.Header.Set(key.ExecuteAsString(evn), value.ExecuteAsString(evn))
 	}
 
+	// 未配置 Content-Type 时，FastHTTP 可能对带 body 的请求使用 application/octet-stream，
+	// 部分服务端（如仅注册 JSON codec 的 Kratos HTTP）会拒绝并返回 CODEC 错误。
+	if !x.Config.WithoutRequestBody {
+		if b := req.Body(); len(b) > 0 {
+			ct := strings.TrimSpace(string(req.Header.Peek("Content-Type")))
+			if ct == "" || strings.EqualFold(ct, "application/octet-stream") {
+				req.Header.Set("Content-Type", "application/json")
+			}
+		}
+	}
+
 	err := x.client.Do(req, resp)
 	if err != nil {
 		msg.Metadata.PutValue(external.ErrorBodyMetadataKey, err.Error())
