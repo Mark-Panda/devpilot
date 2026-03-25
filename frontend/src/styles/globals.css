@@ -1977,6 +1977,16 @@ body {
   background: #ffffff !important;
 }
 
+/* JSON 编辑器：保证可点击区域与 Monaco 命中一致（嵌套在 overflow 侧栏内时） */
+.json-editor-root {
+  position: relative;
+  z-index: 1;
+}
+
+.json-editor-expand-overlay {
+  z-index: 30;
+}
+
 /* JSON 编辑器：强制文字黑色、白底，避免被 rulego-editor-side 等父级浅色覆盖 */
 .json-editor-root .monaco-editor,
 .json-editor-root .monaco-editor .view-lines,

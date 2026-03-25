@@ -89,6 +89,17 @@ const scratchTheme = new ScratchBlocks.Theme(
 
 (ScratchBlocks as { ScratchMsgs?: { setLocale?: (locale: string) => void } }).ScratchMsgs?.setLocale?.("zh-cn");
 
+/** 展示用：尽量格式化为多行 JSON；不可解析则保留原文 */
+function prettyJsonForDisplay(raw: string, emptyPlaceholder: string): string {
+  const s = String(raw ?? "").trim();
+  if (!s) return emptyPlaceholder;
+  try {
+    return JSON.stringify(JSON.parse(s), null, 2);
+  } catch {
+    return String(raw ?? "");
+  }
+}
+
 function parseLlmModelsChainJson(raw: string, fallbackPrimary: string): string[] {
   const s = String(raw ?? "").trim() || "[]";
   try {
@@ -1920,6 +1931,8 @@ function BlockConfigModal({
               height={80}
               minHeight={60}
               showFormatButton
+              showExpandButton
+              expandTitle="HTTP Headers (JSON)"
             />
           </label>
           <label className="form-field" style={{ gridColumn: "1 / -1" }}>
@@ -1930,6 +1943,8 @@ function BlockConfigModal({
               height={100}
               minHeight={60}
               showFormatButton
+              showExpandButton
+              expandTitle="HTTP 请求 Body"
             />
           </label>
           <label className="form-field">
@@ -2791,6 +2806,8 @@ function BlockConfigModal({
                 height={100}
                 minHeight={80}
                 showFormatButton
+                showExpandButton
+                expandTitle="上下文消息 messages (JSON)"
               />
               <small className="form-hint">每项: {`{ "role": "user" | "assistant", "content": "..." }`}，留空 [] 则使用 msg.Data 作为单条用户消息</small>
             </label>
@@ -4581,6 +4598,8 @@ export default function RuleGoScratchEditorPage() {
                   height={100}
                   minHeight={80}
                   showFormatButton
+                  showExpandButton
+                  expandTitle="测试 — 元数据 metadata (JSON)"
                   onFormatError={(msg) => setError(msg)}
                 />
               </label>
@@ -4592,6 +4611,8 @@ export default function RuleGoScratchEditorPage() {
                   height={140}
                   minHeight={80}
                   showFormatButton
+                  showExpandButton
+                  expandTitle="测试 — 消息体 data (JSON)"
                   onFormatError={(msg) => setError(msg)}
                 />
               </label>
@@ -4627,17 +4648,29 @@ export default function RuleGoScratchEditorPage() {
                     </div>
                     {testResult.success ? (
                       <>
-                        <pre style={{ margin: 0, fontSize: 13, whiteSpace: "pre-wrap", wordBreak: "break-all" }}>
-                          {testResult.data || "(无输出)"}
-                        </pre>
+                        <JsonEditor
+                          value={prettyJsonForDisplay(testResult.data ?? "", "(无输出)")}
+                          onChange={() => {}}
+                          readOnly
+                          height={220}
+                          minHeight={120}
+                          showExpandButton
+                          expandTitle="规则链测试 — 输出"
+                        />
                         <p className="form-hint" style={{ marginTop: 8, marginBottom: 0, fontSize: 12 }}>
                           下方可输入回复并点击「发送」继续对话（若未看到输入框请向下滚动）。
                         </p>
                       </>
                     ) : (
-                      <pre style={{ margin: 0, fontSize: 13, color: "var(--color-error, #b91c1c)", whiteSpace: "pre-wrap" }}>
-                        {testResult.error || "未知错误"}
-                      </pre>
+                      <JsonEditor
+                        value={prettyJsonForDisplay(testResult.error ?? "", "未知错误")}
+                        onChange={() => {}}
+                        readOnly
+                        height={180}
+                        minHeight={100}
+                        showExpandButton
+                        expandTitle="规则链测试 — 错误信息"
+                      />
                     )}
                   </div>
                   {testResult.success && (
