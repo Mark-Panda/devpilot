@@ -710,7 +710,8 @@ func (a *agentImpl) buildSystemPrompt(ctx context.Context) string {
 				fileToolHint += "；"
 			}
 			prompt += "\n\n【工作室子任务自主执行】\n你收到的是主 Agent 的委派。请**持续使用工具**（" + fileToolHint + "技能、MCP、" + DelegateToSubAgentToolName +
-				" 等）将任务推进到可交付完成态；涉及创建或修改代码/配置时**必须**调用写入类工具落盘，避免仅输出代码块。\n当你确认本子任务**已全部完成**时，在回复**第一行单独一行**输出 " + StudioTaskCompleteToken +
+				" 等）将任务推进到可交付完成态；涉及创建或修改代码/配置时**必须**调用写入类工具落盘，避免仅输出代码块。调用 " + WorkspaceWriteFileToolName +
+				" 时，tool 参数 JSON 必须**同时包含 path 与 content**，且 content 为完整文件正文（不可只传路径）。\n当你确认本子任务**已全部完成**时，在回复**第一行单独一行**输出 " + StudioTaskCompleteToken +
 				" ，然后空一行再写总结。在完成前不要输出该标记。\n若收到「工作室自动续跑」类系统消息，表示需继续执行：必须再次调用工具推进，直至可声明完成。"
 		}
 	}

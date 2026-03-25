@@ -16,6 +16,23 @@ import (
 	"github.com/tmc/langchaingo/llms"
 )
 
+func jsonKeyPresent(m map[string]json.RawMessage, k string) bool {
+	if m == nil {
+		return false
+	}
+	_, ok := m[k]
+	return ok
+}
+
+func truncateWorkspaceToolArgLog(s string) string {
+	const max = 160
+	s = strings.TrimSpace(s)
+	if len(s) <= max {
+		return s
+	}
+	return s[:max] + "…"
+}
+
 const (
 	WorkspaceReadFileToolName = "devpilot_read_file"
 	WorkspaceWriteFileToolName = "devpilot_write_file"
@@ -57,7 +74,7 @@ var workspaceWriteFileParams = map[string]any{
 		},
 		"content": map[string]any{
 			"type":        "string",
-			"description": "完整文件内容（UTF-8）",
+			"description": "完整文件内容（UTF-8），与 path 同级、同一次 tool 调用内必须给出；不得只传 path。",
 		},
 	},
 	"required": []string{"path", "content"},
@@ -128,9 +145,10 @@ func workspaceProjectFileTools(readOnly bool) []llms.Tool {
 		llms.Tool{
 			Type: "function",
 			Function: &llms.FunctionDefinition{
-				Name:        WorkspaceWriteFileToolName,
-				Description: "在工作区根内创建或覆盖文件（UTF-8）；自动创建缺失父目录。",
-				Parameters:  workspaceWriteFileParams,
+				Name: WorkspaceWriteFileToolName,
+				Description: "在工作区根内创建或覆盖文件（UTF-8）；自动创建缺失父目录。**单次调用的 JSON 必须同时包含 path 与 content**：content 为完整文件正文（不可省略、不可为空字符串）。若正文极长，可先写入骨架再多次调用 " +
+					WorkspaceSearchReplaceToolName + " 分段替换，或拆成多个小文件。",
+				Parameters: workspaceWriteFileParams,
 			},
 		},
 		llms.Tool{
@@ -555,12 +573,51 @@ func (a *agentImpl) executeWorkspaceWriteFile(ctx context.Context, arguments str
 	if root == "" {
 		return "", fmt.Errorf("未配置可用的工作区")
 	}
+	raw := strings.TrimSpace(arguments)
+	if raw == "" {
+		return "", fmt.Errorf("参数为空；须传入 JSON，包含 path 与 content（完整文件 UTF-8 正文）")
+	}
+	var keys map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(raw), &keys); err != nil {
+		return "", fmt.Errorf("参数须为 JSON，包含 path 与 content: %w", err)
+	}
 	var payload struct {
 		Path    string `json:"path"`
 		Content string `json:"content"`
 	}
-	if err := json.Unmarshal([]byte(strings.TrimSpace(arguments)), &payload); err != nil {
-		return "", fmt.Errorf("参数须为 JSON，包含 path 与 content: %w", err)
+	if err := json.Unmarshal([]byte(raw), &payload); err != nil {
+		return "", fmt.Errorf("解析参数失败: %w", err)
+	}
+	contentKeyUsed := ""
+	switch {
+	case jsonKeyPresent(keys, "content"):
+		contentKeyUsed = "content"
+	case jsonKeyPresent(keys, "Content"):
+		var s string
+		_ = json.Unmarshal(keys["Content"], &s)
+		payload.Content = s
+		contentKeyUsed = "Content"
+	case jsonKeyPresent(keys, "file_content"):
+		var s string
+		_ = json.Unmarshal(keys["file_content"], &s)
+		payload.Content = s
+		contentKeyUsed = "file_content"
+	case jsonKeyPresent(keys, "body"):
+		var s string
+		_ = json.Unmarshal(keys["body"], &s)
+		payload.Content = s
+		contentKeyUsed = "body"
+	default:
+		return "", fmt.Errorf("缺少 content 字段：当前参数约为 %q。必须在同一条 tool 调用的 JSON 里包含非空的 content（完整文件正文），仅 path 不足以写入", truncateWorkspaceToolArgLog(raw))
+	}
+	if strings.TrimSpace(payload.Path) == "" {
+		return "", fmt.Errorf("path 不能为空")
+	}
+	if !jsonKeyPresent(keys, "content") && contentKeyUsed != "" {
+		log.Debug().Str("tool", WorkspaceWriteFileToolName).Str("content_key", contentKeyUsed).Msg("write_file 使用了非标准 content 键名")
+	}
+	if strings.TrimSpace(payload.Content) == "" {
+		return "", fmt.Errorf("content 不能为空（已识别字段 %q）。请把完整源码/文本作为 JSON 字符串传入 content，不要只传 path", contentKeyUsed)
 	}
 	if len(payload.Content) > maxWorkspaceFileToolBytes {
 		return "", fmt.Errorf("content 超过 %d 字节", maxWorkspaceFileToolBytes)
