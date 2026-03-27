@@ -31,6 +31,11 @@ const def: BlockTypeDef = {
         config.appendField(new (BlocklyF as any).FieldTextInput(""), "OS_PASS");
         config.appendField(new (BlocklyF as any).FieldCheckbox(false), "OS_INSECURE");
         config.appendField(new (BlocklyF as any).FieldTextInput("60"), "OS_TIMEOUT_SEC");
+        config.appendField(new (BlocklyF as any).FieldTextInput("search"), "OS_API_MODE");
+        config.appendField(new (BlocklyF as any).FieldTextInput("query_then_fetch"), "OS_SEARCH_TYPE");
+        config.appendField(new (BlocklyF as any).FieldCheckbox(true), "OS_IGNORE_UNAVAILABLE");
+        config.appendField(new (BlocklyF as any).FieldCheckbox(false), "OS_SOURCE_ENABLED");
+        config.appendField(new (BlocklyF as any).FieldCheckbox(true), "OS_TRACK_TOTAL_HITS");
         config.appendField(new (BlocklyF as any).FieldTextInput(""), "OS_DEFAULT_BODY");
         (this as Block).appendStatementInput("branch_failure").appendField(UI_RELATION_FAILURE);
         const configInput = (this as Block).getInput("CONFIG");
@@ -51,6 +56,11 @@ const def: BlockTypeDef = {
       password: helpers.getFieldValue(block, "OS_PASS"),
       insecureSkipVerify: helpers.getBooleanField(block, "OS_INSECURE"),
       timeoutSec: Number(helpers.getFieldValue(block, "OS_TIMEOUT_SEC") || "60"),
+      apiMode: helpers.getFieldValue(block, "OS_API_MODE") || "search",
+      searchType: helpers.getFieldValue(block, "OS_SEARCH_TYPE") || "query_then_fetch",
+      ignoreUnavailable: helpers.getBooleanField(block, "OS_IGNORE_UNAVAILABLE"),
+      sourceEnabled: helpers.getBooleanField(block, "OS_SOURCE_ENABLED"),
+      trackTotalHits: helpers.getBooleanField(block, "OS_TRACK_TOTAL_HITS"),
       defaultSearchBody,
     };
   },
@@ -62,6 +72,11 @@ const def: BlockTypeDef = {
     block.setFieldValue(String(c.password ?? ""), "OS_PASS");
     block.setFieldValue(c.insecureSkipVerify ? "TRUE" : "FALSE", "OS_INSECURE");
     block.setFieldValue(String(c.timeoutSec ?? 60), "OS_TIMEOUT_SEC");
+    block.setFieldValue(String(c.apiMode ?? "search"), "OS_API_MODE");
+    block.setFieldValue(String(c.searchType ?? "query_then_fetch"), "OS_SEARCH_TYPE");
+    block.setFieldValue(c.ignoreUnavailable !== false ? "TRUE" : "FALSE", "OS_IGNORE_UNAVAILABLE");
+    block.setFieldValue(c.sourceEnabled ? "TRUE" : "FALSE", "OS_SOURCE_ENABLED");
+    block.setFieldValue(c.trackTotalHits !== false ? "TRUE" : "FALSE", "OS_TRACK_TOTAL_HITS");
     const body = c.defaultSearchBody != null ? String(c.defaultSearchBody) : "";
     block.setFieldValue(body, "OS_DEFAULT_BODY");
   },

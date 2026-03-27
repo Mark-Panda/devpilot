@@ -43,6 +43,25 @@ import {
 import { datetimeLocalToMs, msToDatetimeLocal } from "./datetimeLocalMs";
 
 const volcTlsKnownRegionSet = new Set(VOLC_TLS_KNOWN_REGIONS.map((r) => r.value));
+const OPENSEARCH_DEFAULT_BODY = '{"size":100,"sort":[{"@timestamp":{"order":"desc"}}],"query":{"match_all":{}}}';
+const OPENSEARCH_TIMEOUT_OPTIONS: Array<[string, string]> = [
+  ["30 秒", "30"],
+  ["60 秒", "60"],
+  ["120 秒", "120"],
+  ["180 秒", "180"],
+];
+const OPENSEARCH_TIME_PRESET_OPTIONS: Array<[string, string]> = [
+  ["最近 15 分钟", "last_15m"],
+  ["最近 1 小时", "last_1h"],
+  ["最近 24 小时", "last_24h"],
+  ["最近 7 天", "last_7d"],
+  ["不限制时间", "all"],
+  ["自定义时间段", "custom"],
+];
+const OPENSEARCH_RECENT_ENDPOINTS_KEY = "rulego.opensearch.recent_endpoints";
+const OPENSEARCH_RECENT_ENDPOINTS_LIMIT = 5;
+const OPENSEARCH_RECENT_INDEXES_KEY = "rulego.opensearch.recent_indexes";
+const OPENSEARCH_RECENT_INDEXES_LIMIT = 10;
 
 const scratchTheme = new ScratchBlocks.Theme(
   "scratch",
@@ -157,6 +176,215 @@ function llmChainWithNewPrimary(siteOrder: string[], chain: string[], newPrimary
   return [p, ...ordered.filter((x) => x !== p)];
 }
 
+function parseOpenSearchBodyConfig(rawBody: string): {
+  size: string;
+  sortOrder: string;
+  filterText: string;
+  timePreset: string;
+  customStartLocal: string;
+  customEndLocal: string;
+  sourceEnabled: boolean;
+  trackTotalHits: boolean;
+} {
+  const fallback = {
+    size: "100",
+    sortOrder: "desc",
+    filterText: "",
+    timePreset: "all",
+    customStartLocal: "",
+    customEndLocal: "",
+    sourceEnabled: false,
+    trackTotalHits: true,
+  };
+  const raw = String(rawBody ?? "").trim();
+  if (!raw) return fallback;
+  try {
+    const obj = JSON.parse(raw) as Record<string, unknown>;
+    const sizeNum = Number(obj?.size);
+    const size = Number.isFinite(sizeNum) && sizeNum > 0 ? String(Math.floor(sizeNum)) : fallback.size;
+    let sortOrder = fallback.sortOrder;
+    const sortArr = Array.isArray(obj?.sort) ? (obj.sort as unknown[]) : [];
+    if (sortArr.length > 0 && sortArr[0] && typeof sortArr[0] === "object") {
+      const first = sortArr[0] as Record<string, unknown>;
+      const ts = first["@timestamp"];
+      if (ts && typeof ts === "object") {
+        const order = String((ts as Record<string, unknown>).order ?? "").toLowerCase();
+        if (order === "asc" || order === "desc") sortOrder = order;
+      }
+    }
+    let filterText = "";
+    let timePreset = fallback.timePreset;
+    let customStartLocal = "";
+    let customEndLocal = "";
+    const query = obj?.query;
+    const sourceEnabled = obj?._source !== false;
+    const trackTotalHits = obj?.track_total_hits !== false;
+    if (query && typeof query === "object") {
+      const q = query as Record<string, unknown>;
+      const qs = q.query_string;
+      if (qs && typeof qs === "object") {
+        filterText = String((qs as Record<string, unknown>).query ?? "").trim();
+      }
+      const boolObj = q.bool;
+      if (boolObj && typeof boolObj === "object") {
+        const must = Array.isArray((boolObj as Record<string, unknown>).must)
+          ? ((boolObj as Record<string, unknown>).must as unknown[])
+          : [];
+        for (const item of must) {
+          if (!item || typeof item !== "object") continue;
+          const rec = item as Record<string, unknown>;
+          const itemQs = rec.query_string;
+          if (itemQs && typeof itemQs === "object" && !filterText) {
+            filterText = String((itemQs as Record<string, unknown>).query ?? "").trim();
+          }
+          const range = rec.range;
+          if (!range || typeof range !== "object") continue;
+          const tsRange = (range as Record<string, unknown>)["@timestamp"];
+          if (!tsRange || typeof tsRange !== "object") continue;
+          const rr = tsRange as Record<string, unknown>;
+          const gte = String(rr.gte ?? "").trim();
+          const lte = String(rr.lte ?? "").trim();
+          if (gte === "now-15m") timePreset = "last_15m";
+          else if (gte === "now-1h") timePreset = "last_1h";
+          else if (gte === "now-24h") timePreset = "last_24h";
+          else if (gte === "now-7d") timePreset = "last_7d";
+          else if (gte || lte) timePreset = "custom";
+          if (timePreset === "custom") {
+            const startMs = Date.parse(gte);
+            const endMs = Date.parse(lte);
+            customStartLocal = Number.isFinite(startMs) ? msToDatetimeLocal(startMs) : "";
+            customEndLocal = Number.isFinite(endMs) ? msToDatetimeLocal(endMs) : "";
+          }
+        }
+      }
+    }
+    return { size, sortOrder, filterText, timePreset, customStartLocal, customEndLocal, sourceEnabled, trackTotalHits };
+  } catch {
+    return fallback;
+  }
+}
+
+function buildOpenSearchBodyFromForm(form: Record<string, string | boolean>): string {
+  const sizeRaw = parseInt(String(form.OS_SIZE ?? "100"), 10);
+  const size = Number.isFinite(sizeRaw) && sizeRaw > 0 ? sizeRaw : 100;
+  const sortOrder = String(form.OS_SORT_ORDER ?? "desc").toLowerCase() === "asc" ? "asc" : "desc";
+  const filterText = String(form.OS_FILTER_TEXT ?? "").trim();
+  const timePreset = String(form.OS_TIME_PRESET ?? "all");
+  const must: Array<Record<string, unknown>> = [];
+  if (filterText) {
+    must.push({ query_string: { query: filterText } });
+  }
+  if (timePreset !== "all") {
+    let gte = "";
+    if (timePreset === "last_15m") gte = "now-15m";
+    else if (timePreset === "last_1h") gte = "now-1h";
+    else if (timePreset === "last_24h") gte = "now-24h";
+    else if (timePreset === "last_7d") gte = "now-7d";
+    let lte = "now";
+    if (timePreset === "custom") {
+      const sm = datetimeLocalToMs(String(form.OS_CUSTOM_START_LOCAL ?? ""));
+      const em = datetimeLocalToMs(String(form.OS_CUSTOM_END_LOCAL ?? ""));
+      if (sm > 0) gte = new Date(sm).toISOString();
+      if (em > 0) lte = new Date(em).toISOString();
+    }
+    if (gte || lte) {
+      const rangeObj: Record<string, unknown> = {};
+      if (gte) rangeObj.gte = gte;
+      if (lte) rangeObj.lte = lte;
+      must.push({ range: { "@timestamp": rangeObj } });
+    }
+  }
+  const query =
+    must.length === 0
+      ? { match_all: {} }
+      : must.length === 1
+      ? must[0]
+      : { bool: { must } };
+  const sourceEnabled = Boolean(form.OS_SOURCE_ENABLED);
+  const trackTotalHits = form.OS_TRACK_TOTAL_HITS !== false;
+  return JSON.stringify(
+    {
+      size,
+      sort: [{ "@timestamp": { order: sortOrder } }],
+      query,
+      _source: sourceEnabled,
+      track_total_hits: trackTotalHits,
+    },
+    null,
+    2
+  );
+}
+
+function loadOpenSearchRecentEndpoints(): string[] {
+  try {
+    const raw = window.localStorage.getItem(OPENSEARCH_RECENT_ENDPOINTS_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .map((x) => String(x ?? "").trim())
+      .filter(Boolean)
+      .slice(0, OPENSEARCH_RECENT_ENDPOINTS_LIMIT);
+  } catch {
+    return [];
+  }
+}
+
+function saveOpenSearchRecentEndpoint(endpoint: string): void {
+  const e = String(endpoint ?? "").trim();
+  if (!e) return;
+  try {
+    const current = loadOpenSearchRecentEndpoints().filter((x) => x !== e);
+    const next = [e, ...current].slice(0, OPENSEARCH_RECENT_ENDPOINTS_LIMIT);
+    window.localStorage.setItem(OPENSEARCH_RECENT_ENDPOINTS_KEY, JSON.stringify(next));
+  } catch {
+    // 忽略本地存储异常（隐私模式等）
+  }
+}
+
+function clearOpenSearchRecentEndpoints(): void {
+  try {
+    window.localStorage.removeItem(OPENSEARCH_RECENT_ENDPOINTS_KEY);
+  } catch {
+    // 忽略本地存储异常（隐私模式等）
+  }
+}
+
+function loadOpenSearchRecentIndexes(): string[] {
+  try {
+    const raw = window.localStorage.getItem(OPENSEARCH_RECENT_INDEXES_KEY);
+    if (!raw) return [];
+    const arr = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    return arr
+      .map((x) => String(x ?? "").trim())
+      .filter(Boolean)
+      .slice(0, OPENSEARCH_RECENT_INDEXES_LIMIT);
+  } catch {
+    return [];
+  }
+}
+
+function saveOpenSearchRecentIndex(indexValue: string): void {
+  const idx = String(indexValue ?? "").trim();
+  if (!idx) return;
+  try {
+    const current = loadOpenSearchRecentIndexes().filter((x) => x !== idx);
+    const next = [idx, ...current].slice(0, OPENSEARCH_RECENT_INDEXES_LIMIT);
+    window.localStorage.setItem(OPENSEARCH_RECENT_INDEXES_KEY, JSON.stringify(next));
+  } catch {
+    // 忽略本地存储异常（隐私模式等）
+  }
+}
+
+function clearOpenSearchRecentIndexes(): void {
+  try {
+    window.localStorage.removeItem(OPENSEARCH_RECENT_INDEXES_KEY);
+  } catch {
+    // 忽略本地存储异常（隐私模式等）
+  }
+}
+
 type SubRuleChainOption = { id: string; name: string };
 
 type BlockConfigModalProps = {
@@ -198,6 +426,8 @@ function BlockConfigModal({
   const initialSwitchCasesRef = useRef<CaseItem[]>([]);
   const initialDbClientParamsRef = useRef<Array<{ type: "string" | "number"; value: string }>>([]);
   const [confirmUnsavedOpen, setConfirmUnsavedOpen] = useState(false);
+  const [openSearchRecentEndpoints, setOpenSearchRecentEndpoints] = useState<string[]>([]);
+  const [openSearchRecentIndexes, setOpenSearchRecentIndexes] = useState<string[]>([]);
   const formRef = useRef<HTMLFormElement>(null);
   const joinTargetSelectRef = useRef<HTMLSelectElement>(null);
   const llmSelectedConfig = useMemo(() => {
@@ -247,6 +477,16 @@ function BlockConfigModal({
     remote.sort((a, b) => a.label.localeCompare(b.label, "zh-Hans"));
     return { local, remote };
   }, [block, blockId, refContextRules, currentRuleId, workspaceRef, workspaceDslRevision]);
+
+  useEffect(() => {
+    if (block?.type !== "rulego_opensearchSearch") {
+      setOpenSearchRecentEndpoints([]);
+      setOpenSearchRecentIndexes([]);
+      return;
+    }
+    setOpenSearchRecentEndpoints(loadOpenSearchRecentEndpoints());
+    setOpenSearchRecentIndexes(loadOpenSearchRecentIndexes());
+  }, [block?.type, blockId]);
 
   useEffect(() => {
     if (!block) {
@@ -329,14 +569,31 @@ function BlockConfigModal({
     }
     if (block.type === "rulego_opensearchSearch") {
       next.OS_ENDPOINT = get("OS_ENDPOINT") || "https://localhost:9200";
-      next.OS_INDEX = get("OS_INDEX") || "logs-*";
+      next.OS_INDEX = get("OS_INDEX") || "";
       next.OS_USER = get("OS_USER");
       next.OS_PASS = get("OS_PASS");
       next.OS_INSECURE = getBool("OS_INSECURE");
       next.OS_TIMEOUT_SEC = get("OS_TIMEOUT_SEC") || "60";
-      next.OS_DEFAULT_BODY =
-        get("OS_DEFAULT_BODY") ||
-        '{"size":100,"sort":[{"@timestamp":{"order":"desc"}}],"query":{"match_all":{}}}';
+      next.OS_API_MODE = get("OS_API_MODE") || "search";
+      next.OS_SEARCH_TYPE = get("OS_SEARCH_TYPE") || "query_then_fetch";
+      next.OS_IGNORE_UNAVAILABLE = block.getFieldValue("OS_IGNORE_UNAVAILABLE") !== "FALSE";
+      next.OS_DEFAULT_BODY = prettyJsonForDisplay(get("OS_DEFAULT_BODY") || OPENSEARCH_DEFAULT_BODY, OPENSEARCH_DEFAULT_BODY);
+      next.OS_AUTH_MODE = next.OS_USER || next.OS_PASS ? "basic" : "none";
+      next.OS_TLS_MODE = next.OS_INSECURE ? "insecure" : "strict";
+      const parsed = parseOpenSearchBodyConfig(String(next.OS_DEFAULT_BODY ?? ""));
+      next.OS_SIZE = parsed.size;
+      next.OS_SORT_ORDER = parsed.sortOrder;
+      next.OS_FILTER_TEXT = parsed.filterText;
+      next.OS_TIME_PRESET = parsed.timePreset;
+      next.OS_CUSTOM_START_LOCAL = parsed.customStartLocal;
+      next.OS_CUSTOM_END_LOCAL = parsed.customEndLocal;
+      next.OS_SOURCE_ENABLED = getBool("OS_SOURCE_ENABLED");
+      next.OS_TRACK_TOTAL_HITS = getBool("OS_TRACK_TOTAL_HITS");
+      next.OS_TIMEOUT_MODE = OPENSEARCH_TIMEOUT_OPTIONS.some(([, v]) => v === String(next.OS_TIMEOUT_SEC ?? "")) ? "preset" : "custom";
+      if (String(block.getFieldValue("OS_DEFAULT_BODY") ?? "").trim()) {
+        next.OS_SOURCE_ENABLED = parsed.sourceEnabled;
+        next.OS_TRACK_TOTAL_HITS = parsed.trackTotalHits;
+      }
     }
     if (block.type === "rulego_dbClient") {
       next.DB_DRIVER_NAME = get("DB_DRIVER_NAME") || "mysql";
@@ -639,6 +896,17 @@ function BlockConfigModal({
       "LLM_MAX_TOKENS", "LLM_STOP", "LLM_RESPONSE_FORMAT",
     ]);
     const volcTlsUiOnlyKeys = new Set(["TLS_CUSTOM_START_LOCAL", "TLS_CUSTOM_END_LOCAL"]);
+    const openSearchUiOnlyKeys = new Set([
+      "OS_AUTH_MODE",
+      "OS_TLS_MODE",
+      "OS_SIZE",
+      "OS_SORT_ORDER",
+      "OS_FILTER_TEXT",
+      "OS_TIME_PRESET",
+      "OS_CUSTOM_START_LOCAL",
+      "OS_CUSTOM_END_LOCAL",
+      "OS_TIMEOUT_MODE",
+    ]);
     Object.entries(form).forEach(([key, value]) => {
       if (
         form[key] === undefined ||
@@ -648,7 +916,8 @@ function BlockConfigModal({
         key === "NODE_ID" ||
         key === "DEBUG" ||
         llmParamKeys.has(key) ||
-        volcTlsUiOnlyKeys.has(key)
+        volcTlsUiOnlyKeys.has(key) ||
+        openSearchUiOnlyKeys.has(key)
       )
         return;
       set(key, value as string | boolean);
@@ -727,6 +996,29 @@ function BlockConfigModal({
       block.setFieldValue(endMs > 0 ? String(endMs) : "", "TLS_CUSTOM_END_MS");
       block.setFieldValue(String(form.TLS_DEFAULT_SORT ?? "desc"), "TLS_DEFAULT_SORT");
       block.setFieldValue(form.TLS_HIGHLIGHT ? "TRUE" : "FALSE", "TLS_HIGHLIGHT");
+    }
+    if (block.type === "rulego_opensearchSearch") {
+      const authMode = String(form.OS_AUTH_MODE ?? "none");
+      const tlsMode = String(form.OS_TLS_MODE ?? "strict");
+      const endpoint = String(form.OS_ENDPOINT ?? "").trim();
+      const indexValue = String(form.OS_INDEX ?? "").trim();
+      const timeout = String(form.OS_TIMEOUT_SEC ?? "60").trim();
+      const bodyRaw = buildOpenSearchBodyFromForm(form);
+      block.setFieldValue(endpoint || "https://localhost:9200", "OS_ENDPOINT");
+      block.setFieldValue(indexValue, "OS_INDEX");
+      block.setFieldValue(authMode === "basic" ? String(form.OS_USER ?? "") : "", "OS_USER");
+      block.setFieldValue(authMode === "basic" ? String(form.OS_PASS ?? "") : "", "OS_PASS");
+      block.setFieldValue(tlsMode === "insecure" ? "TRUE" : "FALSE", "OS_INSECURE");
+      block.setFieldValue(timeout || "60", "OS_TIMEOUT_SEC");
+      block.setFieldValue(bodyRaw || OPENSEARCH_DEFAULT_BODY, "OS_DEFAULT_BODY");
+      if (endpoint) {
+        saveOpenSearchRecentEndpoint(endpoint);
+        setOpenSearchRecentEndpoints(loadOpenSearchRecentEndpoints());
+      }
+      if (indexValue) {
+        saveOpenSearchRecentIndex(indexValue);
+        setOpenSearchRecentIndexes(loadOpenSearchRecentIndexes());
+      }
     }
     onSaved?.();
     initialFormRef.current = { ...form };
@@ -2127,6 +2419,47 @@ function BlockConfigModal({
         <>
           <label className="form-field" style={{ gridColumn: "1 / -1" }}>
             <span>Endpoint</span>
+            <select
+              value={
+                openSearchRecentEndpoints.includes(String(form.OS_ENDPOINT ?? "https://localhost:9200"))
+                  ? String(form.OS_ENDPOINT ?? "https://localhost:9200")
+                  : "__custom__"
+              }
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "__custom__") setForm((f) => ({ ...f, OS_ENDPOINT: "https://localhost:9200" }));
+                else setForm((f) => ({ ...f, OS_ENDPOINT: v }));
+              }}
+              style={{ marginBottom: 8, padding: "6px 10px", borderRadius: 8, border: "1px solid #e2e8f0", maxWidth: 420 }}
+            >
+              {openSearchRecentEndpoints.map((ep) => (
+                <option key={ep} value={ep}>
+                  {ep}
+                </option>
+              ))}
+              <option value="__custom__">自定义 Endpoint…</option>
+            </select>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <span style={{ fontSize: 12, color: "#64748b" }}>最近地址最多保留 5 条</span>
+              <button
+                type="button"
+                onClick={() => {
+                  clearOpenSearchRecentEndpoints();
+                  setOpenSearchRecentEndpoints([]);
+                }}
+                style={{
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 6,
+                  background: "#fff",
+                  color: "#475569",
+                  padding: "4px 8px",
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+              >
+                清空最近 Endpoint
+              </button>
+            </div>
             <input
               value={String(form.OS_ENDPOINT ?? "https://localhost:9200")}
               onChange={(e) => setForm((f) => ({ ...f, OS_ENDPOINT: e.target.value }))}
@@ -2135,71 +2468,280 @@ function BlockConfigModal({
               autoCorrect="off"
               autoComplete="off"
             />
+            <span className="form-hint">支持模板变量，例如：<code>https://${"{metadata.os_host}"}:9200</code></span>
           </label>
           <label className="form-field" style={{ gridColumn: "1 / -1" }}>
             <span>Index（单索引、逗号多索引或通配）</span>
+            <select
+              value={
+                openSearchRecentIndexes.includes(String(form.OS_INDEX ?? ""))
+                  ? String(form.OS_INDEX ?? "")
+                  : "__none__"
+              }
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v !== "__none__") setForm((f) => ({ ...f, OS_INDEX: v }));
+              }}
+              style={{ marginBottom: 8, padding: "6px 10px", borderRadius: 8, border: "1px solid #e2e8f0", maxWidth: 420 }}
+            >
+              <option value="__none__">最近使用索引（可选）</option>
+              {openSearchRecentIndexes.map((idx) => (
+                <option key={idx} value={idx}>
+                  {idx}
+                </option>
+              ))}
+            </select>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+              <span style={{ fontSize: 12, color: "#64748b" }}>最近索引最多保留 10 条</span>
+              <button
+                type="button"
+                onClick={() => {
+                  clearOpenSearchRecentIndexes();
+                  setOpenSearchRecentIndexes([]);
+                }}
+                style={{
+                  border: "1px solid #e2e8f0",
+                  borderRadius: 6,
+                  background: "#fff",
+                  color: "#475569",
+                  padding: "4px 8px",
+                  fontSize: 12,
+                  cursor: "pointer",
+                }}
+              >
+                清空最近索引
+              </button>
+            </div>
             <input
-              value={String(form.OS_INDEX ?? "logs-*")}
+              value={String(form.OS_INDEX ?? "")}
               onChange={(e) => setForm((f) => ({ ...f, OS_INDEX: e.target.value }))}
-              placeholder="logs-*"
+              placeholder="例如：teacherschool-channel-platform-server*"
               autoCapitalize="off"
               autoCorrect="off"
               autoComplete="off"
             />
+            <span className="form-hint">支持模板变量，例如：<code>teacherschool-${"{metadata.env}"}-server*</code></span>
           </label>
           <label className="form-field">
-            <span>用户名（可选）</span>
-            <input
-              value={String(form.OS_USER ?? "")}
-              onChange={(e) => setForm((f) => ({ ...f, OS_USER: e.target.value }))}
-              autoCapitalize="off"
-              autoCorrect="off"
-              autoComplete="off"
-            />
+            <span>认证方式</span>
+            <select
+              value={String(form.OS_AUTH_MODE ?? "none")}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "none") setForm((f) => ({ ...f, OS_AUTH_MODE: v, OS_USER: "", OS_PASS: "" }));
+                else setForm((f) => ({ ...f, OS_AUTH_MODE: v }));
+              }}
+            >
+              <option value="none">无认证</option>
+              <option value="basic">Basic 认证（用户名/密码）</option>
+            </select>
           </label>
           <label className="form-field">
-            <span>密码（可选）</span>
-            <input
-              type="password"
-              value={String(form.OS_PASS ?? "")}
-              onChange={(e) => setForm((f) => ({ ...f, OS_PASS: e.target.value }))}
-              autoCapitalize="off"
-              autoCorrect="off"
-              autoComplete="off"
-            />
+            <span>TLS 校验</span>
+            <select
+              value={String(form.OS_TLS_MODE ?? "strict")}
+              onChange={(e) => setForm((f) => ({ ...f, OS_TLS_MODE: e.target.value }))}
+            >
+              <option value="strict">严格校验证书</option>
+              <option value="insecure">跳过证书校验（开发）</option>
+            </select>
           </label>
+          {String(form.OS_AUTH_MODE ?? "none") === "basic" ? (
+            <>
+              <label className="form-field">
+                <span>用户名（可选）</span>
+                <input
+                  value={String(form.OS_USER ?? "")}
+                  onChange={(e) => setForm((f) => ({ ...f, OS_USER: e.target.value }))}
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  autoComplete="off"
+                />
+              </label>
+              <label className="form-field">
+                <span>密码（可选）</span>
+                <input
+                  type="password"
+                  value={String(form.OS_PASS ?? "")}
+                  onChange={(e) => setForm((f) => ({ ...f, OS_PASS: e.target.value }))}
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  autoComplete="off"
+                />
+              </label>
+            </>
+          ) : null}
           <label className="form-field">
             <span>超时 (秒)</span>
-            <input
-              type="number"
-              value={String(form.OS_TIMEOUT_SEC ?? "60")}
-              onChange={(e) => setForm((f) => ({ ...f, OS_TIMEOUT_SEC: e.target.value }))}
-            />
+            <select
+              value={
+                String(form.OS_TIMEOUT_MODE ?? "preset") === "custom"
+                  ? "__custom__"
+                  : OPENSEARCH_TIMEOUT_OPTIONS.some(([, v]) => v === String(form.OS_TIMEOUT_SEC ?? "60"))
+                  ? String(form.OS_TIMEOUT_SEC ?? "60")
+                  : "__custom__"
+              }
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "__custom__") {
+                  setForm((f) => ({ ...f, OS_TIMEOUT_MODE: "custom", OS_TIMEOUT_SEC: String(f.OS_TIMEOUT_SEC ?? "") || "90" }));
+                } else {
+                  setForm((f) => ({ ...f, OS_TIMEOUT_MODE: "preset", OS_TIMEOUT_SEC: v }));
+                }
+              }}
+            >
+              {OPENSEARCH_TIMEOUT_OPTIONS.map(([label, value]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+              <option value="__custom__">自定义秒数…</option>
+            </select>
+            {String(form.OS_TIMEOUT_MODE ?? "preset") === "custom" ? (
+              <input
+                style={{ marginTop: 8 }}
+                type="number"
+                min={1}
+                max={600}
+                value={String(form.OS_TIMEOUT_SEC ?? "60")}
+                onChange={(e) => setForm((f) => ({ ...f, OS_TIMEOUT_SEC: e.target.value }))}
+              />
+            ) : null}
           </label>
-          <label className="form-field" style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 8 }}>
+          <label className="form-field">
+            <span>搜索类型（search_type）</span>
+            <select
+              value={String(form.OS_SEARCH_TYPE ?? "query_then_fetch")}
+              onChange={(e) => setForm((f) => ({ ...f, OS_SEARCH_TYPE: e.target.value }))}
+            >
+              <option value="query_then_fetch">query_then_fetch（默认，速度优先）</option>
+              <option value="dfs_query_then_fetch">dfs_query_then_fetch（精度优先）</option>
+            </select>
+          </label>
+          <label className="form-field" style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <input
               type="checkbox"
-              checked={Boolean(form.OS_INSECURE)}
-              onChange={(e) => setForm((f) => ({ ...f, OS_INSECURE: e.target.checked }))}
+              checked={Boolean(form.OS_IGNORE_UNAVAILABLE)}
+              onChange={(e) => setForm((f) => ({ ...f, OS_IGNORE_UNAVAILABLE: e.target.checked }))}
             />
-            <span>跳过 TLS 证书校验（仅建议开发环境）</span>
+            <span>忽略不可用索引（ignore_unavailable）</span>
+          </label>
+          <label className="form-field">
+            <span>日志条数</span>
+            <select
+              value={["20", "50", "100", "200", "500"].includes(String(form.OS_SIZE ?? "100")) ? String(form.OS_SIZE ?? "100") : "__custom__"}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "__custom__") setForm((f) => ({ ...f, OS_SIZE: "100" }));
+                else setForm((f) => ({ ...f, OS_SIZE: v }));
+              }}
+            >
+              <option value="20">20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="200">200</option>
+              <option value="500">500</option>
+              <option value="__custom__">自定义…</option>
+            </select>
+            {!["20", "50", "100", "200", "500"].includes(String(form.OS_SIZE ?? "")) ? (
+              <input
+                style={{ marginTop: 8 }}
+                type="number"
+                min={1}
+                max={5000}
+                value={String(form.OS_SIZE ?? "100")}
+                onChange={(e) => setForm((f) => ({ ...f, OS_SIZE: e.target.value }))}
+              />
+            ) : null}
+          </label>
+          <label className="form-field">
+            <span>时间排序</span>
+            <select
+              value={String(form.OS_SORT_ORDER ?? "desc")}
+              onChange={(e) => setForm((f) => ({ ...f, OS_SORT_ORDER: e.target.value }))}
+            >
+              <option value="desc">最新在前 (desc)</option>
+              <option value="asc">最早在前 (asc)</option>
+            </select>
+          </label>
+          <label className="form-field" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={Boolean(form.OS_SOURCE_ENABLED)}
+              onChange={(e) => setForm((f) => ({ ...f, OS_SOURCE_ENABLED: e.target.checked }))}
+            />
+            <span>返回 _source 字段</span>
+          </label>
+          <label className="form-field" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={form.OS_TRACK_TOTAL_HITS !== false}
+              onChange={(e) => setForm((f) => ({ ...f, OS_TRACK_TOTAL_HITS: e.target.checked }))}
+            />
+            <span>精确统计总命中（track_total_hits）</span>
           </label>
           <label className="form-field" style={{ gridColumn: "1 / -1" }}>
-            <span>默认 _search 请求体（JSON）</span>
+            <span>时间范围</span>
+            <select
+              value={String(form.OS_TIME_PRESET ?? "all")}
+              onChange={(e) => setForm((f) => ({ ...f, OS_TIME_PRESET: e.target.value }))}
+              style={{ maxWidth: 320 }}
+            >
+              {OPENSEARCH_TIME_PRESET_OPTIONS.map(([label, value]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            {String(form.OS_TIME_PRESET ?? "all") === "custom" ? (
+              <div style={{ marginTop: 8, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <span style={{ fontSize: 12, color: "#64748b" }}>开始时间</span>
+                  <input
+                    type="datetime-local"
+                    value={String(form.OS_CUSTOM_START_LOCAL ?? "")}
+                    onChange={(e) => setForm((f) => ({ ...f, OS_CUSTOM_START_LOCAL: e.target.value }))}
+                  />
+                </label>
+                <label style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+                  <span style={{ fontSize: 12, color: "#64748b" }}>结束时间</span>
+                  <input
+                    type="datetime-local"
+                    value={String(form.OS_CUSTOM_END_LOCAL ?? "")}
+                    onChange={(e) => setForm((f) => ({ ...f, OS_CUSTOM_END_LOCAL: e.target.value }))}
+                  />
+                </label>
+              </div>
+            ) : null}
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>过滤条件（可选，query_string）</span>
+            <input
+              value={String(form.OS_FILTER_TEXT ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, OS_FILTER_TEXT: e.target.value }))}
+              placeholder='例如：level:error AND service:"api-gateway"'
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>请求体预览（自动生成）</span>
             <textarea
-              rows={10}
-              value={String(
-                form.OS_DEFAULT_BODY ??
-                  '{"size":100,"sort":[{"@timestamp":{"order":"desc"}}],"query":{"match_all":{}}}'
-              )}
-              onChange={(e) => setForm((f) => ({ ...f, OS_DEFAULT_BODY: e.target.value }))}
+              rows={8}
+              value={buildOpenSearchBodyFromForm(form)}
+              readOnly
               style={{ width: "100%", fontFamily: "monospace", fontSize: 12, padding: 8, borderRadius: 8, border: "1px solid #e2e8f0" }}
               spellCheck={false}
             />
           </label>
           <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
-            POST <code>{"{endpoint}/{index}/_search"}</code>。消息 data 为空时用上述默认体；为 JSON 对象时作为完整请求体；为纯文本时按{" "}
-            <code>query_string</code> 检索（size/sort 尽量继承默认体）。
+            POST <code>{"{endpoint}/{index}/_search"}</code>。未传消息 data 时使用上方表单自动生成的默认体；若消息 data 为 JSON 对象会覆盖默认体；若为纯文本会按{" "}
+            <code>query_string</code> 检索。
+          </p>
+          <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
+            模板语法：OpenSearch 的 <code>Endpoint</code>、<code>Index</code>、默认请求体都支持 <code>${"{...}"}</code>，可引用 <code>msg</code> 与{" "}
+            <code>metadata</code>（如 <code>${"{metadata.env}"}</code>、<code>${"{msg.data}"}</code>）。
           </p>
         </>
       )}
