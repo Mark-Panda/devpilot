@@ -82,13 +82,22 @@
     "defaultQuery": "*",
     "limit": 100,
     "useApiV3": false,
-    "timeoutSec": 60
+    "timeoutSec": 60,
+    "timeRangePreset": "last_15m",
+    "defaultStartTimeMs": 0,
+    "defaultEndTimeMs": 0,
+    "defaultSort": "desc",
+    "highLight": false
   }
 }
 ```
 - `endpoint`：留空时使用 `https://tls.{region}.volces.com`
 - `sessionToken`：STS 临时凭证时填写，否则留空
 - `useApiV3`：`true` 时使用 SearchLogsV2（API 0.3.0），与控制台检索行为更接近
+- `timeRangePreset`：无消息内 `startTime`/`endTime` 时的默认时间窗（结束为当前请求时刻）。可选 `last_15m`、`last_30m`、`last_1h`、`last_6h`、`last_24h`、`last_7d`、`today_local`（本机时区当天 0 点至今）、`custom`
+- `defaultStartTimeMs` / `defaultEndTimeMs`：仅 `timeRangePreset` 为 `custom` 时生效（Unix 毫秒，且结束须大于开始）
+- `defaultSort`：`desc` 或 `asc`；消息 JSON 里 `sort` 可覆盖
+- `highLight`：默认是否高亮；消息 JSON 里 `highLight` 可覆盖
 - 入站消息 `data`：可为检索语句字符串，或 JSON `{"query","startTime","endTime","topicId","context","sort","highLight"}`（时间单位为毫秒）
 - 成功时 `data` 为 TLS 返回的 JSON（含 `Logs`、`HitCount` 等）；`metadata` 含 `volc_tls_topic_id`、`volc_tls_query`、`volc_tls_hit_count`
 - 连接：`Success` / `Failure`

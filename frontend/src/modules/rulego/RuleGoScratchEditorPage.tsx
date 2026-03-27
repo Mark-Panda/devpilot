@@ -34,6 +34,15 @@ import { UI_RELATION_FAILURE } from "./relationLabels";
 import { listModelConfigs } from "../model-management/useModelConfigApi";
 import type { ModelConfig } from "../model-management/types";
 import { applyAgentSelectionsToDsl, buildAgentPreviewItems, type AgentPreviewItem } from "./agentPlanner";
+import {
+  VOLC_TLS_TIME_PRESET_OPTIONS,
+  VOLC_TLS_SORT_OPTIONS,
+  VOLC_TLS_LIMIT_OPTIONS,
+  VOLC_TLS_KNOWN_REGIONS,
+} from "./rulego-blocks/blocks/volcTlsSearchLogs";
+import { datetimeLocalToMs, msToDatetimeLocal } from "./datetimeLocalMs";
+
+const volcTlsKnownRegionSet = new Set(VOLC_TLS_KNOWN_REGIONS.map((r) => r.value));
 
 const scratchTheme = new ScratchBlocks.Theme(
   "scratch",
@@ -315,6 +324,13 @@ function BlockConfigModal({
       next.TLS_LIMIT = get("TLS_LIMIT") || "100";
       next.TLS_API_V3 = getBool("TLS_API_V3");
       next.TLS_TIMEOUT_SEC = get("TLS_TIMEOUT_SEC") || "60";
+      next.TLS_TIME_PRESET = get("TLS_TIME_PRESET") || "last_15m";
+      const sm = parseInt(get("TLS_CUSTOM_START_MS") || "0", 10);
+      const em = parseInt(get("TLS_CUSTOM_END_MS") || "0", 10);
+      next.TLS_CUSTOM_START_LOCAL = msToDatetimeLocal(Number.isFinite(sm) && sm > 0 ? sm : 0);
+      next.TLS_CUSTOM_END_LOCAL = msToDatetimeLocal(Number.isFinite(em) && em > 0 ? em : 0);
+      next.TLS_DEFAULT_SORT = get("TLS_DEFAULT_SORT") || "desc";
+      next.TLS_HIGHLIGHT = getBool("TLS_HIGHLIGHT");
     }
     if (block.type === "rulego_opensearchSearch") {
       next.OS_ENDPOINT = get("OS_ENDPOINT") || "https://localhost:9200";
@@ -627,8 +643,18 @@ function BlockConfigModal({
       "LLM_TEMPERATURE", "LLM_TOP_P", "LLM_PRESENCE_PENALTY", "LLM_FREQUENCY_PENALTY",
       "LLM_MAX_TOKENS", "LLM_STOP", "LLM_RESPONSE_FORMAT",
     ]);
+    const volcTlsUiOnlyKeys = new Set(["TLS_CUSTOM_START_LOCAL", "TLS_CUSTOM_END_LOCAL"]);
     Object.entries(form).forEach(([key, value]) => {
-      if (form[key] === undefined || key === "CASES_JSON" || key === "GROUP_SLOT_COUNT" || key === "FORK_BRANCH_COUNT" || key === "NODE_ID" || key === "DEBUG" || llmParamKeys.has(key))
+      if (
+        form[key] === undefined ||
+        key === "CASES_JSON" ||
+        key === "GROUP_SLOT_COUNT" ||
+        key === "FORK_BRANCH_COUNT" ||
+        key === "NODE_ID" ||
+        key === "DEBUG" ||
+        llmParamKeys.has(key) ||
+        volcTlsUiOnlyKeys.has(key)
+      )
         return;
       set(key, value as string | boolean);
     });
@@ -692,6 +718,20 @@ function BlockConfigModal({
       const sql = String(form.DB_SQL ?? "");
       const paramCount = (sql.match(/\?/g) || []).length;
       block.setFieldValue(JSON.stringify(dbClientParams.slice(0, paramCount)), "DB_PARAMS");
+    }
+    if (block.type === "rulego_volcTlsSearchLogs") {
+      const preset = String(form.TLS_TIME_PRESET ?? "last_15m");
+      block.setFieldValue(preset, "TLS_TIME_PRESET");
+      let startMs = 0;
+      let endMs = 0;
+      if (preset === "custom") {
+        startMs = datetimeLocalToMs(String(form.TLS_CUSTOM_START_LOCAL ?? ""));
+        endMs = datetimeLocalToMs(String(form.TLS_CUSTOM_END_LOCAL ?? ""));
+      }
+      block.setFieldValue(startMs > 0 ? String(startMs) : "", "TLS_CUSTOM_START_MS");
+      block.setFieldValue(endMs > 0 ? String(endMs) : "", "TLS_CUSTOM_END_MS");
+      block.setFieldValue(String(form.TLS_DEFAULT_SORT ?? "desc"), "TLS_DEFAULT_SORT");
+      block.setFieldValue(form.TLS_HIGHLIGHT ? "TRUE" : "FALSE", "TLS_HIGHLIGHT");
     }
     onSaved?.();
     initialFormRef.current = { ...form };
@@ -1887,27 +1927,51 @@ function BlockConfigModal({
       {block.type === "rulego_volcTlsSearchLogs" && (
         <>
           <label className="form-field" style={{ gridColumn: "1 / -1" }}>
-            <span>Endpoint（留空时按 Region 使用官方 TLS 域名）</span>
+            <span>Endpoint（留空则 <code>https://tls.&lt;Region&gt;.volces.com</code>）</span>
             <input
               value={String(form.TLS_ENDPOINT ?? "")}
               onChange={(e) => setForm((f) => ({ ...f, TLS_ENDPOINT: e.target.value }))}
-              placeholder="如 https://tls.cn-beijing.volces.com"
+              placeholder="一般留空即可"
               autoCapitalize="off"
               autoCorrect="off"
               autoComplete="off"
             />
           </label>
-          <label className="form-field">
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
             <span>Region</span>
-            <input
-              value={String(form.TLS_REGION ?? "cn-beijing")}
-              onChange={(e) => setForm((f) => ({ ...f, TLS_REGION: e.target.value }))}
-              placeholder="cn-beijing"
-              autoCapitalize="off"
-              autoCorrect="off"
-              autoComplete="off"
-            />
+            <select
+              value={volcTlsKnownRegionSet.has(String(form.TLS_REGION ?? "").trim()) ? String(form.TLS_REGION ?? "cn-beijing") : "__custom__"}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "__custom__") {
+                  setForm((f) => ({ ...f, TLS_REGION: volcTlsKnownRegionSet.has(String(f.TLS_REGION ?? "").trim()) ? "" : String(f.TLS_REGION ?? "") }));
+                } else {
+                  setForm((f) => ({ ...f, TLS_REGION: v }));
+                }
+              }}
+              style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #e2e8f0", maxWidth: "100%" }}
+            >
+              {VOLC_TLS_KNOWN_REGIONS.map((r) => (
+                <option key={r.value} value={r.value}>
+                  {r.label}
+                </option>
+              ))}
+              <option value="__custom__">其他区域（下方填写代码）</option>
+            </select>
           </label>
+          {!volcTlsKnownRegionSet.has(String(form.TLS_REGION ?? "").trim()) ? (
+            <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+              <span>自定义 Region</span>
+              <input
+                value={String(form.TLS_REGION ?? "")}
+                onChange={(e) => setForm((f) => ({ ...f, TLS_REGION: e.target.value }))}
+                placeholder="如 cn-beijing"
+                autoCapitalize="off"
+                autoCorrect="off"
+                autoComplete="off"
+              />
+            </label>
+          ) : null}
           <label className="form-field" style={{ gridColumn: "1 / -1" }}>
             <span>Access Key ID</span>
             <input
@@ -1945,7 +2009,7 @@ function BlockConfigModal({
             <input
               value={String(form.TLS_TOPIC_ID ?? "")}
               onChange={(e) => setForm((f) => ({ ...f, TLS_TOPIC_ID: e.target.value }))}
-              placeholder="日志主题 ID"
+              placeholder="日志主题 ID（必填）"
               autoCapitalize="off"
               autoCorrect="off"
               autoComplete="off"
@@ -1962,23 +2026,127 @@ function BlockConfigModal({
               autoComplete="off"
             />
           </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>默认时间范围（无消息里 start/end 时使用；结束时间均为「当前请求时刻」）</span>
+            <select
+              value={String(form.TLS_TIME_PRESET ?? "last_15m")}
+              onChange={(e) => setForm((f) => ({ ...f, TLS_TIME_PRESET: e.target.value }))}
+              style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #e2e8f0", maxWidth: "100%" }}
+            >
+              {VOLC_TLS_TIME_PRESET_OPTIONS.map(([label, v]) => (
+                <option key={v} value={v}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {String(form.TLS_TIME_PRESET ?? "") === "custom" ? (
+            <>
+              <label className="form-field">
+                <span>开始时间</span>
+                <input
+                  type="datetime-local"
+                  value={String(form.TLS_CUSTOM_START_LOCAL ?? "")}
+                  onChange={(e) => setForm((f) => ({ ...f, TLS_CUSTOM_START_LOCAL: e.target.value }))}
+                />
+              </label>
+              <label className="form-field">
+                <span>结束时间</span>
+                <input
+                  type="datetime-local"
+                  value={String(form.TLS_CUSTOM_END_LOCAL ?? "")}
+                  onChange={(e) => setForm((f) => ({ ...f, TLS_CUSTOM_END_LOCAL: e.target.value }))}
+                />
+              </label>
+            </>
+          ) : null}
           <label className="form-field">
-            <span>单次返回条数上限 (limit)</span>
-            <input
-              type="number"
-              min={1}
-              max={500}
-              value={String(form.TLS_LIMIT ?? "100")}
-              onChange={(e) => setForm((f) => ({ ...f, TLS_LIMIT: e.target.value }))}
-            />
+            <span>排序</span>
+            <select
+              value={String(form.TLS_DEFAULT_SORT ?? "desc")}
+              onChange={(e) => setForm((f) => ({ ...f, TLS_DEFAULT_SORT: e.target.value }))}
+              style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #e2e8f0", width: "100%" }}
+            >
+              {VOLC_TLS_SORT_OPTIONS.map(([label, v]) => (
+                <option key={v} value={v}>
+                  {label}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="form-field">
-            <span>超时 (秒)</span>
+            <span>单次返回条数</span>
+            <select
+              value={
+                VOLC_TLS_LIMIT_OPTIONS.some(([, v]) => v === String(form.TLS_LIMIT ?? "100"))
+                  ? String(form.TLS_LIMIT ?? "100")
+                  : "__custom__"
+              }
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "__custom__") {
+                  setForm((f) => ({ ...f, TLS_LIMIT: "150" }));
+                } else {
+                  setForm((f) => ({ ...f, TLS_LIMIT: v }));
+                }
+              }}
+              style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #e2e8f0", width: "100%" }}
+            >
+              {VOLC_TLS_LIMIT_OPTIONS.map(([label, v]) => (
+                <option key={v} value={v}>
+                  {label}
+                </option>
+              ))}
+              <option value="__custom__">自定义…</option>
+            </select>
+          </label>
+          {!VOLC_TLS_LIMIT_OPTIONS.some(([, v]) => v === String(form.TLS_LIMIT ?? "")) ? (
+            <label className="form-field">
+              <span>自定义条数 (1–500)</span>
+              <input
+                type="number"
+                min={1}
+                max={500}
+                value={String(form.TLS_LIMIT ?? "100")}
+                onChange={(e) => setForm((f) => ({ ...f, TLS_LIMIT: e.target.value }))}
+              />
+            </label>
+          ) : null}
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>请求超时</span>
+            <select
+              value={["30", "60", "120", "180"].includes(String(form.TLS_TIMEOUT_SEC ?? "")) ? String(form.TLS_TIMEOUT_SEC ?? "60") : "__custom__"}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "__custom__") setForm((f) => ({ ...f, TLS_TIMEOUT_SEC: "90" }));
+                else setForm((f) => ({ ...f, TLS_TIMEOUT_SEC: v }));
+              }}
+              style={{ padding: "6px 10px", borderRadius: 8, border: "1px solid #e2e8f0", maxWidth: 280 }}
+            >
+              <option value="30">30 秒</option>
+              <option value="60">60 秒</option>
+              <option value="120">120 秒</option>
+              <option value="180">180 秒</option>
+              <option value="__custom__">自定义秒数…</option>
+            </select>
+            {!["30", "60", "120", "180"].includes(String(form.TLS_TIMEOUT_SEC ?? "")) ? (
+              <input
+                type="number"
+                min={1}
+                max={600}
+                value={String(form.TLS_TIMEOUT_SEC ?? "60")}
+                onChange={(e) => setForm((f) => ({ ...f, TLS_TIMEOUT_SEC: e.target.value }))}
+                style={{ marginTop: 8, padding: "6px 10px", borderRadius: 8, border: "1px solid #e2e8f0", maxWidth: 160 }}
+              />
+            ) : null}
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 8 }}>
             <input
-              type="number"
-              value={String(form.TLS_TIMEOUT_SEC ?? "60")}
-              onChange={(e) => setForm((f) => ({ ...f, TLS_TIMEOUT_SEC: e.target.value }))}
+              type="checkbox"
+              checked={Boolean(form.TLS_HIGHLIGHT)}
+              onChange={(e) => setForm((f) => ({ ...f, TLS_HIGHLIGHT: e.target.checked }))}
             />
+            <span>默认开启检索高亮（消息 JSON 里 highLight 可覆盖）</span>
           </label>
           <label className="form-field" style={{ gridColumn: "1 / -1", display: "flex", alignItems: "center", gap: 8 }}>
             <input
@@ -1989,8 +2157,8 @@ function BlockConfigModal({
             <span>使用 API 0.3.0（SearchLogsV2，与控制台检索一致）</span>
           </label>
           <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
-            成功时消息 data 为 TLS 返回 JSON（含 Logs、HitCount 等）。消息 data 可覆盖检索：纯文本作 query，或 JSON{" "}
-            <code>{"{\"query\":\"*\",\"startTime\":毫秒,\"endTime\":毫秒,\"topicId\":\"…\"}"}</code>。
+            成功时消息 data 为 TLS 返回 JSON。上游仍可用纯文本作 query，或 JSON 覆盖{" "}
+            <code>startTime</code>/<code>endTime</code>/<code>sort</code>/<code>highLight</code> 等；未传时间字段时使用上面默认时间范围。
           </p>
         </>
       )}
@@ -3675,13 +3843,18 @@ export default function RuleGoScratchEditorPage() {
       setSaveFeedback({ type: "error", message: msg });
       return;
     }
-    if (!json.trim()) {
+    // 有画布时以当前工作区序列化为准，避免仅从 DSL 恢复后 editor_json 为空导致 json 状态未更新而误报「Scratch JSON 不能为空」
+    const editorJsonPayload = workspaceRef.current
+      ? JSON.stringify(ScratchBlocks.serialization.workspaces.save(workspaceRef.current), null, 2)
+      : (json ?? "").trim();
+    if (!editorJsonPayload.trim()) {
       const msg = "Scratch JSON 不能为空";
       setError(msg);
       setSaveFeedback({ type: "error", message: msg });
       return;
     }
     if (workspaceRef.current) {
+      setJson(editorJsonPayload);
       setDsl(nextDsl);
     }
     if (overrides?.root !== undefined) setRoot(overrides.root);
@@ -3693,7 +3866,7 @@ export default function RuleGoScratchEditorPage() {
           name: trimmedName,
           description: String(useDescription).trim(),
           definition: nextDsl.trim(),
-          editorJson: json.trim(),
+          editorJson: editorJsonPayload.trim(),
           requestMetadataParamsJson: editingRule.requestMetadataParamsJson ?? "[]",
           requestMessageBodyParamsJson: editingRule.requestMessageBodyParamsJson ?? "[]",
         });
@@ -3702,7 +3875,7 @@ export default function RuleGoScratchEditorPage() {
           name: trimmedName,
           description: String(useDescription).trim(),
           definition: nextDsl.trim(),
-          editorJson: json.trim(),
+          editorJson: editorJsonPayload.trim(),
           requestMetadataParamsJson: "[]",
           requestMessageBodyParamsJson: "[]",
         });
@@ -4351,8 +4524,8 @@ export default function RuleGoScratchEditorPage() {
     return Array.from(out);
   }, []);
 
-  const handleGenerateAgentPlan = async () => {
-    const prompt = agentPrompt.trim();
+  const handleGenerateAgentPlan = async (opts?: { promptText?: string }) => {
+    const prompt = (opts?.promptText ?? agentPrompt).trim();
     if (!prompt) {
       setAgentError("请先输入需求描述");
       return;
@@ -4413,8 +4586,7 @@ export default function RuleGoScratchEditorPage() {
     }
     const mergedPrompt = [agentPrompt.trim(), ...qaPairs].filter(Boolean).join("\n\n");
     setAgentPrompt(mergedPrompt);
-    setAgentConversationHistory((prev) => [...prev, { role: "user", content: qaPairs.join("\n\n") }]);
-    await handleGenerateAgentPlan();
+    await handleGenerateAgentPlan({ promptText: mergedPrompt });
   };
 
   const getAgentQuickAnswerTemplates = (question: string): string[] => {
@@ -4980,7 +5152,9 @@ export default function RuleGoScratchEditorPage() {
               <div className="rulego-agent-input-panel">
               <div className="rulego-agent-chat-log">
                 {agentConversationHistory.length === 0 ? (
-                  <div className="form-hint">你可以先描述目标，Agent 会主动思考并在信息不足时追问你。</div>
+                  <div className="form-hint">
+                    你可以先描述目标，Agent 会主动思考并在信息不足时追问你。每次生成都会携带当前画布完整 DSL 与结构摘要，便于在现有链路上补充与衔接。
+                  </div>
                 ) : (
                   agentConversationHistory.map((msg, idx) => (
                     <div key={`${idx}-${msg.role}`} className={`rulego-agent-chat-bubble ${msg.role === "user" ? "user" : "assistant"}`}>

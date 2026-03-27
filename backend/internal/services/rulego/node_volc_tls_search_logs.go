@@ -21,16 +21,21 @@ type VolcTlsSearchLogsNode struct {
 }
 
 type volcTlsSearchLogsConfig struct {
-	Endpoint       string `json:"endpoint"`
-	Region         string `json:"region"`
-	AccessKeyID    string `json:"accessKeyId"`
-	SecretAccessKey string `json:"secretAccessKey"`
-	SessionToken   string `json:"sessionToken"`
-	TopicID        string `json:"topicId"`
-	DefaultQuery   string `json:"defaultQuery"`
-	Limit          int    `json:"limit"`
-	UseAPIV3       bool   `json:"useApiV3"`
-	TimeoutSec     int    `json:"timeoutSec"`
+	Endpoint           string `json:"endpoint"`
+	Region             string `json:"region"`
+	AccessKeyID        string `json:"accessKeyId"`
+	SecretAccessKey    string `json:"secretAccessKey"`
+	SessionToken       string `json:"sessionToken"`
+	TopicID            string `json:"topicId"`
+	DefaultQuery       string `json:"defaultQuery"`
+	Limit              int    `json:"limit"`
+	UseAPIV3           bool   `json:"useApiV3"`
+	TimeoutSec         int    `json:"timeoutSec"`
+	TimeRangePreset    string `json:"timeRangePreset"`    // last_15m | last_30m | last_1h | last_6h | last_24h | last_7d | today_local | custom
+	DefaultStartTimeMs int64  `json:"defaultStartTimeMs"` // preset=custom 时有效（Unix 毫秒）
+	DefaultEndTimeMs   int64  `json:"defaultEndTimeMs"`
+	DefaultSort        string `json:"defaultSort"` // desc | asc
+	HighLight          bool   `json:"highLight"`
 }
 
 func (n *VolcTlsSearchLogsNode) Type() string { return "volcTls/searchLogs" }
@@ -60,6 +65,14 @@ func (n *VolcTlsSearchLogsNode) Init(_ types.Config, configuration types.Configu
 	if n.cfg.TimeoutSec <= 0 {
 		n.cfg.TimeoutSec = 60
 	}
+	n.cfg.TimeRangePreset = strings.TrimSpace(n.cfg.TimeRangePreset)
+	n.cfg.DefaultSort = strings.TrimSpace(n.cfg.DefaultSort)
+	if n.cfg.DefaultSort == "" {
+		n.cfg.DefaultSort = "desc"
+	}
+	if n.cfg.DefaultSort != "asc" && n.cfg.DefaultSort != "desc" {
+		n.cfg.DefaultSort = "desc"
+	}
 	if n.cfg.AccessKeyID == "" || n.cfg.SecretAccessKey == "" {
 		return errors.New("volcTls/searchLogs: accessKeyId 与 secretAccessKey 不能为空")
 	}
@@ -82,14 +95,61 @@ type volcTlsSearchMsg struct {
 	HighLight *bool  `json:"highLight"`
 }
 
-func resolveVolcTlsSearch(msgData string, topicDefault, queryDefault string) (volcTlsSearchMsg, error) {
+// tlsDefaultTimeWindowMS 根据节点配置计算默认检索时间窗（Unix 毫秒）；相对类预设以 nowMs 为结束时间。
+func tlsDefaultTimeWindowMS(cfg *volcTlsSearchLogsConfig, nowMs int64) (startMs, endMs int64) {
+	if cfg == nil {
+		return nowMs - 15*60*1000, nowMs
+	}
+	preset := strings.TrimSpace(cfg.TimeRangePreset)
+	if preset == "" {
+		preset = "last_15m"
+	}
+	endMs = nowMs
+	switch preset {
+	case "custom":
+		s, e := cfg.DefaultStartTimeMs, cfg.DefaultEndTimeMs
+		if e > s && s > 0 {
+			return s, e
+		}
+		return nowMs - 15*60*1000, nowMs
+	case "last_30m":
+		return nowMs - 30*60*1000, nowMs
+	case "last_1h":
+		return nowMs - 60*60*1000, nowMs
+	case "last_6h":
+		return nowMs - 6*60*60*1000, nowMs
+	case "last_24h":
+		return nowMs - 24*60*60*1000, nowMs
+	case "last_7d":
+		return nowMs - 7*24*60*60*1000, nowMs
+	case "today_local":
+		t := time.UnixMilli(nowMs).In(time.Local)
+		startOfDay := time.Date(t.Year(), t.Month(), t.Day(), 0, 0, 0, 0, t.Location())
+		return startOfDay.UnixMilli(), nowMs
+	default: // last_15m 及未知预设
+		return nowMs - 15*60*1000, nowMs
+	}
+}
+
+func resolveVolcTlsSearch(msgData string, topicDefault, queryDefault string, cfg *volcTlsSearchLogsConfig) (volcTlsSearchMsg, error) {
 	now := time.Now().UnixMilli()
+	startDef, endDef := tlsDefaultTimeWindowMS(cfg, now)
+	sortDef := "desc"
+	if cfg != nil {
+		sortDef = strings.TrimSpace(cfg.DefaultSort)
+	}
+	if sortDef == "" {
+		sortDef = "desc"
+	}
+	if sortDef != "asc" && sortDef != "desc" {
+		sortDef = "desc"
+	}
 	out := volcTlsSearchMsg{
 		Query:     queryDefault,
-		StartTime: now - 15*60*1000,
-		EndTime:   now,
+		StartTime: startDef,
+		EndTime:   endDef,
 		TopicID:   topicDefault,
-		Sort:      "desc",
+		Sort:      sortDef,
 	}
 	msgData = strings.TrimSpace(msgData)
 	if msgData == "" {
@@ -120,6 +180,9 @@ func resolveVolcTlsSearch(msgData string, topicDefault, queryDefault string) (vo
 	}
 	if raw.HighLight != nil {
 		out.HighLight = raw.HighLight
+	} else if cfg != nil && cfg.HighLight {
+		v := true
+		out.HighLight = &v
 	}
 	if out.TopicID == "" {
 		return volcTlsSearchMsg{}, errors.New("volcTls/searchLogs: topicId 为空（请在节点配置或消息 JSON 中提供 topicId）")
@@ -141,7 +204,7 @@ func tlsEndpointFor(cfg *volcTlsSearchLogsConfig) string {
 }
 
 func (n *VolcTlsSearchLogsNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) {
-	params, err := resolveVolcTlsSearch(msg.GetData(), n.cfg.TopicID, n.cfg.DefaultQuery)
+	params, err := resolveVolcTlsSearch(msg.GetData(), n.cfg.TopicID, n.cfg.DefaultQuery, &n.cfg)
 	if err != nil {
 		ctx.TellFailure(msg, err)
 		return

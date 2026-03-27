@@ -20,6 +20,7 @@ package rulego
 import (
 	"bytes"
 	"crypto/tls"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -111,6 +112,7 @@ func (x *RestApiCallNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) {
 	req.SetRequestURI(endpointURL)
 	req.Header.SetMethod(x.Config.RequestMethod)
 
+	var reqBodyForLog string
 	if !x.Config.WithoutRequestBody {
 		var body []byte
 		if x.template.BodyTemplate != nil {
@@ -123,7 +125,17 @@ func (x *RestApiCallNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) {
 		} else {
 			body = []byte(msg.GetData())
 		}
+		// 方案A：若模板渲染后是非法 JSON，但当前消息 data 是合法 JSON，则回退使用消息体，
+		// 可避免 `${msg.xxx}` 在 JSON 字符串上下文中造成的未转义引号问题。
+		contentType := strings.ToLower(strings.TrimSpace(x.Config.Headers["Content-Type"]))
+		if strings.Contains(contentType, "application/json") {
+			if !json.Valid(body) && json.Valid([]byte(msg.GetData())) {
+				log.Printf("[rulego][restApiCall] invalid templated json body, fallback to msg.data")
+				body = []byte(msg.GetData())
+			}
+		}
 		req.SetBody(body)
+		reqBodyForLog = string(body)
 	}
 
 	for key, value := range x.template.HeadersTemplate {
@@ -141,14 +153,35 @@ func (x *RestApiCallNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) {
 		}
 	}
 
+	start := time.Now()
+	log.Printf("[rulego][restApiCall] request method=%s url=%s body=%s",
+		x.Config.RequestMethod,
+		endpointURL,
+		truncateRestAPILog(reqBodyForLog, 1000),
+	)
+
 	err := x.client.Do(req, resp)
 	if err != nil {
+		log.Printf("[rulego][restApiCall] request failed method=%s url=%s elapsed=%s err=%v",
+			x.Config.RequestMethod,
+			endpointURL,
+			time.Since(start),
+			err,
+		)
 		msg.Metadata.PutValue(external.ErrorBodyMetadataKey, err.Error())
 		ctx.TellFailure(msg, err)
 		return
 	}
 
 	statusCode := resp.StatusCode()
+	respBodyForLog := string(resp.Body())
+	log.Printf("[rulego][restApiCall] response method=%s url=%s status=%d elapsed=%s body=%s",
+		x.Config.RequestMethod,
+		endpointURL,
+		statusCode,
+		time.Since(start),
+		truncateRestAPILog(respBodyForLog, 1000),
+	)
 	msg.Metadata.PutValue(external.StatusMetadataKey, fmt.Sprintf("%d %s", statusCode, fasthttp.StatusMessage(statusCode)))
 	msg.Metadata.PutValue(external.StatusCodeMetadataKey, strconv.Itoa(statusCode))
 
@@ -290,4 +323,15 @@ func readFromFastHTTPStream(ctx types.RuleContext, msg types.RuleMsg, resp *fast
 		Body: io.NopCloser(bodyReader),
 	}
 	external.HttpUtils.ReadFromStream(ctx, msg, adaptedResp)
+}
+
+func truncateRestAPILog(s string, max int) string {
+	s = strings.TrimSpace(s)
+	if s == "" {
+		return ""
+	}
+	if len(s) <= max {
+		return s
+	}
+	return s[:max] + "..."
 }

@@ -355,7 +355,13 @@ func (s *Service) GenerateRuleGoPlan(input GenerateRuleGoPlanInput) (GenerateRul
 	}
 	systemPrompt := "你是 RuleGo 可视化编辑器规划助手。请严格返回 JSON 对象，不要输出任何额外文本。\n" +
 		"JSON 结构: {\"thought\":\"你的思考摘要\",\"need_clarification\":false,\"questions\":[\"可选追问\"],\"nodes\":[{\"id\":\"可选\",\"node_type\":\"必填\",\"name\":\"可选\",\"configuration\":{},\"confidence\":0~1,\"reason\":\"可选\"}],\"edges\":[{\"from_id\":\"必填\",\"to_id\":\"必填\",\"type\":\"可选默认Success\",\"confidence\":0~1,\"reason\":\"可选\"}],\"warnings\":[\"可选\"],\"overall_confidence\":0~1}\n" +
-		"规则: 1) 若用户需求信息不足，need_clarification=true，给出1-3个高价值追问，nodes/edges可为空；2) 若信息充分，need_clarification=false，并输出尽可能完整计划；3) node_type 必须优先使用可用节点类型；4) edges 必须引用 nodes 或当前 DSL 里的节点 id。"
+		"规则:\n" +
+		"1) 若用户需求信息不足，need_clarification=true，给出1-3个高价值追问，nodes/edges可为空；\n" +
+		"2) 若信息充分，need_clarification=false，并输出尽可能完整计划；\n" +
+		"3) node_type 必须优先使用可用节点类型列表中的类型；\n" +
+		"4) edges 的 from_id/to_id 必须引用你本次输出的 nodes 中 id，或引用输入里「当前画布」已有节点的 id（见 current_dsl 与 canvas_structure）；\n" +
+		"5) 输入中的 current_dsl 为当前画布完整 RuleGo 规则链 JSON（含 ruleChain、metadata.nodes 全量 configuration、metadata.connections、endpoints 等）；canvas_structure 为同一画布的拓扑摘要（节点 id/type/name、连线 fromId/toId/type、端点概要），用于快速把握结构；你必须结合二者理解整条链，在补充、修改、分支、错误处理等规划时优先复用已有节点 id 与连接关系，避免重复堆砌已有能力；\n" +
+		"6) 若 current_dsl 为空字符串，表示画布为空，可从触发器开始规划全新链。"
 	history := make([]map[string]string, 0, len(input.ConversationHistory))
 	for _, h := range input.ConversationHistory {
 		r := strings.TrimSpace(h.Role)
@@ -367,10 +373,12 @@ func (s *Service) GenerateRuleGoPlan(input GenerateRuleGoPlanInput) (GenerateRul
 			"content": strings.TrimSpace(h.Content),
 		})
 	}
+	canvasStruct := compactCanvasStructureFromRuleGoDSL(input.CurrentDSL)
 	userPayload, _ := json.Marshal(map[string]interface{}{
 		"requirement":            prompt,
 		"conversation_history":   history,
 		"current_dsl":            strings.TrimSpace(input.CurrentDSL),
+		"canvas_structure":       canvasStruct,
 		"node_types":             input.NodeTypes,
 		"clarification_strategy": "ask_high_value_questions_first_if_needed",
 	})
