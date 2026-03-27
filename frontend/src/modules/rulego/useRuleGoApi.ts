@@ -27,6 +27,8 @@ type CreateRuleGoRuleInput = {
   description: string;
   definition: string;
   editor_json: string;
+  request_metadata_params_json: string;
+  request_message_body_params_json: string;
 };
 
 type UpdateRuleGoRuleInput = CreateRuleGoRuleInput;

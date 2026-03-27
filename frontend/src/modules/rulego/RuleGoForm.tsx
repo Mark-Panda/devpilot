@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getEnabledFromDefinition } from "./dslUtils";
+import RuleChainRequestParamsEditor from "./RuleChainRequestParamsEditor";
+import { emptyRuleChainParamsJson } from "./ruleChainRequestParams";
 import type { RuleGoRule } from "./types";
 
 /** 从 DSL definition JSON 中解析 ruleChain.debugMode / ruleChain.root */
@@ -44,6 +46,8 @@ type FormValues = {
   enabled: boolean;
   definition: string;
   editorJson: string;
+  requestMetadataParamsJson: string;
+  requestMessageBodyParamsJson: string;
   debugMode: boolean;
   root: boolean;
 };
@@ -76,6 +80,8 @@ export default function RuleGoForm({
       enabled: def ? getEnabledFromDefinition(def) : true,
       definition: initial?.definition ?? "",
       editorJson: initial?.editorJson ?? "",
+      requestMetadataParamsJson: initial?.requestMetadataParamsJson?.trim() || emptyRuleChainParamsJson(),
+      requestMessageBodyParamsJson: initial?.requestMessageBodyParamsJson?.trim() || emptyRuleChainParamsJson(),
       debugMode: flags.debugMode,
       root: flags.root,
     };
@@ -90,6 +96,8 @@ export default function RuleGoForm({
       enabled: def ? getEnabledFromDefinition(def) : true,
       definition: initial?.definition ?? "",
       editorJson: initial?.editorJson ?? "",
+      requestMetadataParamsJson: initial?.requestMetadataParamsJson?.trim() || emptyRuleChainParamsJson(),
+      requestMessageBodyParamsJson: initial?.requestMessageBodyParamsJson?.trim() || emptyRuleChainParamsJson(),
       debugMode: flags.debugMode,
       root: flags.root,
     });
@@ -139,6 +147,8 @@ export default function RuleGoForm({
       enabled: values.enabled,
       definition: definitionOut,
       editorJson: showEditorJson ? values.editorJson.trim() : (initial?.editorJson ?? ""),
+      requestMetadataParamsJson: values.requestMetadataParamsJson.trim(),
+      requestMessageBodyParamsJson: values.requestMessageBodyParamsJson.trim(),
       debugMode: values.debugMode,
       root: values.root,
     };
@@ -153,8 +163,9 @@ export default function RuleGoForm({
   };
 
   return (
-    <form className="modal-body" onSubmit={handleSubmit}>
-      <div className="form-grid">
+    <form className="modal-body modal-body-form" onSubmit={handleSubmit}>
+      <div className="modal-body-scroll">
+        <div className="form-grid">
         <label className="form-field">
           <span>规则名称</span>
           <input
@@ -179,6 +190,28 @@ export default function RuleGoForm({
           />
           <small className="form-hint">用于说明该规则的使用场景</small>
         </label>
+        <div className="form-field form-field-full">
+          <span>规则链请求参数 — 元数据</span>
+          <RuleChainRequestParamsEditor
+            title="元数据（metadata）"
+            value={values.requestMetadataParamsJson}
+            onChange={(json) => setValues({ ...values, requestMetadataParamsJson: json })}
+          />
+          <small className="form-hint">
+            对应执行时的 metadata；生成技能时会与说明一并写入技能 description
+          </small>
+        </div>
+        <div className="form-field form-field-full">
+          <span>规则链请求参数 — 消息体</span>
+          <RuleChainRequestParamsEditor
+            title="消息体（data）"
+            value={values.requestMessageBodyParamsJson}
+            onChange={(json) => setValues({ ...values, requestMessageBodyParamsJson: json })}
+          />
+          <small className="form-hint">
+            对应执行时的 data 载荷字段说明；可与元数据配合描述入参
+          </small>
+        </div>
         {showDefinition ? (
           <label className="form-field">
             <span>规则定义</span>
@@ -226,21 +259,25 @@ export default function RuleGoForm({
           <small className="form-hint">控制规则是否生效</small>
         </label>
         {initial?.definition ? (
-          <>
-            <label className="form-field form-field-checkbox">
-              <input
-                type="checkbox"
-                checked={values.root}
-                onChange={(e) => setValues({ ...values, root: e.target.checked })}
-              />
-              <span>是否根规则链</span>
-              <small className="form-hint">与 DSL ruleChain.root 一致，保存时同步到规则定义</small>
-            </label>
-          </>
+          <label className="form-field">
+            <span>是否根规则链</span>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={values.root}
+              aria-label={values.root ? "根规则链" : "子规则链"}
+              className="rulego-enable-switch"
+              onClick={() => setValues({ ...values, root: !values.root })}
+            >
+              <span className="rulego-enable-switch-thumb" aria-hidden />
+            </button>
+            <small className="form-hint">与 DSL ruleChain.root 一致，保存时同步到规则定义</small>
+          </label>
         ) : null}
+        </div>
       </div>
 
-      {error ? <div className="form-error">{error}</div> : null}
+      {error ? <div className="form-error rulego-form-error-below-scroll">{error}</div> : null}
 
       <div className="modal-actions">
         <button type="button" className="text-button" onClick={onCancel}>

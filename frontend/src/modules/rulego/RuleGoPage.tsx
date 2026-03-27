@@ -77,6 +77,8 @@ export default function RuleGoPage() {
                 description: rule.description,
                 definition: rule.definition,
                 editorJson: rule.editorJson,
+                requestMetadataParamsJson: rule.requestMetadataParamsJson ?? "[]",
+                requestMessageBodyParamsJson: rule.requestMessageBodyParamsJson ?? "[]",
               };
               return (
               <div className="table-row" key={rule.id}>
@@ -223,7 +225,7 @@ export default function RuleGoPage() {
           aria-modal="true"
           onClick={() => setModalOpen(false)}
         >
-          <div className="modal" onClick={(event) => event.stopPropagation()}>
+          <div className="modal modal--rulego-edit" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">
               <h3>{editingRule ? "编辑规则" : "新增规则"}</h3>
               <button

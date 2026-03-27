@@ -3522,6 +3522,8 @@ export default function RuleGoScratchEditorPage() {
           description: String(useDescription).trim(),
           definition: nextDsl.trim(),
           editorJson: json.trim(),
+          requestMetadataParamsJson: editingRule.requestMetadataParamsJson ?? "[]",
+          requestMessageBodyParamsJson: editingRule.requestMessageBodyParamsJson ?? "[]",
         });
       } else {
         const created = await create({
@@ -3529,6 +3531,8 @@ export default function RuleGoScratchEditorPage() {
           description: String(useDescription).trim(),
           definition: nextDsl.trim(),
           editorJson: json.trim(),
+          requestMetadataParamsJson: "[]",
+          requestMessageBodyParamsJson: "[]",
         });
         // 新建保存后跳转到该规则的编辑 URL，后续点击保存会走 update 而非再次 create
         navigate(`/rulego/editor/${created.id}`, { replace: true });

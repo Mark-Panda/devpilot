@@ -13,7 +13,6 @@ import (
 	"devpilot/backend/internal/store/models"
 )
 
-
 // createSkillToolName 用于“根据规则链生成技能”流程的工具名，与 initSkills/skill-creator 的 name 一致。
 const createSkillToolName = "skill-creator"
 
@@ -187,6 +186,11 @@ func buildCreateSkillUserMessage(rule models.RuleGoRule) string {
 	b.WriteString(rule.Name)
 	b.WriteString("\n\n规则链描述：")
 	b.WriteString(rule.Description)
+	paramsBlock := formatRuleChainParamsForSkillDescription(rule.RequestMetadataParamsJSON, rule.RequestMessageBodyParamsJSON)
+	if paramsBlock != "" {
+		b.WriteString("\n\n以下「规则链请求参数」章节必须完整并入你在 skill-creator 中提交的 description 字段（可与触发场景说明合并为一段连贯英文描述，但不要省略参数名、类型、是否必填与说明）：\n\n")
+		b.WriteString(paramsBlock)
+	}
 	b.WriteString("\n\n规则链 DSL（JSON）：\n")
 	b.WriteString(rule.Definition)
 	b.WriteString("\n\n请在 input 中传入 JSON：{\"name\": \"英文技能名\", \"description\": \"英文描述（何时使用）\", \"body\": \"简短 Markdown 正文\"}。")
@@ -224,4 +228,3 @@ func (s *Service) DeleteSkillForRuleChain(ruleID string) error {
 func skillDirNameForRule(rule models.RuleGoRule) string {
 	return "rule-" + rule.ID
 }
-

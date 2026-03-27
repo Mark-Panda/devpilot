@@ -11,11 +11,19 @@ import {
 import { useRuleGoStore } from "./store";
 import type { RuleGoRule } from "./types";
 
+function pickOptionalStringField(obj: unknown, key: string): string | undefined {
+  if (!obj || typeof obj !== "object") return undefined;
+  const v = (obj as Record<string, unknown>)[key];
+  return typeof v === "string" && v.trim() !== "" ? v : undefined;
+}
+
 type RuleGoInput = {
   name: string;
   description: string;
   definition: string;
   editorJson: string;
+  requestMetadataParamsJson: string;
+  requestMessageBodyParamsJson: string;
 };
 
 export function useRuleGoRules() {
@@ -36,6 +44,8 @@ export function useRuleGoRules() {
           description: rule.description,
           definition: rule.definition,
           editorJson: rule.editor_json,
+          requestMetadataParamsJson: pickOptionalStringField(rule, "request_metadata_params_json"),
+          requestMessageBodyParamsJson: pickOptionalStringField(rule, "request_message_body_params_json"),
           skillDirName: rule.skill_dir_name || undefined,
         }))
       );
@@ -52,6 +62,8 @@ export function useRuleGoRules() {
       description: input.description,
       definition: input.definition,
       editor_json: input.editorJson,
+      request_metadata_params_json: input.requestMetadataParamsJson,
+      request_message_body_params_json: input.requestMessageBodyParamsJson,
     });
     const rule: RuleGoRule = {
       id: result.id,
@@ -59,6 +71,8 @@ export function useRuleGoRules() {
       description: result.description,
       definition: result.definition,
       editorJson: result.editor_json,
+      requestMetadataParamsJson: pickOptionalStringField(result, "request_metadata_params_json"),
+      requestMessageBodyParamsJson: pickOptionalStringField(result, "request_message_body_params_json"),
       skillDirName: result.skill_dir_name || undefined,
     };
     addRule(rule);
@@ -71,12 +85,16 @@ export function useRuleGoRules() {
       description: input.description,
       definition: input.definition,
       editor_json: input.editorJson,
+      request_metadata_params_json: input.requestMetadataParamsJson,
+      request_message_body_params_json: input.requestMessageBodyParamsJson,
     });
     updateRule(id, {
       name: input.name,
       description: result.description,
       definition: result.definition,
       editorJson: result.editor_json,
+      requestMetadataParamsJson: pickOptionalStringField(result, "request_metadata_params_json"),
+      requestMessageBodyParamsJson: pickOptionalStringField(result, "request_message_body_params_json"),
       skillDirName: result.skill_dir_name || undefined,
     });
   };
