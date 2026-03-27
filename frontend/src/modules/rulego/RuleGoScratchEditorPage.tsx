@@ -8,9 +8,11 @@ import { isRuleGoTriggerBlockType, validateRuleGoTriggerLayout } from "./rulegoW
 import { useRuleGoRules } from "./useRuleGoRules";
 import {
   executeRuleGoRuleByDefinition,
+  generateRuleGoPlan,
   listAvailableSkills,
   type AvailableSkillItem,
   type ExecuteRuleOutput,
+  type GenerateRuleGoPlanResult,
 } from "./useRuleGoApi";
 import {
   registerAllBlocks,
@@ -24,6 +26,7 @@ import { BlockLibraryPanel, DRAG_TYPE_BLOCK } from "./BlockLibraryPanel";
 import { UI_RELATION_FAILURE } from "./relationLabels";
 import { listModelConfigs } from "../model-management/useModelConfigApi";
 import type { ModelConfig } from "../model-management/types";
+import { applyAgentSelectionsToDsl, buildAgentPreviewItems, type AgentPreviewItem } from "./agentPlanner";
 
 const scratchTheme = new ScratchBlocks.Theme(
   "scratch",
@@ -3155,6 +3158,25 @@ export default function RuleGoScratchEditorPage() {
   /** 与 Blockly workspace 缩放同步，便于工具栏显示与滚轮缩放后刷新 */
   const [zoomPercent, setZoomPercent] = useState(90);
   const [librarySearchKeyword, setLibrarySearchKeyword] = useState("");
+  const [agentModalOpen, setAgentModalOpen] = useState(false);
+  const [agentPrompt, setAgentPrompt] = useState("");
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentError, setAgentError] = useState<string | null>(null);
+  const [agentPlanResult, setAgentPlanResult] = useState<GenerateRuleGoPlanResult | null>(null);
+  const [agentPreviewItems, setAgentPreviewItems] = useState<AgentPreviewItem[]>([]);
+  const [agentSelectedIds, setAgentSelectedIds] = useState<Set<string>>(new Set());
+  const [agentConversationHistory, setAgentConversationHistory] = useState<Array<{ role: string; content: string }>>([]);
+  const [agentQuestionAnswers, setAgentQuestionAnswers] = useState<Record<string, string>>({});
+  const [agentCollapsedQuestions, setAgentCollapsedQuestions] = useState<Record<string, boolean>>({});
+  const [agentShowOnlyUnanswered, setAgentShowOnlyUnanswered] = useState(true);
+  const [agentPreviewFilter, setAgentPreviewFilter] = useState<"selected" | "all">("all");
+  const [agentModelConfigs, setAgentModelConfigs] = useState<ModelConfig[]>([]);
+  const [agentModelConfigId, setAgentModelConfigId] = useState("");
+  const [agentModelName, setAgentModelName] = useState("");
+  const [agentReadyPulse, setAgentReadyPulse] = useState(false);
+  const [agentReadyPulseShownInSession, setAgentReadyPulseShownInSession] = useState(false);
+  const agentPrimaryActionRef = useRef<HTMLButtonElement | null>(null);
+  const prevAgentAllAnsweredRef = useRef(false);
   const sidePanelRef = useRef<HTMLDivElement>(null);
   const lastTouchedBlockIdRef = useRef<string | null>(null);
   /** 供 workspace 内 handleChange 读取最新值，避免闭包陈旧导致生成的 DSL 与保存时不一致 */
@@ -3170,6 +3192,10 @@ export default function RuleGoScratchEditorPage() {
   }, [name, debugMode, root, enabled]);
 
   const editingRule = useMemo(() => rules.find((rule) => rule.id === id), [rules, id]);
+  const agentSelectedConfig = useMemo(
+    () => agentModelConfigs.find((cfg) => cfg.id === agentModelConfigId) ?? null,
+    [agentModelConfigs, agentModelConfigId]
+  );
 
   const bumpWorkspaceZoom = useCallback((dir: 1 | -1) => {
     const ws = workspaceRef.current as (WorkspaceSvg & { zoomCenter?: (d: number) => void }) | null;
@@ -3186,6 +3212,27 @@ export default function RuleGoScratchEditorPage() {
     () => rules.filter((r) => isSubRuleChain(r.definition ?? "")).map((r) => ({ id: r.id, name: r.name })),
     [rules]
   );
+
+  useEffect(() => {
+    if (!agentModalOpen) return;
+    void (async () => {
+      try {
+        const list = await listModelConfigs();
+        setAgentModelConfigs(list);
+        if (!agentModelConfigId && list.length > 0) {
+          setAgentModelConfigId(list[0].id);
+          setAgentModelName(list[0].models?.[0] ?? "");
+        } else if (agentModelConfigId) {
+          const current = list.find((c) => c.id === agentModelConfigId);
+          if (current && current.models.length > 0 && !current.models.includes(agentModelName)) {
+            setAgentModelName(current.models[0]);
+          }
+        }
+      } catch (err) {
+        setAgentError(err instanceof Error ? err.message : String(err));
+      }
+    })();
+  }, [agentModalOpen, agentModelConfigId, agentModelName]);
 
   const handleCanvasDragOver = (e: React.DragEvent) => {
     e.preventDefault();
@@ -4113,7 +4160,232 @@ export default function RuleGoScratchEditorPage() {
     setImportDslText("");
   };
 
+  const getSupportedAgentNodeTypes = useCallback((): string[] => {
+    const contents = rulegoToolbox.contents;
+    if (!Array.isArray(contents)) return [];
+    const out = new Set<string>();
+    contents.forEach((cat) => {
+      if (!("contents" in cat) || !Array.isArray(cat.contents)) return;
+      cat.contents.forEach((item) => {
+        if (!("type" in item)) return;
+        const def = getBlockDef(String(item.type));
+        if (def?.nodeType) out.add(def.nodeType);
+      });
+    });
+    return Array.from(out);
+  }, []);
+
+  const handleGenerateAgentPlan = async () => {
+    const prompt = agentPrompt.trim();
+    if (!prompt) {
+      setAgentError("请先输入需求描述");
+      return;
+    }
+    const ws = workspaceRef.current;
+    if (!ws) {
+      setAgentError("工作区尚未初始化");
+      return;
+    }
+    if (!agentSelectedConfig || !agentModelName.trim()) {
+      setAgentError("请选择可用模型配置与模型后再生成预览");
+      return;
+    }
+    setAgentLoading(true);
+    setAgentError(null);
+    try {
+      const currentDsl = buildRuleGoDsl(ws, name, debugMode, root, enabled);
+      const supportedNodeTypes = getSupportedAgentNodeTypes();
+      const plan = await generateRuleGoPlan({
+        prompt,
+        current_dsl: currentDsl || "",
+        node_types: supportedNodeTypes,
+        conversation_history: agentConversationHistory,
+        base_url: agentSelectedConfig.baseUrl,
+        api_key: agentSelectedConfig.apiKey,
+        model: agentModelName.trim(),
+        fallback_models: agentSelectedConfig.models.filter((m) => m !== agentModelName.trim()),
+      });
+      setAgentPlanResult(plan);
+      setAgentConversationHistory((prev) => [
+        ...prev,
+        { role: "user", content: prompt },
+        { role: "assistant", content: plan.thought?.trim() || "已分析需求并返回规划结果。" },
+      ]);
+      const preview = buildAgentPreviewItems(plan, new Set(supportedNodeTypes));
+      setAgentPreviewItems(preview);
+      const defaults = preview.filter((item) => item.valid && item.confidence >= 0.6).map((item) => item.id);
+      setAgentSelectedIds(new Set(defaults));
+    } catch (err) {
+      setAgentError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAgentLoading(false);
+    }
+  };
+
+  const handleSubmitAgentAnswers = async () => {
+    if (!agentPlanResult?.questions?.length) return;
+    const qaPairs = agentPlanResult.questions
+      .map((q) => {
+        const a = String(agentQuestionAnswers[q] ?? "").trim();
+        if (!a) return "";
+        return `问题: ${q}\n回答: ${a}`;
+      })
+      .filter(Boolean);
+    if (qaPairs.length === 0) {
+      setAgentError("请至少回答一个 Agent 追问");
+      return;
+    }
+    const mergedPrompt = [agentPrompt.trim(), ...qaPairs].filter(Boolean).join("\n\n");
+    setAgentPrompt(mergedPrompt);
+    setAgentConversationHistory((prev) => [...prev, { role: "user", content: qaPairs.join("\n\n") }]);
+    await handleGenerateAgentPlan();
+  };
+
+  const getAgentQuickAnswerTemplates = (question: string): string[] => {
+    const q = question.toLowerCase();
+    if (q.includes("触发") || q.includes("trigger")) {
+      return ["使用 HTTP 触发", "使用定时触发（每 5 分钟）", "沿用当前画布已有触发器"];
+    }
+    if (q.includes("错误") || q.includes("失败") || q.includes("fallback")) {
+      return ["失败后记录日志并结束", "失败后走延迟重试 3 次", "失败后发送飞书告警"];
+    }
+    if (q.includes("输出") || q.includes("通知") || q.includes("result")) {
+      return ["结果输出到飞书消息", "结果返回 HTTP 响应", "结果写入数据库"];
+    }
+    return ["按默认最佳实践处理", "保持最小可用流程", "请你给出推荐并说明理由"];
+  };
+
+  const getAgentRecommendedAnswer = (
+    question: string,
+    context: { hasTrigger: boolean; hasLlm: boolean; hasFeishu: boolean; hasDelay: boolean }
+  ): string => {
+    const q = question.toLowerCase();
+    if (q.includes("触发") || q.includes("trigger")) {
+      if (context.hasTrigger) return "建议沿用当前画布已有触发器，减少重复节点并保持入口一致。";
+      return "建议使用 HTTP 触发，便于手动调试与后续系统集成。";
+    }
+    if (q.includes("错误") || q.includes("失败") || q.includes("fallback")) {
+      if (context.hasDelay) return "建议沿用现有延迟节点做最多 3 次重试，最终失败再发送告警。";
+      return "建议失败后先记录日志，再进行最多 3 次延迟重试，仍失败则发送飞书告警。";
+    }
+    if (q.includes("输出") || q.includes("通知") || q.includes("result")) {
+      if (context.hasFeishu) return "建议沿用当前飞书消息节点输出结果摘要，同时保留 HTTP 返回主结果。";
+      return "建议主结果返回 HTTP 响应，同时将关键摘要发送到飞书消息。";
+    }
+    if ((q.includes("模型") || q.includes("llm")) && context.hasLlm) {
+      return "建议复用当前画布已有 LLM 节点配置（模型、温度、技能），仅补充输入输出映射。";
+    }
+    return "建议先按最小可用方案实现，保留后续扩展点，并在关键分支增加可观测日志。";
+  };
+
+  const getAgentRecommendedCandidates = (
+    question: string,
+    context: { hasTrigger: boolean; hasLlm: boolean; hasFeishu: boolean; hasDelay: boolean }
+  ): string[] => {
+    const q = question.toLowerCase();
+    if (q.includes("触发") || q.includes("trigger")) {
+      const base = [
+        context.hasTrigger ? "沿用当前画布已有触发器" : "使用 HTTP 触发器",
+        "使用定时触发器（每 5 分钟）",
+        "使用 WebSocket 触发器",
+      ];
+      return base;
+    }
+    if (q.includes("错误") || q.includes("失败") || q.includes("fallback")) {
+      const base = [
+        context.hasDelay ? "沿用延迟节点，失败重试 3 次后告警" : "失败后延迟重试 3 次，再告警",
+        "失败后仅记录日志并终止",
+        "失败后直接发送飞书告警",
+      ];
+      return base;
+    }
+    if (q.includes("输出") || q.includes("通知") || q.includes("result")) {
+      const base = [
+        context.hasFeishu ? "沿用飞书节点发送摘要 + HTTP 返回主结果" : "HTTP 返回主结果 + 飞书发送摘要",
+        "仅返回 HTTP 响应",
+        "写入数据库并发送飞书通知",
+      ];
+      return base;
+    }
+    if (q.includes("模型") || q.includes("llm")) {
+      const base = [
+        context.hasLlm ? "复用现有 LLM 节点配置" : "新建 LLM 节点并使用默认模型配置",
+        "增加兜底模型链（主模型失败自动切换）",
+        "先用低成本模型，关键路径再切高性能模型",
+      ];
+      return base;
+    }
+    return [
+      "按最小可用方案实现",
+      "按可观测性优先实现（增强日志与错误分支）",
+      "按可扩展性优先实现（预留更多分支）",
+    ];
+  };
+
+  const handleAutoFillAgentAnswers = () => {
+    if (!agentPlanResult?.questions?.length) return;
+    const ws = workspaceRef.current;
+    const allBlocks = (ws?.getAllBlocks?.(false) ?? []) as Block[];
+    const context = {
+      hasTrigger: allBlocks.some((b) => isRuleGoTriggerBlockType(b.type)),
+      hasLlm: allBlocks.some((b) => b.type === "rulego_llm"),
+      hasFeishu: allBlocks.some((b) => b.type === "rulego_feishuImMessage"),
+      hasDelay: allBlocks.some((b) => b.type === "rulego_delay"),
+    };
+    const next: Record<string, string> = {};
+    agentPlanResult.questions.forEach((q) => {
+      next[q] = getAgentRecommendedAnswer(q, context);
+    });
+    setAgentQuestionAnswers((prev) => ({ ...next, ...prev }));
+  };
+
+  const handleApplyAgentSelections = () => {
+    const ws = workspaceRef.current;
+    if (!ws) {
+      setAgentError("工作区尚未初始化");
+      return;
+    }
+    try {
+      const currentDsl = buildRuleGoDsl(ws, name, debugMode, root, enabled);
+      const nextDsl = applyAgentSelectionsToDsl(currentDsl || "", agentPreviewItems, agentSelectedIds);
+      loadWorkspaceFromRuleGoDsl(nextDsl, ws);
+      ensureRuleGoNodeIdsAreUuid(ws);
+      const loadedDsl = buildRuleGoDsl(ws, name, debugMode, root, enabled);
+      setDsl(loadedDsl);
+      setJson(JSON.stringify(ScratchBlocks.serialization.workspaces.save(ws), null, 2));
+      setTriggerLayoutError(validateRuleGoTriggerLayout(ws));
+      setBlockCount(ws.getTopBlocks(true).length);
+      setAgentModalOpen(false);
+    } catch (err) {
+      setAgentError(err instanceof Error ? err.message : String(err));
+    }
+  };
+
   const workspaceWs = workspaceRef.current as (WorkspaceSvg & { undo?: () => void; redo?: () => void }) | null;
+  const agentQuestionTotal = agentPlanResult?.questions?.length ?? 0;
+  const agentQuestionAnswered = (agentPlanResult?.questions ?? []).filter(
+    (q) => String(agentQuestionAnswers[q] ?? "").trim().length > 0
+  ).length;
+  const agentAllQuestionsAnswered = agentQuestionTotal > 0 && agentQuestionAnswered === agentQuestionTotal;
+
+  useEffect(() => {
+    if (!agentPlanResult?.need_clarification) {
+      prevAgentAllAnsweredRef.current = false;
+      return;
+    }
+    if (agentAllQuestionsAnswered && !prevAgentAllAnsweredRef.current && !agentReadyPulseShownInSession) {
+      prevAgentAllAnsweredRef.current = true;
+      setAgentReadyPulseShownInSession(true);
+      setAgentReadyPulse(true);
+      agentPrimaryActionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+      const t = window.setTimeout(() => setAgentReadyPulse(false), 900);
+      return () => window.clearTimeout(t);
+    }
+    if (!agentAllQuestionsAnswered) {
+      prevAgentAllAnsweredRef.current = false;
+      setAgentReadyPulse(false);
+    }
+  }, [agentAllQuestionsAnswered, agentPlanResult?.need_clarification, agentReadyPulseShownInSession]);
   const blockLibraryCount = useMemo(() => {
     const contents = rulegoToolbox.contents;
     if (!Array.isArray(contents)) return 0;
@@ -4213,6 +4485,16 @@ export default function RuleGoScratchEditorPage() {
           </button>
         </div>
         <div className="rulego-editor-header-extra">
+          <button
+            className="rulego-toolbar-btn"
+            type="button"
+            onClick={() => {
+              setAgentError(null);
+              setAgentModalOpen(true);
+            }}
+          >
+            Agent 对话
+          </button>
           <button className="rulego-toolbar-btn text" type="button" onClick={() => navigate("/rulego")}>
             返回列表
           </button>
@@ -4456,6 +4738,302 @@ export default function RuleGoScratchEditorPage() {
                   复制
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {agentModalOpen && (
+        <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setAgentModalOpen(false)}>
+          <div className="modal rulego-agent-modal" style={{ maxWidth: 820 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3>Agent 对话编排</h3>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <button
+                  type="button"
+                  className="text-button"
+                  onClick={() => {
+                    setAgentPrompt("");
+                    setAgentPlanResult(null);
+                    setAgentPreviewItems([]);
+                    setAgentSelectedIds(new Set());
+                    setAgentConversationHistory([]);
+                    setAgentQuestionAnswers({});
+                    setAgentCollapsedQuestions({});
+                    setAgentShowOnlyUnanswered(true);
+                    setAgentPreviewFilter("all");
+                    setAgentReadyPulseShownInSession(false);
+                    setAgentError(null);
+                  }}
+                >
+                  新对话
+                </button>
+                <button type="button" className="text-button" onClick={() => setAgentModalOpen(false)} aria-label="关闭">
+                  ×
+                </button>
+              </div>
+            </div>
+            <div className="modal-body rulego-agent-modal-body">
+              <div className="rulego-agent-input-panel">
+              <div className="rulego-agent-chat-log">
+                {agentConversationHistory.length === 0 ? (
+                  <div className="form-hint">你可以先描述目标，Agent 会主动思考并在信息不足时追问你。</div>
+                ) : (
+                  agentConversationHistory.map((msg, idx) => (
+                    <div key={`${idx}-${msg.role}`} className={`rulego-agent-chat-bubble ${msg.role === "user" ? "user" : "assistant"}`}>
+                      <div className="rulego-agent-chat-role">{msg.role === "user" ? "你" : "Agent"}</div>
+                      <div className="rulego-agent-chat-content">{msg.content}</div>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="rulego-agent-model-row">
+                <label className="form-field">
+                  <span>模型配置</span>
+                  <select
+                    value={agentModelConfigId}
+                    onChange={(e) => {
+                      const nextId = e.target.value;
+                      setAgentModelConfigId(nextId);
+                      const cfg = agentModelConfigs.find((c) => c.id === nextId);
+                      setAgentModelName(cfg?.models?.[0] ?? "");
+                    }}
+                  >
+                    {agentModelConfigs.length === 0 ? <option value="">暂无模型配置</option> : null}
+                    {agentModelConfigs.map((cfg) => (
+                      <option key={cfg.id} value={cfg.id}>
+                        {cfg.siteDescription || cfg.baseUrl}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="form-field">
+                  <span>模型</span>
+                  <select value={agentModelName} onChange={(e) => setAgentModelName(e.target.value)}>
+                    {(agentSelectedConfig?.models ?? []).map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                    {(agentSelectedConfig?.models ?? []).length === 0 ? <option value="">暂无可用模型</option> : null}
+                  </select>
+                </label>
+              </div>
+              <label className="form-field">
+                <span>需求描述</span>
+                <textarea
+                  rows={4}
+                  value={agentPrompt}
+                  onChange={(e) => setAgentPrompt(e.target.value)}
+                  placeholder="例如：接收 HTTP 请求后调用 LLM 生成回复，再发送飞书消息"
+                />
+              </label>
+              <div className="modal-actions rulego-agent-primary-actions">
+                <span className="form-hint">
+                  {agentPlanResult?.need_clarification
+                    ? agentAllQuestionsAnswered
+                      ? "信息已补充完整，点击右侧按钮继续生成预览"
+                      : "请先回答追问，再点击右侧按钮继续生成预览"
+                    : "先生成预览，再逐条勾选应用到画布"}
+                </span>
+                <button
+                  ref={agentPrimaryActionRef}
+                  type="button"
+                  className={`primary-button ${
+                    agentPlanResult?.need_clarification && agentAllQuestionsAnswered ? "rulego-agent-ready-button" : ""
+                  } ${agentReadyPulse ? "rulego-agent-ready-pulse" : ""}`}
+                  onClick={() =>
+                    agentPlanResult?.need_clarification ? void handleSubmitAgentAnswers() : void handleGenerateAgentPlan()
+                  }
+                  disabled={agentLoading}
+                >
+                  {agentLoading
+                    ? "生成中..."
+                    : agentPlanResult?.need_clarification
+                      ? agentAllQuestionsAnswered
+                        ? "可继续生成"
+                        : "提交补充信息并继续生成"
+                      : "生成预览"}
+                </button>
+              </div>
+              {agentError ? <div className="form-error">{agentError}</div> : null}
+              </div>
+              {agentPlanResult ? (
+                <div className="rulego-agent-preview rulego-agent-result-panel">
+                  {agentPlanResult.thought ? (
+                    <div className="rulego-agent-thought">
+                      <div className="rulego-agent-thought-title">Agent 思考</div>
+                      <div className="form-hint">{agentPlanResult.thought}</div>
+                    </div>
+                  ) : null}
+                  {agentPlanResult.questions?.length ? (
+                    <div className="rulego-agent-questions">
+                      <div className="rulego-agent-questions-head">
+                        <div className="rulego-agent-thought-title">
+                          Agent 追问（请回答后继续）
+                          <span className="rulego-agent-question-progress">已回答 {agentQuestionAnswered} / {agentQuestionTotal}</span>
+                        </div>
+                        <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+                          <label className="form-hint" style={{ display: "inline-flex", gap: 6, alignItems: "center" }}>
+                            <input
+                              type="checkbox"
+                              checked={agentShowOnlyUnanswered}
+                              onChange={(e) => setAgentShowOnlyUnanswered(e.target.checked)}
+                            />
+                            仅显示未回答
+                          </label>
+                          <button type="button" className="text-button" onClick={handleAutoFillAgentAnswers}>
+                            一键填充推荐答案
+                          </button>
+                        </div>
+                      </div>
+                      {agentPlanResult.questions
+                        .filter((q) => (agentShowOnlyUnanswered ? !String(agentQuestionAnswers[q] ?? "").trim() : true))
+                        .map((q) => {
+                        const collapsed = agentCollapsedQuestions[q] === true;
+                        const answer = agentQuestionAnswers[q] ?? "";
+                        return (
+                          <div key={q} className="form-field rulego-agent-question-item">
+                            <div className="rulego-agent-question-head">
+                              <span>{q}</span>
+                              <button
+                                type="button"
+                                className="text-button"
+                                onClick={() =>
+                                  setAgentCollapsedQuestions((prev) => ({ ...prev, [q]: !collapsed }))
+                                }
+                              >
+                                {collapsed ? "展开" : "折叠"}
+                              </button>
+                            </div>
+                            {collapsed ? (
+                              <div className="form-hint">{answer ? `已回答：${answer}` : "未回答"}</div>
+                            ) : (
+                              <>
+                                <input
+                                  value={answer}
+                                  onChange={(e) =>
+                                    setAgentQuestionAnswers((prev) => ({ ...prev, [q]: e.target.value }))
+                                  }
+                                  placeholder="请输入你的回答"
+                                />
+                                <div className="rulego-agent-candidate-options">
+                                  {(() => {
+                                    const ws = workspaceRef.current;
+                                    const allBlocks = (ws?.getAllBlocks?.(false) ?? []) as Block[];
+                                    const context = {
+                                      hasTrigger: allBlocks.some((b) => isRuleGoTriggerBlockType(b.type)),
+                                      hasLlm: allBlocks.some((b) => b.type === "rulego_llm"),
+                                      hasFeishu: allBlocks.some((b) => b.type === "rulego_feishuImMessage"),
+                                      hasDelay: allBlocks.some((b) => b.type === "rulego_delay"),
+                                    };
+                                    return getAgentRecommendedCandidates(q, context).map((opt) => (
+                                      <button
+                                        key={opt}
+                                        type="button"
+                                        className={`rulego-agent-candidate-option ${answer === opt ? "active" : ""}`}
+                                        onClick={() => setAgentQuestionAnswers((prev) => ({ ...prev, [q]: opt }))}
+                                      >
+                                        {opt}
+                                      </button>
+                                    ));
+                                  })()}
+                                </div>
+                                <div className="rulego-agent-quick-answers">
+                                  {getAgentQuickAnswerTemplates(q).map((tpl) => (
+                                    <button
+                                      key={tpl}
+                                      type="button"
+                                      className="text-button"
+                                      onClick={() => setAgentQuestionAnswers((prev) => ({ ...prev, [q]: tpl }))}
+                                    >
+                                      {tpl}
+                                    </button>
+                                  ))}
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                      <div className="modal-actions">
+                        <button type="button" className="primary-button" onClick={() => void handleSubmitAgentAnswers()}>
+                          提交回答并继续生成（也可点上方主按钮）
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+                  {agentPlanResult.warnings?.length ? (
+                    <div className="form-hint">注意: {agentPlanResult.warnings.join("；")}</div>
+                  ) : null}
+                  <div className="rulego-agent-preview-toolbar">
+                    <div className="form-hint">预览项过滤</div>
+                    <div className="rulego-agent-preview-filter">
+                      <button
+                        type="button"
+                        className={`rulego-agent-candidate-option ${agentPreviewFilter === "selected" ? "active" : ""}`}
+                        onClick={() => setAgentPreviewFilter("selected")}
+                      >
+                        仅已勾选
+                      </button>
+                      <button
+                        type="button"
+                        className={`rulego-agent-candidate-option ${agentPreviewFilter === "all" ? "active" : ""}`}
+                        onClick={() => setAgentPreviewFilter("all")}
+                      >
+                        全部
+                      </button>
+                    </div>
+                  </div>
+                  <div className="rulego-agent-preview-list">
+                    {agentPreviewItems
+                      .filter((item) => (agentPreviewFilter === "selected" ? agentSelectedIds.has(item.id) : true))
+                      .map((item) => (
+                      <label
+                        key={item.id}
+                        className={`rulego-agent-preview-item ${item.valid ? "" : "invalid"}`}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={agentSelectedIds.has(item.id)}
+                          disabled={!item.valid}
+                          onChange={(e) => {
+                            setAgentSelectedIds((prev) => {
+                              const next = new Set(prev);
+                              if (e.target.checked) next.add(item.id);
+                              else next.delete(item.id);
+                              return next;
+                            });
+                          }}
+                        />
+                        <div className="rulego-agent-preview-item-body">
+                          <div className="rulego-agent-preview-item-title">{item.title}</div>
+                          <div className="form-hint">{item.detail}</div>
+                          <div className="form-hint">
+                            置信度: {Math.round(item.confidence * 100)}%
+                            {item.reason ? ` · ${item.reason}` : ""}
+                            {!item.valid && item.validationError ? ` · ${item.validationError}` : ""}
+                          </div>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="modal-actions">
+                    <button type="button" className="text-button" onClick={() => setAgentModalOpen(false)}>
+                      取消
+                    </button>
+                    <button
+                      type="button"
+                      className="primary-button"
+                      onClick={handleApplyAgentSelections}
+                      disabled={agentPlanResult.need_clarification === true}
+                      title={agentPlanResult.need_clarification ? "请先回答 Agent 追问后再应用" : undefined}
+                    >
+                      应用所选项
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           </div>
         </div>

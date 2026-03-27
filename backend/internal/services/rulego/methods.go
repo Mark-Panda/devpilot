@@ -2,6 +2,7 @@ package rulego
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -221,5 +222,140 @@ func (s *Service) ListAvailableSkills() ([]AvailableSkillItem, error) {
 	for _, sk := range skills {
 		out = append(out, AvailableSkillItem{Name: sk.Name, Description: sk.Description})
 	}
+	return out, nil
+}
+
+type GenerateRuleGoPlanInput struct {
+	Prompt              string   `json:"prompt"`
+	CurrentDSL          string   `json:"current_dsl"`
+	NodeTypes           []string `json:"node_types"`
+	BaseURL             string   `json:"base_url,omitempty"`
+	APIKey              string   `json:"api_key,omitempty"`
+	Model               string   `json:"model,omitempty"`
+	FallbackModels      []string `json:"fallback_models,omitempty"`
+	ConversationHistory []struct {
+		Role    string `json:"role"`
+		Content string `json:"content"`
+	} `json:"conversation_history,omitempty"`
+}
+
+type RuleGoPlanNode struct {
+	ID            string                 `json:"id,omitempty"`
+	NodeType      string                 `json:"node_type"`
+	Name          string                 `json:"name,omitempty"`
+	Configuration map[string]interface{} `json:"configuration,omitempty"`
+	Confidence    float64                `json:"confidence,omitempty"`
+	Reason        string                 `json:"reason,omitempty"`
+}
+
+type RuleGoPlanEdge struct {
+	FromID     string  `json:"from_id"`
+	ToID       string  `json:"to_id"`
+	Type       string  `json:"type,omitempty"`
+	Confidence float64 `json:"confidence,omitempty"`
+	Reason     string  `json:"reason,omitempty"`
+}
+
+type GenerateRuleGoPlanResult struct {
+	Nodes             []RuleGoPlanNode `json:"nodes"`
+	Edges             []RuleGoPlanEdge `json:"edges"`
+	Warnings          []string         `json:"warnings,omitempty"`
+	OverallConfidence float64          `json:"overall_confidence,omitempty"`
+	Thought           string           `json:"thought,omitempty"`
+	Questions         []string         `json:"questions,omitempty"`
+	NeedClarification bool             `json:"need_clarification,omitempty"`
+	RawResponse       string           `json:"raw_response,omitempty"`
+}
+
+// GenerateRuleGoPlan 根据自然语言需求生成可预览的规则链计划（节点+连线），供前端勾选后应用。
+func (s *Service) GenerateRuleGoPlan(input GenerateRuleGoPlanInput) (GenerateRuleGoPlanResult, error) {
+	prompt := strings.TrimSpace(input.Prompt)
+	if prompt == "" {
+		return GenerateRuleGoPlanResult{}, fmt.Errorf("prompt 不能为空")
+	}
+	baseURL := strings.TrimSpace(input.BaseURL)
+	apiKey := strings.TrimSpace(input.APIKey)
+	model := strings.TrimSpace(input.Model)
+	fallbackModels := make([]string, 0, len(input.FallbackModels))
+	for _, m := range input.FallbackModels {
+		if t := strings.TrimSpace(m); t != "" {
+			fallbackModels = append(fallbackModels, t)
+		}
+	}
+	if baseURL == "" || apiKey == "" || model == "" {
+		if s.llmConfigLister == nil {
+			return GenerateRuleGoPlanResult{}, fmt.Errorf("未配置模型管理，无法调用 Agent 规划")
+		}
+		configs, err := s.llmConfigLister.ListLLMConfigs(context.Background())
+		if err != nil {
+			return GenerateRuleGoPlanResult{}, fmt.Errorf("读取模型配置失败: %w", err)
+		}
+		if len(configs) == 0 {
+			return GenerateRuleGoPlanResult{}, fmt.Errorf("未找到可用模型配置，请先在模型管理中配置")
+		}
+		var chosen LLMConfigEntry
+		for _, c := range configs {
+			if strings.TrimSpace(c.BaseURL) != "" && strings.TrimSpace(c.APIKey) != "" && len(c.Models) > 0 {
+				chosen = c
+				break
+			}
+		}
+		if strings.TrimSpace(chosen.BaseURL) == "" || strings.TrimSpace(chosen.APIKey) == "" || len(chosen.Models) == 0 {
+			return GenerateRuleGoPlanResult{}, fmt.Errorf("模型配置不完整：需要 base_url、api_key、models")
+		}
+		baseURL = strings.TrimSpace(chosen.BaseURL)
+		apiKey = strings.TrimSpace(chosen.APIKey)
+		model = strings.TrimSpace(chosen.Models[0])
+		if len(chosen.Models) > 1 {
+			fallbackModels = chosen.Models[1:]
+		}
+	}
+
+	cfg := llm.Config{
+		BaseURL: baseURL,
+		APIKey:  apiKey,
+		Model:   model,
+		Models:  fallbackModels,
+	}
+	client, err := llm.NewClient(context.Background(), cfg)
+	if err != nil {
+		return GenerateRuleGoPlanResult{}, fmt.Errorf("创建 LLM 客户端失败: %w", err)
+	}
+	systemPrompt := "你是 RuleGo 可视化编辑器规划助手。请严格返回 JSON 对象，不要输出任何额外文本。\n" +
+		"JSON 结构: {\"thought\":\"你的思考摘要\",\"need_clarification\":false,\"questions\":[\"可选追问\"],\"nodes\":[{\"id\":\"可选\",\"node_type\":\"必填\",\"name\":\"可选\",\"configuration\":{},\"confidence\":0~1,\"reason\":\"可选\"}],\"edges\":[{\"from_id\":\"必填\",\"to_id\":\"必填\",\"type\":\"可选默认Success\",\"confidence\":0~1,\"reason\":\"可选\"}],\"warnings\":[\"可选\"],\"overall_confidence\":0~1}\n" +
+		"规则: 1) 若用户需求信息不足，need_clarification=true，给出1-3个高价值追问，nodes/edges可为空；2) 若信息充分，need_clarification=false，并输出尽可能完整计划；3) node_type 必须优先使用可用节点类型；4) edges 必须引用 nodes 或当前 DSL 里的节点 id。"
+	history := make([]map[string]string, 0, len(input.ConversationHistory))
+	for _, h := range input.ConversationHistory {
+		r := strings.TrimSpace(h.Role)
+		if r == "" {
+			continue
+		}
+		history = append(history, map[string]string{
+			"role":    r,
+			"content": strings.TrimSpace(h.Content),
+		})
+	}
+	userPayload, _ := json.Marshal(map[string]interface{}{
+		"requirement":            prompt,
+		"conversation_history":   history,
+		"current_dsl":            strings.TrimSpace(input.CurrentDSL),
+		"node_types":             input.NodeTypes,
+		"clarification_strategy": "ask_high_value_questions_first_if_needed",
+	})
+	raw, err := client.ChatWithSystem(context.Background(), systemPrompt, string(userPayload))
+	if err != nil {
+		return GenerateRuleGoPlanResult{}, llm.FormatErrorForUser(err)
+	}
+	clean := strings.TrimSpace(raw)
+	start := strings.Index(clean, "{")
+	end := strings.LastIndex(clean, "}")
+	if start >= 0 && end > start {
+		clean = clean[start : end+1]
+	}
+	var out GenerateRuleGoPlanResult
+	if err := json.Unmarshal([]byte(clean), &out); err != nil {
+		return GenerateRuleGoPlanResult{}, fmt.Errorf("解析模型返回 JSON 失败: %w", err)
+	}
+	out.RawResponse = raw
 	return out, nil
 }

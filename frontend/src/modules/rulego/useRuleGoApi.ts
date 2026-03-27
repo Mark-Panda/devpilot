@@ -5,6 +5,7 @@ import {
   DeleteSkillForRuleChain,
   ExecuteRule,
   ExecuteRuleDefinition,
+  GenerateRuleGoPlan,
   GenerateSkillFromRuleChain,
   GetExecutionLog,
   GetRuleGoRule,
@@ -143,4 +144,52 @@ export async function generateSkillFromRuleChain(
 /** 删除规则链关联的技能目录（禁用/删除规则链时由后端自动调用，也可前端主动调用） */
 export async function deleteSkillForRuleChain(ruleId: string): Promise<void> {
   return DeleteSkillForRuleChain(ruleId);
+}
+
+export type GenerateRuleGoPlanInput = {
+  prompt: string;
+  current_dsl?: string;
+  node_types?: string[];
+  conversation_history?: Array<{ role: string; content: string }>;
+  base_url?: string;
+  api_key?: string;
+  model?: string;
+  fallback_models?: string[];
+};
+
+export type GenerateRuleGoPlanResult = {
+  nodes: Array<{
+    id?: string;
+    node_type: string;
+    name?: string;
+    configuration?: Record<string, unknown>;
+    confidence?: number;
+    reason?: string;
+  }>;
+  edges: Array<{
+    from_id: string;
+    to_id: string;
+    type?: string;
+    confidence?: number;
+    reason?: string;
+  }>;
+  warnings?: string[];
+  overall_confidence?: number;
+  thought?: string;
+  questions?: string[];
+  need_clarification?: boolean;
+  raw_response?: string;
+};
+
+export async function generateRuleGoPlan(input: GenerateRuleGoPlanInput): Promise<GenerateRuleGoPlanResult> {
+  return GenerateRuleGoPlan({
+    prompt: input.prompt,
+    current_dsl: input.current_dsl ?? "",
+    node_types: input.node_types ?? [],
+    conversation_history: input.conversation_history ?? [],
+    base_url: input.base_url ?? "",
+    api_key: input.api_key ?? "",
+    model: input.model ?? "",
+    fallback_models: input.fallback_models ?? [],
+  });
 }
