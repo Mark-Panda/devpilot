@@ -1,5 +1,5 @@
 /**
- * Cursor ACP：通过 `agent acp` JSON-RPC 执行一次 Prompt（与「追踪·Agent 分析」的 --print 模式互补）。
+ * Cursor ACP：通过 `agent acp` JSON-RPC 执行一次 Prompt。
  */
 import type { Block } from "blockly/core";
 import type { BlockTypeDef } from "../types";

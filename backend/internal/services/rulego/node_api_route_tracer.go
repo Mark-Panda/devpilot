@@ -328,131 +328,6 @@ func serviceIndexForTracer(msg types.RuleMsg, n int) int {
 	return 0
 }
 
-// --- apiRouteTracer/agentAnalyze：在仓库目录下调用 Cursor agent CLI 分析 API 入口 ---
-
-type apiRouteTracerAgentAnalyzeConfig struct {
-	AgentCommand string `json:"agentCommand"`
-	TimeoutSec   int    `json:"timeoutSec"`
-	MaxRetries   int    `json:"maxRetries"`
-}
-
-type apiRouteTracerAgentAnalyzeNode struct {
-	cfg apiRouteTracerAgentAnalyzeConfig
-}
-
-func (n *apiRouteTracerAgentAnalyzeNode) Type() string { return "apiRouteTracer/agentAnalyze" }
-
-func (n *apiRouteTracerAgentAnalyzeNode) New() types.Node { return &apiRouteTracerAgentAnalyzeNode{} }
-
-func (n *apiRouteTracerAgentAnalyzeNode) Init(_ types.Config, configuration types.Configuration) error {
-	if err := mapConfigurationToStruct(configuration, &n.cfg); err != nil {
-		return err
-	}
-	n.cfg.AgentCommand = strings.TrimSpace(n.cfg.AgentCommand)
-	if n.cfg.AgentCommand == "" {
-		n.cfg.AgentCommand = "agent"
-	}
-	if n.cfg.TimeoutSec <= 0 {
-		n.cfg.TimeoutSec = 1800
-	}
-	if n.cfg.MaxRetries < 0 {
-		n.cfg.MaxRetries = 0
-	}
-	if n.cfg.MaxRetries > 4 {
-		n.cfg.MaxRetries = 4
-	}
-	return nil
-}
-
-func (n *apiRouteTracerAgentAnalyzeNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) {
-	servicePath := ""
-	if msg.Metadata != nil {
-		servicePath = strings.TrimSpace(msg.Metadata.GetValue("api_route_tracer_service_path"))
-	}
-	if servicePath == "" {
-		ctx.TellFailure(msg, errors.New("agentAnalyze: 缺少 metadata api_route_tracer_service_path（请先执行 gitPrepare）"))
-		return
-	}
-	traceURL := ""
-	traceMethod := ""
-	if msg.Metadata != nil {
-		traceURL = strings.TrimSpace(msg.Metadata.GetValue("trace_url"))
-		traceMethod = strings.TrimSpace(msg.Metadata.GetValue("trace_method"))
-	}
-	if traceURL == "" || traceMethod == "" {
-		ctx.TellFailure(msg, errors.New("agentAnalyze: 缺少 trace_url / trace_method（请在上游将请求 url、method 写入 metadata，例如 jsTransform + restApiCall）"))
-		return
-	}
-	projType := ""
-	if msg.Metadata != nil {
-		projType = strings.TrimSpace(msg.Metadata.GetValue("api_route_tracer_project_type"))
-	}
-	if projType == "" {
-		projType = "代码"
-	}
-
-	fullPrompt := fmt.Sprintf(`这是一个%s项目。我需要找到 API endpoint '%s' (%s 方法) 在代码中的位置。
-
-请分析：
-1. 这个 API 在哪些文件中被调用？
-2. 是在哪个页面、组件或功能模块中使用的？
-3. 是通过什么方式触发的？（按钮点击、页面加载、表单提交等）
-4. 相关的 UI 入口在哪里？（菜单项、按钮、链接等）
-5. 对应的路由路径是什么？
-
-请给出具体的文件路径和代码位置。`, projType, traceURL, strings.ToUpper(traceMethod))
-
-	simplePrompt := fmt.Sprintf(`这是一个%s。请快速找到 API '%s' (%s) 的调用位置。
-
-只需要告诉我：
-1. 哪个文件调用了这个 API？
-2. 什么按钮或操作触发的？
-3. 对应的路由路径？
-
-请简洁回答，给出文件路径和关键信息即可。`, projType, traceURL, strings.ToLower(traceMethod))
-
-	maxAttempts := n.cfg.MaxRetries + 1
-	var lastErr error
-	var stdout string
-	for attempt := 0; attempt < maxAttempts; attempt++ {
-		prompt := fullPrompt
-		if attempt > 0 {
-			prompt = simplePrompt
-		}
-		ctxRun, cancel := context.WithTimeout(context.Background(), time.Duration(n.cfg.TimeoutSec)*time.Second)
-		cmd := exec.CommandContext(ctxRun, n.cfg.AgentCommand, "--print", "--trust", prompt)
-		cmd.Dir = servicePath
-		var outBuf, errBuf bytes.Buffer
-		cmd.Stdout = &outBuf
-		cmd.Stderr = &errBuf
-		err := cmd.Run()
-		cancel()
-		stdout = strings.TrimSpace(outBuf.String())
-		if err == nil {
-			out := msg.Copy()
-			if out.Metadata == nil {
-				out.Metadata = types.NewMetadata()
-			}
-			mergeTraceMetadata(msg, out)
-			out.Metadata.PutValue("api_route_tracer_agent_attempts", strconv.Itoa(attempt+1))
-			if stderr := strings.TrimSpace(errBuf.String()); stderr != "" {
-				out.Metadata.PutValue("api_route_tracer_agent_stderr", stderr)
-			}
-			out.SetData(stdout)
-			ctx.TellSuccess(out)
-			return
-		}
-		lastErr = err
-		if stderr := strings.TrimSpace(errBuf.String()); stderr != "" {
-			lastErr = fmt.Errorf("%w: %s", err, stderr)
-		}
-		log.Printf("[rulego] apiRouteTracer/agentAnalyze 尝试 %d/%d 失败: %v", attempt+1, maxAttempts, lastErr)
-	}
-	ctx.TellFailure(msg, lastErr)
-}
-
-func (n *apiRouteTracerAgentAnalyzeNode) Destroy() { n.cfg = apiRouteTracerAgentAnalyzeConfig{} }
-
 // --- helpers ---
 
 func mapConfigurationToStruct(configuration types.Configuration, out interface{}) error {
@@ -509,10 +384,8 @@ func mergeTraceMetadata(from, to types.RuleMsg) {
 func init() {
 	rulego.Registry.Register(&SourcegraphSearchNode{})
 	rulego.Registry.Register(&apiRouteTracerGitPrepareNode{})
-	rulego.Registry.Register(&apiRouteTracerAgentAnalyzeNode{})
-	log.Printf("[rulego] 自定义节点已注册: type=%s, type=%s, type=%s",
+	log.Printf("[rulego] 自定义节点已注册: type=%s, type=%s",
 		(&SourcegraphSearchNode{}).Type(),
 		(&apiRouteTracerGitPrepareNode{}).Type(),
-		(&apiRouteTracerAgentAnalyzeNode{}).Type(),
 	)
 }

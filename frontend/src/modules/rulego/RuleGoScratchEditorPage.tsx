@@ -291,11 +291,6 @@ function BlockConfigModal({
     if (block.type === "rulego_apiRouteTracer_gitPrepare") {
       next.WORK_DIR = get("WORK_DIR");
     }
-    if (block.type === "rulego_apiRouteTracer_agentAnalyze") {
-      next.AGENT_CMD = get("AGENT_CMD") || "agent";
-      next.TIMEOUT_SEC = get("TIMEOUT_SEC") || "180";
-      next.MAX_RETRIES = get("MAX_RETRIES") || "2";
-    }
     if (block.type === "rulego_cursorAcp") {
       next.ACP_AGENT_PRESET = get("ACP_AGENT_PRESET") || "path";
       next.AGENT_CMD = get("AGENT_CMD") || "agent";
@@ -1683,40 +1678,6 @@ function BlockConfigModal({
           </label>
           <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
             支持完整 Router JSON（按 data 下标取项，下标来自 metadata 的 api_route_tracer_service_index 或 for 注入的 _loopIndex）；也支持 for 遍历 msg.data 时传入的单条 service 对象。
-          </p>
-        </>
-      )}
-      {block.type === "rulego_apiRouteTracer_agentAnalyze" && (
-        <>
-          <label className="form-field">
-            <span>Agent 命令 (agentCommand)</span>
-            <input
-              value={String(form.AGENT_CMD ?? "agent")}
-              onChange={(e) => setForm((f) => ({ ...f, AGENT_CMD: e.target.value }))}
-              placeholder="agent"
-              autoCapitalize="off"
-              autoCorrect="off"
-              autoComplete="off"
-            />
-          </label>
-          <label className="form-field">
-            <span>单次超时 (秒)</span>
-            <input
-              type="number"
-              value={String(form.TIMEOUT_SEC ?? "180")}
-              onChange={(e) => setForm((f) => ({ ...f, TIMEOUT_SEC: e.target.value }))}
-            />
-          </label>
-          <label className="form-field">
-            <span>最大重试次数 (maxRetries)</span>
-            <input
-              type="number"
-              value={String(form.MAX_RETRIES ?? "2")}
-              onChange={(e) => setForm((f) => ({ ...f, MAX_RETRIES: e.target.value }))}
-            />
-          </label>
-          <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
-            依赖前置节点写入的 metadata：api_route_tracer_service_path、trace_url、trace_method。首次完整提示词，重试时切换为简化提示词。
           </p>
         </>
       )}

@@ -49,7 +49,6 @@ const BLOCK_LABELS: Record<string, string> = {
   rulego_fileDelete: "删文件",
   rulego_fileList: "列文件",
   rulego_apiRouteTracer_gitPrepare: "追踪·Git 工作区",
-  rulego_apiRouteTracer_agentAnalyze: "追踪·Agent 分析",
   rulego_cursorAcp: "追踪·Cursor ACP",
   rulego_sourcegraphSearch: "Sourcegraph 搜索",
   rulego_rpaBrowserNavigate: "RPA·浏览器打开",

@@ -131,7 +131,6 @@ export const toolbox = {
       contents: [
         { kind: "block" as const, type: "rulego_sourcegraphSearch" },
         { kind: "block" as const, type: "rulego_apiRouteTracer_gitPrepare" },
-        { kind: "block" as const, type: "rulego_apiRouteTracer_agentAnalyze" },
         { kind: "block" as const, type: "rulego_cursorAcp" },
       ],
     },

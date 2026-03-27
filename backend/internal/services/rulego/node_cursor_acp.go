@@ -16,7 +16,7 @@ import (
 )
 
 // cursorACPNode 通过 Cursor CLI 的 ACP（agent acp）执行一次会话内 Prompt。
-// 与 apiRouteTracer/agentAnalyze 的「agent --print」单次调用并存：本节点支持流式、工具权限自动批复与会话协议。
+// 本节点支持流式、工具权限自动批复与会话协议。
 type cursorACPNode struct {
 	cfg cursorACPConfig
 }
