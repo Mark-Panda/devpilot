@@ -25,6 +25,7 @@ import "./blocks/startTrigger";
 import "./blocks/endpointTriggers";
 import "./blocks/dbClient";
 import "./blocks/apiRouteTracer";
+import "./blocks/cursorAcp";
 
 import {
   getBlockDef,
@@ -131,6 +132,7 @@ export const toolbox = {
         { kind: "block" as const, type: "rulego_sourcegraphSearch" },
         { kind: "block" as const, type: "rulego_apiRouteTracer_gitPrepare" },
         { kind: "block" as const, type: "rulego_apiRouteTracer_agentAnalyze" },
+        { kind: "block" as const, type: "rulego_cursorAcp" },
       ],
     },
     {

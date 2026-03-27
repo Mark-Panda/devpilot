@@ -16,6 +16,7 @@ alwaysApply: false
 - cacheGet
 - cacheSet
 - comment
+- cursor/acp
 - dbClient
 - delay
 - end

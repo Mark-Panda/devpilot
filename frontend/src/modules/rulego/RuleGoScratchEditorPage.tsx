@@ -21,6 +21,13 @@ import {
   getBlockTypeFromNodeType,
   getBlockTypeForEndpointDslType,
 } from "./rulego-blocks";
+import {
+  cursorAcpAgentPresetOptions,
+  cursorAcpArgsPresetOptions,
+  cursorAcpPermissionOptions,
+  cursorAcpSessionModeOptions,
+  cursorAcpTimeoutPresetOptions,
+} from "./rulego-blocks/blocks/cursorAcp";
 import { JsEditor, JsonEditor, SqlEditor } from "../../shared/components";
 import { BlockLibraryPanel, DRAG_TYPE_BLOCK } from "./BlockLibraryPanel";
 import { UI_RELATION_FAILURE } from "./relationLabels";
@@ -279,6 +286,17 @@ function BlockConfigModal({
       next.AGENT_CMD = get("AGENT_CMD") || "agent";
       next.TIMEOUT_SEC = get("TIMEOUT_SEC") || "180";
       next.MAX_RETRIES = get("MAX_RETRIES") || "2";
+    }
+    if (block.type === "rulego_cursorAcp") {
+      next.ACP_AGENT_PRESET = get("ACP_AGENT_PRESET") || "path";
+      next.AGENT_CMD = get("AGENT_CMD") || "agent";
+      next.ACP_TIMEOUT_PRESET = get("ACP_TIMEOUT_PRESET") || "1800";
+      next.TIMEOUT_SEC = get("TIMEOUT_SEC") || "1800";
+      next.WORK_DIR = get("WORK_DIR");
+      next.ACP_SESSION_MODE = get("ACP_SESSION_MODE") || "agent";
+      next.PERM_OPTION = get("PERM_OPTION") || "allow-once";
+      next.ACP_ARGS_PRESET = get("ACP_ARGS_PRESET") || "default";
+      next.ACP_ARGS_JSON = String(block.getFieldValue("ACP_ARGS_JSON") ?? "").trim() || "[]";
     }
     if (block.type === "rulego_sourcegraphSearch") {
       next.SG_ENDPOINT = get("SG_ENDPOINT") || "https://sourcegraph.com";
@@ -1659,6 +1677,160 @@ function BlockConfigModal({
           </label>
           <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
             依赖前置节点写入的 metadata：api_route_tracer_service_path、trace_url、trace_method。首次完整提示词，重试时切换为简化提示词。
+          </p>
+        </>
+      )}
+      {block.type === "rulego_cursorAcp" && (
+        <>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>Agent 可执行文件</span>
+            <select
+              value={String(form.ACP_AGENT_PRESET ?? "path")}
+              onChange={(e) => {
+                const v = e.target.value;
+                setForm((f) => ({
+                  ...f,
+                  ACP_AGENT_PRESET: v,
+                  ...(v === "path"
+                    ? { AGENT_CMD: "agent" }
+                    : v === "local"
+                      ? { AGENT_CMD: "~/.local/bin/agent" }
+                      : {}),
+                }));
+              }}
+            >
+              {cursorAcpAgentPresetOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {form.ACP_AGENT_PRESET === "custom" && (
+            <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+              <span>自定义命令或路径 (agentCommand)</span>
+              <input
+                value={String(form.AGENT_CMD ?? "")}
+                onChange={(e) => setForm((f) => ({ ...f, AGENT_CMD: e.target.value }))}
+                placeholder="例如 /opt/cursor/bin/agent"
+                autoCapitalize="off"
+                autoCorrect="off"
+                autoComplete="off"
+              />
+            </label>
+          )}
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>执行超时</span>
+            <select
+              value={String(form.ACP_TIMEOUT_PRESET ?? "1800")}
+              onChange={(e) => {
+                const v = e.target.value;
+                setForm((f) => ({
+                  ...f,
+                  ACP_TIMEOUT_PRESET: v,
+                  ...(v !== "custom" ? { TIMEOUT_SEC: v } : {}),
+                }));
+              }}
+            >
+              {cursorAcpTimeoutPresetOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {form.ACP_TIMEOUT_PRESET === "custom" && (
+            <label className="form-field">
+              <span>自定义超时（秒）</span>
+              <input
+                type="number"
+                min={30}
+                value={String(form.TIMEOUT_SEC ?? "1800")}
+                onChange={(e) => setForm((f) => ({ ...f, TIMEOUT_SEC: e.target.value }))}
+              />
+            </label>
+          )}
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>ACP 会话模式 (sessionMode)</span>
+            <select
+              value={String(form.ACP_SESSION_MODE ?? "agent")}
+              onChange={(e) => setForm((f) => ({ ...f, ACP_SESSION_MODE: e.target.value }))}
+            >
+              {cursorAcpSessionModeOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>工具权限自动批复 (permissionOptionId)</span>
+            <select
+              value={String(form.PERM_OPTION ?? "allow-once")}
+              onChange={(e) => setForm((f) => ({ ...f, PERM_OPTION: e.target.value }))}
+            >
+              {cursorAcpPermissionOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>CLI 附加参数（须含 acp）</span>
+            <select
+              value={String(form.ACP_ARGS_PRESET ?? "default")}
+              onChange={(e) => {
+                const v = e.target.value;
+                setForm((f) => ({
+                  ...f,
+                  ACP_ARGS_PRESET: v,
+                  ...(v === "default"
+                    ? { ACP_ARGS_JSON: "[]" }
+                    : v === "k_acp"
+                      ? { ACP_ARGS_JSON: JSON.stringify(["-k", "acp"]) }
+                      : {}),
+                }));
+              }}
+            >
+              {cursorAcpArgsPresetOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {form.ACP_ARGS_PRESET === "custom" && (
+            <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+              <span>自定义 args（JSON 数组）</span>
+              <textarea
+                value={String(form.ACP_ARGS_JSON ?? "[]")}
+                onChange={(e) => setForm((f) => ({ ...f, ACP_ARGS_JSON: e.target.value }))}
+                placeholder='例如 ["-k","acp"]'
+                rows={3}
+                style={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }}
+                spellCheck={false}
+                autoCapitalize="off"
+                autoCorrect="off"
+                autoComplete="off"
+              />
+            </label>
+          )}
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>默认工作目录 (workDir，可选，支持 ~/ 展开)</span>
+            <input
+              value={String(form.WORK_DIR ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, WORK_DIR: e.target.value }))}
+              placeholder="可被 metadata cursor_acp_cwd 或 api_route_tracer_service_path 覆盖"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
+            提示词完全来自上游消息的 <code>msg.Data</code>（此处无需填写）。工作目录优先 metadata <code>cursor_acp_cwd</code>，否则{" "}
+            <code>api_route_tracer_service_path</code>，否则本块 workDir。需本机已安装 Cursor CLI 并完成 <code>agent login</code> 或配置{" "}
+            <code>CURSOR_API_KEY</code>。Plan/Ask 模式通过 <code>session/new</code> 传参（若当前 CLI 版本不支持可能需去掉该配置）。
           </p>
         </>
       )}
