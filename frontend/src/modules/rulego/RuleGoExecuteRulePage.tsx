@@ -9,6 +9,7 @@ import {
   initLeafStringValuesFromParamTree,
   parseMetadataAndBodyParamTrees,
 } from "./ruleGoExecuteParamMaps";
+import { formatRelationTypeForDisplay } from "./relationLabels";
 import type { RuleGoRule } from "./types";
 import {
   getExecutionLog,
@@ -28,6 +29,33 @@ function prettyJsonForDisplay(raw: string, emptyPlaceholder: string): string {
   }
 }
 
+type ChainVisual = "idle" | "waiting" | "running" | "done" | "error";
+
+function dslNodeVisual(
+  execId: string | null,
+  runningExec: boolean,
+  finishedExec: boolean,
+  log: RuleGoExecutionNodeLog | undefined
+): ChainVisual {
+  if (!execId) return "idle";
+  if (!log) return finishedExec ? "idle" : "waiting";
+  const done = Boolean((log.finished_at ?? "").trim());
+  if (!done) return "running";
+  if ((log.error_message ?? "").trim()) return "error";
+  return "done";
+}
+
+function chainVisualLabel(v: ChainVisual): string {
+  const map: Record<ChainVisual, string> = {
+    idle: "未执行",
+    waiting: "待执行",
+    running: "执行中",
+    done: "完成",
+    error: "失败",
+  };
+  return map[v];
+}
+
 function RuleParamFields({
   nodes,
   values,
@@ -40,13 +68,13 @@ function RuleParamFields({
   depth?: number;
 }) {
   return (
-    <div style={{ marginLeft: depth ? 12 : 0 }}>
+    <div style={depth ? { marginLeft: 10 } : undefined}>
       {nodes.map((n) => {
         if (!n.key.trim()) return null;
         if (n.type === "object") {
           return (
-            <fieldset key={n.id} style={{ marginBottom: 12, border: "1px solid var(--color-border, #e2e8f0)", borderRadius: 8, padding: "8px 12px" }}>
-              <legend style={{ fontSize: 13, fontWeight: 600 }}>{n.key}</legend>
+            <fieldset key={n.id} className="rulego-exec-nested-fieldset">
+              <legend>{n.key}</legend>
               <RuleParamFields nodes={n.children} values={values} onChange={onChange} depth={depth + 1} />
             </fieldset>
           );
@@ -54,7 +82,7 @@ function RuleParamFields({
         if (n.type === "array" && n.children.length > 0) {
           return (
             <div key={n.id} style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6 }}>{n.key}（数组元素）</div>
+              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, color: "#334155" }}>{n.key}（数组元素）</div>
               <RuleParamFields nodes={n.children} values={values} onChange={onChange} depth={depth + 1} />
             </div>
           );
@@ -228,14 +256,15 @@ export default function RuleGoExecuteRulePage() {
     return extractNodesFromRuleDefinition(selectedRule.definition);
   }, [selectedRule]);
 
-  const nodeIdToLogStatus = useMemo(() => {
-    const m = new Map<string, { done: boolean }>();
+  const latestLogByNodeId = useMemo(() => {
+    const m = new Map<string, RuleGoExecutionNodeLog>();
     for (const n of pollNodes) {
       const nid = (n.node_id ?? "").trim();
       if (!nid) continue;
-      const done = Boolean((n.finished_at ?? "").trim());
       const prev = m.get(nid);
-      if (!prev || !prev.done) m.set(nid, { done });
+      if (!prev || (n.order_index ?? 0) >= (prev.order_index ?? 0)) {
+        m.set(nid, n);
+      }
     }
     return m;
   }, [pollNodes]);
@@ -243,8 +272,16 @@ export default function RuleGoExecuteRulePage() {
   const running = Boolean(execId && pollLog && !(pollLog.finished_at ?? "").trim());
   const finished = Boolean((pollLog?.finished_at ?? "").trim());
 
+  const selectLogForDslNode = useCallback(
+    (nodeId: string) => {
+      const log = latestLogByNodeId.get(nodeId);
+      if (log) setSelectedNode(log);
+    },
+    [latestLogByNodeId]
+  );
+
   return (
-    <div className="page">
+    <div className="page rulego-exec-page">
       <div className="page-header">
         <div>
           <h2>执行规则</h2>
@@ -257,230 +294,259 @@ export default function RuleGoExecuteRulePage() {
         </div>
       </div>
 
-      {rulesError ? <div className="form-error">{rulesError}</div> : null}
+      {rulesError ? <div className="form-error" style={{ marginBottom: 12 }}>{rulesError}</div> : null}
 
-      <div
-        className="table-card"
-        style={{
-          display: "grid",
-          gridTemplateColumns: "minmax(280px, 1fr) minmax(320px, 1.1fr)",
-          gap: 20,
-          padding: 20,
-          alignItems: "start",
-        }}
-      >
-        <div>
-          {loading ? (
-            <p className="table-empty">加载中…</p>
-          ) : mainEnabledRules.length === 0 ? (
-            <p className="table-empty">暂无已启用的主规则链，请先在规则管理中启用根规则链。</p>
-          ) : (
-            <>
-              <label className="form-field">
-                <span>规则链</span>
-                <select
-                  className="form-input"
-                  value={selectedId}
-                  onChange={(e) => setSelectedId(e.target.value)}
-                >
-                  {mainEnabledRules.map((r) => (
-                    <option key={r.id} value={r.id}>
-                      {r.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
+      <div className="rulego-exec-layout">
+        <section className="rulego-exec-panel">
+          <div className="rulego-exec-panel-header">请求参数</div>
+          <div className="rulego-exec-panel-body rulego-exec-panel-body--form">
+            {loading ? (
+              <p className="table-empty">加载中…</p>
+            ) : mainEnabledRules.length === 0 ? (
+              <p className="table-empty">暂无已启用的主规则链，请先在规则管理中启用根规则链。</p>
+            ) : (
+              <>
+                <div className="rulego-exec-section">
+                  <label className="form-field" style={{ marginBottom: 0 }}>
+                    <span>规则链</span>
+                    <select
+                      className="form-input"
+                      value={selectedId}
+                      onChange={(e) => setSelectedId(e.target.value)}
+                    >
+                      {mainEnabledRules.map((r) => (
+                        <option key={r.id} value={r.id}>
+                          {r.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
 
-              <label className="form-field">
-                <span>消息类型 (message_type)</span>
-                <input
-                  className="form-input"
-                  value={msgType}
-                  onChange={(e) => setMsgType(e.target.value)}
-                  placeholder="default"
-                  autoCapitalize="off"
-                  spellCheck={false}
-                />
-              </label>
+                <div className="rulego-exec-section">
+                  <div className="rulego-exec-section-title">消息</div>
+                  <label className="form-field" style={{ marginBottom: 0 }}>
+                    <span>消息类型 (message_type)</span>
+                    <input
+                      className="form-input"
+                      value={msgType}
+                      onChange={(e) => setMsgType(e.target.value)}
+                      placeholder="default"
+                      autoCapitalize="off"
+                      spellCheck={false}
+                    />
+                  </label>
+                </div>
 
-              <div style={{ marginTop: 16 }}>
-                <div style={{ fontWeight: 600, marginBottom: 8 }}>元数据参数</div>
-                {metaNodes.length === 0 ? (
-                  <p className="form-hint" style={{ marginBottom: 12 }}>
-                    未配置则发送空 metadata（可在规则表单中编辑「请求元数据参数」）
-                  </p>
-                ) : (
-                  <RuleParamFields nodes={metaNodes} values={metaLeaves} onChange={updateMetaLeaf} />
-                )}
-              </div>
+                <div className="rulego-exec-section">
+                  <div className="rulego-exec-section-title">元数据参数</div>
+                  {metaNodes.length === 0 ? (
+                    <p className="form-hint" style={{ marginBottom: 0 }}>
+                      未配置则发送空 metadata（可在规则表单中编辑「请求元数据参数」）
+                    </p>
+                  ) : (
+                    <RuleParamFields nodes={metaNodes} values={metaLeaves} onChange={updateMetaLeaf} />
+                  )}
+                </div>
 
-              <div style={{ marginTop: 16 }}>
-                <div style={{ fontWeight: 600, marginBottom: 8 }}>消息体参数</div>
-                {bodyNodes.length === 0 ? (
-                  <p className="form-hint" style={{ marginBottom: 12 }}>
-                    未配置则发送 {"{}"}
-                  </p>
-                ) : (
-                  <RuleParamFields nodes={bodyNodes} values={bodyLeaves} onChange={updateBodyLeaf} />
-                )}
-              </div>
+                <div className="rulego-exec-section">
+                  <div className="rulego-exec-section-title">消息体参数</div>
+                  {bodyNodes.length === 0 ? (
+                    <p className="form-hint" style={{ marginBottom: 0 }}>
+                      未配置则发送 {"{}"}
+                    </p>
+                  ) : (
+                    <RuleParamFields nodes={bodyNodes} values={bodyLeaves} onChange={updateBodyLeaf} />
+                  )}
+                </div>
 
-              <div style={{ marginTop: 16, display: "flex", gap: 12, flexWrap: "wrap" }}>
-                <button
-                  type="button"
-                  className="primary-button"
-                  disabled={starting || running}
-                  onClick={() => void handleExecute()}
-                >
-                  {starting ? "启动中…" : running ? "执行中…" : "执行"}
-                </button>
-                {execId ? (
-                  <button type="button" className="text-button" onClick={() => navigate(`/rulego/logs/${execId}`)}>
-                    在执行日志中打开
+                <div className="rulego-exec-actions">
+                  <button
+                    type="button"
+                    className="primary-button"
+                    disabled={starting || running}
+                    onClick={() => void handleExecute()}
+                  >
+                    {starting ? "启动中…" : running ? "执行中…" : "执行"}
                   </button>
-                ) : null}
+                  {execId ? (
+                    <button type="button" className="text-button" onClick={() => navigate(`/rulego/logs/${execId}`)}>
+                      在执行日志中打开
+                    </button>
+                  ) : null}
+                </div>
+
+                {runError ? <div className="form-error" style={{ marginTop: 12 }}>{runError}</div> : null}
+
+                <p className="form-hint" style={{ marginTop: 14, marginBottom: 0 }}>
+                  若规则链含 LLM / 技能等，执行可能持续数分钟；可留在本页查看节点进度，或稍后在「执行日志」中查看完整记录。
+                </p>
+              </>
+            )}
+          </div>
+        </section>
+
+        <section className="rulego-exec-panel">
+          <div className="rulego-exec-panel-header">执行与规则链</div>
+          <div className="rulego-exec-panel-body">
+            {!execId ? (
+              <div className="rulego-exec-empty-hint">
+                选择左侧规则并点击「执行」后，将在此展示规则链结构、实时执行轨迹与节点入参/出参。
               </div>
-
-              {runError ? <div className="form-error" style={{ marginTop: 12 }}>{runError}</div> : null}
-
-              <p className="form-hint" style={{ marginTop: 16 }}>
-                若规则链含 LLM / 技能等，执行可能持续数分钟；可留在本页查看节点进度，或稍后在「执行日志」中查看完整记录。
-              </p>
-            </>
-          )}
-        </div>
-
-        <div style={{ minWidth: 0 }}>
-          <div style={{ fontWeight: 600, marginBottom: 8 }}>执行进度</div>
-          {!execId ? (
-            <p className="form-hint">选择规则并点击「执行」后，此处显示进度与节点轨迹。</p>
-          ) : (
-            <>
-              <div style={{ fontSize: 13, color: "var(--color-muted, #64748b)", marginBottom: 8 }}>
-                execution_id: <code style={{ wordBreak: "break-all" }}>{execId}</code>
-              </div>
-              <div style={{ marginBottom: 12 }}>
-                {running && <span className="rulego-log-status pending">执行中…</span>}
-                {finished && pollLog?.success && <span className="rulego-log-status success">成功</span>}
-                {finished && !pollLog?.success && <span className="rulego-log-status failure">失败</span>}
+            ) : (
+              <>
+                <div className="rulego-exec-status-bar">
+                  {running && <span className="rulego-log-status pending">执行中</span>}
+                  {finished && pollLog?.success && <span className="rulego-log-status success">成功</span>}
+                  {finished && !pollLog?.success && <span className="rulego-log-status failure">失败</span>}
+                  <span className="rulego-exec-exec-id" title="执行记录 ID">
+                    ID <code>{execId}</code>
+                  </span>
+                </div>
                 {finished && pollLog?.error_message ? (
-                  <div className="form-error" style={{ marginTop: 8 }}>
+                  <div className="form-error" style={{ marginBottom: 16 }}>
                     {pollLog.error_message}
                   </div>
                 ) : null}
-              </div>
 
-              <div style={{ fontWeight: 600, margin: "12px 0 6px" }}>节点执行轨迹</div>
-              <div
-                style={{
-                  maxHeight: 220,
-                  overflowY: "auto",
-                  border: "1px solid var(--color-border, #e2e8f0)",
-                  borderRadius: 8,
-                  marginBottom: 16,
-                }}
-              >
+                {dslNodes.length > 0 ? (
+                  <div className="rulego-exec-chain-wrap">
+                    <div className="rulego-exec-section-title">规则链结构（按 DSL 顺序）</div>
+                    <p className="form-hint" style={{ marginTop: 0, marginBottom: 8, fontSize: 12 }}>
+                      横向为画布节点顺序；颜色表示当前执行状态。可点击已出现日志的节点查看详情。
+                    </p>
+                    <div className="rulego-exec-chain-scroll" aria-label="规则链节点">
+                      {dslNodes.map((dn, idx) => {
+                        const log = latestLogByNodeId.get(dn.id);
+                        const vis = dslNodeVisual(execId, running, finished, log);
+                        const cardClass = [
+                          "rulego-exec-chain-card",
+                          `rulego-exec-chain-card--${vis}`,
+                          log ? "is-clickable" : "",
+                          selectedNode?.node_id === dn.id ? "is-selected" : "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ");
+                        const badgeClass = `rulego-exec-chain-badge rulego-exec-chain-badge--${vis === "done" ? "done" : vis === "error" ? "error" : vis === "running" ? "running" : vis === "waiting" ? "waiting" : "idle"}`;
+                        return (
+                          <div key={dn.id} className="rulego-exec-chain-node">
+                            <button
+                              type="button"
+                              className={cardClass}
+                              disabled={!log}
+                              onClick={() => selectLogForDslNode(dn.id)}
+                              title={log ? "查看该节点日志" : "尚未产生节点日志"}
+                            >
+                              <span className="rulego-exec-chain-index">步骤 {idx + 1}</span>
+                              <span className="rulego-exec-chain-name">{dn.name || dn.id}</span>
+                              <span className="rulego-exec-chain-id" title={dn.id}>
+                                {dn.id}
+                              </span>
+                              <span className={badgeClass}>{chainVisualLabel(vis)}</span>
+                            </button>
+                            {idx < dslNodes.length - 1 ? <span className="rulego-exec-chain-connector" aria-hidden /> : null}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ) : execId ? (
+                  <p className="form-hint" style={{ marginBottom: 16 }}>
+                    当前规则 DSL 中无 metadata.nodes 列表，仅显示下方执行轨迹。
+                  </p>
+                ) : null}
+
+                <div className="rulego-exec-section-title">节点执行轨迹</div>
+                <p className="form-hint" style={{ marginTop: 0, marginBottom: 8, fontSize: 12 }}>
+                  按实际进入顺序排列；蓝色为执行中，绿色为已完成，红色为节点报错。
+                </p>
                 {pollNodes.length === 0 ? (
-                  <div className="form-hint" style={{ padding: 12 }}>
+                  <div className="rulego-exec-empty-hint" style={{ padding: "16px 12px" }}>
                     等待首个节点日志…
                   </div>
                 ) : (
-                  pollNodes.map((n) => {
-                    const done = Boolean((n.finished_at ?? "").trim());
-                    const active = selectedNode?.id === n.id;
-                    return (
-                      <button
-                        key={n.id}
-                        type="button"
-                        onClick={() => setSelectedNode(n)}
-                        style={{
-                          display: "block",
-                          width: "100%",
-                          textAlign: "left",
-                          padding: "8px 12px",
-                          border: "none",
-                          borderBottom: "1px solid var(--color-border, #e2e8f0)",
-                          background: active ? "var(--color-block-bg, #f1f5f9)" : "transparent",
-                          cursor: "pointer",
-                          fontSize: 13,
-                        }}
-                      >
-                        <span style={{ color: "var(--color-muted, #64748b)", marginRight: 8 }}>#{n.order_index}</span>
-                        <strong>{n.node_name || n.node_id}</strong>
-                        <span style={{ marginLeft: 8, fontSize: 12 }}>
-                          {done ? "已完成" : "执行中"}
-                          {(n.error_message ?? "").trim() ? " · 错误" : ""}
-                        </span>
-                      </button>
-                    );
-                  })
-                )}
-              </div>
-
-              {dslNodes.length > 0 ? (
-                <>
-                  <div style={{ fontWeight: 600, margin: "12px 0 6px" }}>规则链节点概览（DSL）</div>
-                  <div style={{ fontSize: 12, color: "var(--color-muted, #64748b)", marginBottom: 6 }}>
-                    与画布 metadata.nodes 对应，便于对照执行状态
-                  </div>
-                  <ul style={{ margin: 0, paddingLeft: 18, maxHeight: 120, overflowY: "auto" }}>
-                    {dslNodes.map((dn) => {
-                      const st = nodeIdToLogStatus.get(dn.id);
-                      let label = "待执行";
-                      if (st) label = st.done ? "已记录" : "执行中";
+                  <ul className="rulego-exec-timeline" aria-label="节点执行轨迹">
+                    {pollNodes.map((n) => {
+                      const done = Boolean((n.finished_at ?? "").trim());
+                      const hasErr = Boolean((n.error_message ?? "").trim());
+                      const active = selectedNode?.id === n.id;
+                      const rel = formatRelationTypeForDisplay(n.relation_type);
                       return (
-                        <li key={dn.id}>
-                          {dn.name || dn.id}{" "}
-                          <span style={{ color: "var(--color-muted, #64748b)" }}>({label})</span>
+                        <li key={n.id}>
+                          <button
+                            type="button"
+                            className={`rulego-exec-timeline-item${active ? " is-selected" : ""}${!done ? " is-running" : ""}${done && hasErr ? " is-error" : ""}${done && !hasErr ? " is-done" : ""}`}
+                            onClick={() => setSelectedNode(n)}
+                          >
+                            <span className="rulego-exec-timeline-dot" aria-hidden />
+                            <div className="rulego-exec-timeline-head">
+                              <span className="rulego-exec-timeline-order">#{n.order_index}</span>
+                              <span className="rulego-exec-timeline-title">{n.node_name || n.node_id}</span>
+                            </div>
+                            <div className="rulego-exec-timeline-meta">
+                              {rel ? (
+                                <>
+                                  <span className="rulego-exec-timeline-relation">{rel}</span>
+                                  <span> · </span>
+                                </>
+                              ) : null}
+                              <span>{done ? "已完成" : "执行中"}</span>
+                              {hasErr ? <span> · 节点错误</span> : null}
+                            </div>
+                          </button>
                         </li>
                       );
                     })}
                   </ul>
-                </>
-              ) : null}
+                )}
 
-              {selectedNode ? (
-                <div style={{ marginTop: 16 }}>
-                  <div style={{ fontWeight: 600, marginBottom: 8 }}>
-                    节点日志 · {selectedNode.node_name || selectedNode.node_id}
-                  </div>
-                  <label className="form-field">
-                    <span>入参 data</span>
-                    <JsonEditor
-                      value={prettyJsonForDisplay(selectedNode.input_data ?? "", "(空)")}
-                      onChange={() => {}}
-                      readOnly
-                      height={120}
-                      minHeight={80}
-                      showExpandButton
-                      expandTitle="节点入参 data"
-                    />
-                  </label>
-                  <label className="form-field">
-                    <span>出参 data</span>
-                    <JsonEditor
-                      value={prettyJsonForDisplay(selectedNode.output_data ?? "", "(空)")}
-                      onChange={() => {}}
-                      readOnly
-                      height={120}
-                      minHeight={80}
-                      showExpandButton
-                      expandTitle="节点出参 data"
-                    />
-                  </label>
-                  {(selectedNode.error_message ?? "").trim() ? (
+                {selectedNode ? (
+                  <div className="rulego-exec-detail-card">
+                    <div className="rulego-exec-detail-title">
+                      节点详情 · {selectedNode.node_name || selectedNode.node_id}
+                    </div>
                     <label className="form-field">
-                      <span>错误</span>
-                      <pre className="form-error" style={{ whiteSpace: "pre-wrap", fontSize: 12, padding: 8 }}>
-                        {selectedNode.error_message}
-                      </pre>
+                      <span>入参 data</span>
+                      <JsonEditor
+                        value={prettyJsonForDisplay(selectedNode.input_data ?? "", "(空)")}
+                        onChange={() => {}}
+                        readOnly
+                        height={140}
+                        minHeight={80}
+                        showExpandButton
+                        expandTitle="节点入参 data"
+                      />
                     </label>
-                  ) : null}
-                </div>
-              ) : null}
-            </>
-          )}
-        </div>
+                    <label className="form-field">
+                      <span>出参 data</span>
+                      <JsonEditor
+                        value={prettyJsonForDisplay(selectedNode.output_data ?? "", "(空)")}
+                        onChange={() => {}}
+                        readOnly
+                        height={140}
+                        minHeight={80}
+                        showExpandButton
+                        expandTitle="节点出参 data"
+                      />
+                    </label>
+                    {(selectedNode.error_message ?? "").trim() ? (
+                      <label className="form-field">
+                        <span>错误</span>
+                        <pre className="form-error" style={{ whiteSpace: "pre-wrap", fontSize: 12, padding: 8 }}>
+                          {selectedNode.error_message}
+                        </pre>
+                      </label>
+                    ) : null}
+                  </div>
+                ) : pollNodes.length > 0 ? (
+                  <p className="form-hint" style={{ marginTop: 8 }}>
+                    点击上方轨迹中的某一节点，查看该步的入参、出参与错误信息。
+                  </p>
+                ) : null}
+              </>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   );

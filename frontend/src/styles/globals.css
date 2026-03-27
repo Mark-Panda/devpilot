@@ -2651,6 +2651,449 @@ body {
   color: #0369a1;
 }
 
+/* 执行规则页 */
+.rulego-exec-page .rulego-exec-layout {
+  display: grid;
+  grid-template-columns: minmax(300px, 1fr) minmax(340px, 1.15fr);
+  gap: 20px;
+  align-items: start;
+}
+
+@media (max-width: 960px) {
+  .rulego-exec-page .rulego-exec-layout {
+    grid-template-columns: 1fr;
+  }
+}
+
+.rulego-exec-panel {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
+  overflow: hidden;
+}
+
+.rulego-exec-panel-header {
+  padding: 14px 18px;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: #0f172a;
+  background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.rulego-exec-panel-body {
+  padding: 18px 18px 20px;
+  max-height: min(72vh, 820px);
+  overflow-y: auto;
+}
+
+.rulego-exec-panel-body--form {
+  max-height: min(72vh, 860px);
+}
+
+.rulego-exec-section {
+  margin-top: 18px;
+}
+
+.rulego-exec-section:first-of-type {
+  margin-top: 0;
+}
+
+.rulego-exec-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #64748b;
+  margin-bottom: 10px;
+}
+
+.rulego-exec-nested-fieldset {
+  margin-bottom: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  background: #fafbfc;
+}
+
+.rulego-exec-nested-fieldset legend {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  padding: 0 6px;
+}
+
+.rulego-exec-actions {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.rulego-exec-status-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  margin-bottom: 16px;
+}
+
+.rulego-exec-exec-id {
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #475569;
+  word-break: break-all;
+  flex: 1;
+  min-width: 0;
+}
+
+.rulego-exec-exec-id code {
+  font-size: 11px;
+  background: #e2e8f0;
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #0f172a;
+}
+
+/* 规则链 DSL：横向流程 */
+.rulego-exec-chain-wrap {
+  margin-bottom: 20px;
+}
+
+.rulego-exec-chain-scroll {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+  padding: 12px 4px 16px;
+  margin: 0 -4px;
+  scrollbar-width: thin;
+}
+
+.rulego-exec-chain-node {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  min-width: 0;
+}
+
+.rulego-exec-chain-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  min-width: 112px;
+  max-width: 160px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  cursor: default;
+  text-align: left;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.12s ease;
+}
+
+.rulego-exec-chain-card.is-clickable {
+  cursor: pointer;
+}
+
+.rulego-exec-chain-card.is-clickable:hover {
+  border-color: #94a3b8;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+.rulego-exec-chain-card:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.rulego-exec-chain-card:disabled:hover {
+  border-color: #e2e8f0;
+  box-shadow: none;
+}
+
+.rulego-exec-chain-card.is-selected {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+}
+
+.rulego-exec-chain-card--idle {
+  opacity: 0.88;
+}
+
+.rulego-exec-chain-card--waiting {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.rulego-exec-chain-card--running {
+  border-color: #38bdf8;
+  background: linear-gradient(180deg, #f0f9ff 0%, #e0f2fe 100%);
+  animation: rulego-exec-pulse 1.4s ease-in-out infinite;
+}
+
+.rulego-exec-chain-card--done {
+  border-color: #6ee7b7;
+  background: linear-gradient(180deg, #ecfdf5 0%, #d1fae5 100%);
+}
+
+.rulego-exec-chain-card--error {
+  border-color: #fca5a5;
+  background: linear-gradient(180deg, #fef2f2 0%, #fee2e2 100%);
+}
+
+@keyframes rulego-exec-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.35);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(56, 189, 248, 0.12);
+  }
+}
+
+.rulego-exec-chain-index {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  font-variant-numeric: tabular-nums;
+}
+
+.rulego-exec-chain-name {
+  font-size: 13px;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.rulego-exec-chain-id {
+  font-size: 10px;
+  font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+  color: #94a3b8;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rulego-exec-chain-badge {
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+.rulego-exec-chain-badge--idle {
+  background: #f1f5f9;
+  color: #64748b;
+}
+
+.rulego-exec-chain-badge--waiting {
+  background: #e2e8f0;
+  color: #475569;
+}
+
+.rulego-exec-chain-badge--running {
+  background: #bae6fd;
+  color: #0369a1;
+}
+
+.rulego-exec-chain-badge--done {
+  background: #a7f3d0;
+  color: #065f46;
+}
+
+.rulego-exec-chain-badge--error {
+  background: #fecaca;
+  color: #991b1b;
+}
+
+.rulego-exec-chain-connector {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 2px;
+  margin: 0 2px;
+  align-self: center;
+  background: linear-gradient(90deg, #cbd5e1, #94a3b8);
+  border-radius: 1px;
+  margin-top: 28px;
+}
+
+/* 执行轨迹：时间线 */
+.rulego-exec-timeline {
+  list-style: none;
+  margin: 0 0 16px;
+  padding: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fafbfc;
+}
+
+.rulego-exec-timeline > li {
+  list-style: none;
+}
+
+.rulego-exec-timeline-item {
+  position: relative;
+  padding: 12px 12px 12px 36px;
+  border-bottom: 1px solid #e2e8f0;
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+  background: transparent;
+  border-left: none;
+  border-right: none;
+  border-top: none;
+  font: inherit;
+  transition: background 0.12s ease;
+}
+
+.rulego-exec-timeline > li:last-child .rulego-exec-timeline-item {
+  border-bottom: none;
+}
+
+.rulego-exec-timeline-item:hover {
+  background: #f1f5f9;
+}
+
+.rulego-exec-timeline-item.is-selected {
+  background: #eef2ff;
+}
+
+.rulego-exec-timeline-item::before {
+  content: "";
+  position: absolute;
+  left: 14px;
+  top: 22px;
+  bottom: -10px;
+  width: 2px;
+  background: #cbd5e1;
+}
+
+.rulego-exec-timeline > li:last-child .rulego-exec-timeline-item::before {
+  bottom: auto;
+  height: 0;
+}
+
+.rulego-exec-timeline-dot {
+  position: absolute;
+  left: 9px;
+  top: 16px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #94a3b8;
+  border: 2px solid #ffffff;
+  box-shadow: 0 0 0 1px #cbd5e1;
+  z-index: 1;
+}
+
+.rulego-exec-timeline-item.is-running .rulego-exec-timeline-dot {
+  background: #0ea5e9;
+  box-shadow: 0 0 0 1px #38bdf8;
+  animation: rulego-exec-dot-pulse 1.2s ease-in-out infinite;
+}
+
+.rulego-exec-timeline-item.is-done .rulego-exec-timeline-dot {
+  background: #10b981;
+  box-shadow: 0 0 0 1px #6ee7b7;
+}
+
+.rulego-exec-timeline-item.is-error .rulego-exec-timeline-dot {
+  background: #ef4444;
+  box-shadow: 0 0 0 1px #fca5a5;
+}
+
+@keyframes rulego-exec-dot-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+.rulego-exec-timeline-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 10px;
+  margin-bottom: 4px;
+}
+
+.rulego-exec-timeline-order {
+  font-size: 11px;
+  font-weight: 700;
+  color: #94a3b8;
+  font-variant-numeric: tabular-nums;
+}
+
+.rulego-exec-timeline-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.rulego-exec-timeline-meta {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.rulego-exec-timeline-relation {
+  display: inline-block;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #e0e7ff;
+  color: #4338ca;
+  font-weight: 600;
+}
+
+.rulego-exec-detail-card {
+  margin-top: 16px;
+  padding: 14px 16px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.rulego-exec-detail-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.rulego-exec-empty-hint {
+  padding: 20px 16px;
+  text-align: center;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.5;
+  background: #f8fafc;
+  border-radius: 10px;
+  border: 1px dashed #cbd5e1;
+}
+
 .rulego-log-time {
   font-size: 13px;
   color: #64748b;
