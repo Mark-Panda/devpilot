@@ -16,10 +16,11 @@ import (
 
 // ExecuteRuleOutput 执行规则链的出参
 type ExecuteRuleOutput struct {
-	Success bool   `json:"success"`
-	Data    string `json:"data"`    // 末端节点产出数据
-	Error   string `json:"error"`   // 若失败时的错误信息
-	Elapsed int64  `json:"elapsed"` // 耗时毫秒
+	Success       bool   `json:"success"`
+	Data          string `json:"data"`           // 末端节点产出数据
+	Error         string `json:"error"`          // 若失败时的错误信息
+	Elapsed       int64  `json:"elapsed"`        // 耗时毫秒
+	ExecutionID   string `json:"execution_id"`   // 有执行日志时写入，便于查询节点步骤
 }
 
 // ExecuteRuleInput 执行规则链的入参
@@ -27,6 +28,133 @@ type ExecuteRuleInput struct {
 	MessageType string            `json:"message_type"` // 消息类型，默认 "default"
 	Metadata    map[string]string `json:"metadata"`     // 元数据键值
 	Data        string            `json:"data"`         // 消息体，通常为 JSON 字符串
+}
+
+// StartExecuteRuleResult 异步执行启动后立即返回，供前端轮询 GetExecutionLog
+type StartExecuteRuleResult struct {
+	ExecutionID string `json:"execution_id"`
+}
+
+func (s *Service) finalizeExecutionLogAfterRun(ctx context.Context, execLogID string, lastMsg types.RuleMsg, lastErr error) {
+	if s.execLogStore == nil || execLogID == "" {
+		return
+	}
+	finishAt := time.Now().UTC().Format(time.RFC3339)
+	outData := ""
+	outMeta := "{}"
+	if lastErr == nil && lastMsg.GetData() != "" {
+		outData = lastMsg.GetData()
+		if lastMsg.Metadata != nil {
+			outMeta = MetadataToJSON(lastMsg.Metadata.GetReadOnlyValues())
+		}
+	}
+	errStr := ""
+	if lastErr != nil {
+		errStr = lastErr.Error()
+	}
+	_ = s.execLogStore.UpdateExecutionLog(ctx, execLogID, outData, outMeta, errStr, finishAt, lastErr == nil)
+}
+
+func runOnMsgAndWait(engine types.RuleEngine, msgType string, metadata *types.Metadata, data string) (types.RuleMsg, error) {
+	var lastMsg types.RuleMsg
+	var lastErr error
+	var mu sync.Mutex
+	engine.OnMsgAndWait(
+		types.NewMsg(time.Now().UnixMilli(), msgType, types.JSON, metadata, data),
+		types.WithOnEnd(func(ctx types.RuleContext, msg types.RuleMsg, err error, relationType string) {
+			mu.Lock()
+			lastMsg = msg
+			lastErr = err
+			mu.Unlock()
+		}),
+	)
+	return lastMsg, lastErr
+}
+
+// StartExecuteRule 在后台执行规则链并立即返回 execution_id；前端可轮询 GetExecutionLog 查看节点级进度与日志。
+// 与 ExecuteRule 行为一致，仅非阻塞；未加载到池中的规则会在执行结束后释放临时引擎。
+func (s *Service) StartExecuteRule(ruleID string, input ExecuteRuleInput) (StartExecuteRuleResult, error) {
+	var zero StartExecuteRuleResult
+	if s.execLogStore == nil {
+		return zero, errors.New("执行日志不可用，无法启动带进度跟踪的执行")
+	}
+	ctx := context.Background()
+	rule, err := s.store.GetByID(ctx, ruleID)
+	if err != nil {
+		if errors.Is(err, pebble.ErrNotFound) {
+			return zero, errors.New("规则不存在")
+		}
+		return zero, err
+	}
+	if !EnabledFromDefinition(rule.Definition) {
+		return zero, errors.New("规则已停用")
+	}
+	if rule.Definition == "" {
+		return zero, errors.New("规则定义为空")
+	}
+
+	def := rule.Definition
+	if s.llmConfigLister != nil {
+		if patched, err := PatchDefinitionWithLLMKeys(ctx, def, s.llmConfigLister); err == nil {
+			def = patched
+		}
+	}
+	def = AlignDefinitionRuleChainID(def, ruleID)
+	defBytes := []byte(def)
+
+	data := input.Data
+	if data == "" {
+		data = "{}"
+	}
+	execLog, err := s.execLogStore.CreateExecutionLog(ctx, models.RuleGoExecutionLog{
+		RuleID:        ruleID,
+		RuleName:      rule.Name,
+		TriggerType:   "manual",
+		InputData:     data,
+		InputMetadata: MetadataToJSON(input.Metadata),
+	})
+	if err != nil || execLog.ID == "" {
+		return zero, errors.New("创建执行记录失败")
+	}
+
+	if existing, ok := rulego.Get(ruleID); ok && existing.Initialized() {
+		_ = existing.ReloadSelf(defBytes, types.WithAspects(&LogAspect{}))
+		go s.runExecuteRuleInBackground(existing, ruleID, input, execLog.ID, true)
+		return StartExecuteRuleResult{ExecutionID: execLog.ID}, nil
+	}
+	engine, createErr := rulego.New(ruleID, defBytes, types.WithAspects(&LogAspect{}))
+	if createErr != nil {
+		return zero, createErr
+	}
+	go s.runExecuteRuleInBackground(engine, ruleID, input, execLog.ID, false)
+	return StartExecuteRuleResult{ExecutionID: execLog.ID}, nil
+}
+
+func (s *Service) runExecuteRuleInBackground(engine types.RuleEngine, ruleID string, input ExecuteRuleInput, execLogID string, fromPool bool) {
+	defer func() {
+		if !fromPool {
+			engine.Stop(nil)
+			rulego.Del(ruleID)
+		}
+	}()
+	ctx := context.Background()
+	metadata := types.NewMetadata()
+	for k, v := range input.Metadata {
+		metadata.PutValue(k, v)
+	}
+	metadata.PutValue("_execution_id", execLogID)
+	data := input.Data
+	if data == "" {
+		data = "{}"
+	}
+	msgType := input.MessageType
+	if msgType == "" {
+		msgType = "default"
+	}
+	start := time.Now()
+	lastMsg, lastErr := runOnMsgAndWait(engine, msgType, metadata, data)
+	_ = time.Since(start).Milliseconds()
+	s.finalizeExecutionLogAfterRun(ctx, execLogID, lastMsg, lastErr)
 }
 
 // ExecuteRule 根据规则 ID 同步执行一次规则链，返回末端结果或错误。
@@ -95,42 +223,12 @@ func (s *Service) ExecuteRule(ruleID string, input ExecuteRuleInput) (ExecuteRul
 	}
 
 	start := time.Now()
-	var lastMsg types.RuleMsg
-	var lastErr error
-	var mu sync.Mutex
-
-	engine.OnMsgAndWait(
-		types.NewMsg(time.Now().UnixMilli(), msgType, types.JSON, metadata, data),
-		types.WithOnEnd(func(ctx types.RuleContext, msg types.RuleMsg, err error, relationType string) {
-			mu.Lock()
-			lastMsg = msg
-			lastErr = err
-			mu.Unlock()
-		}),
-	)
-
+	lastMsg, lastErr := runOnMsgAndWait(engine, msgType, metadata, data)
 	elapsed := time.Since(start).Milliseconds()
-	mu.Lock()
-	finishAt := time.Now().UTC().Format("2006-01-02T15:04:05Z07:00")
-	mu.Unlock()
 
-	if s.execLogStore != nil && execLog.ID != "" {
-		outData := ""
-		outMeta := "{}"
-		if lastErr == nil && lastMsg.GetData() != "" {
-			outData = lastMsg.GetData()
-			if lastMsg.Metadata != nil {
-				outMeta = MetadataToJSON(lastMsg.Metadata.GetReadOnlyValues())
-			}
-		}
-		errStr := ""
-		if lastErr != nil {
-			errStr = lastErr.Error()
-		}
-		_ = s.execLogStore.UpdateExecutionLog(ctx, execLog.ID, outData, outMeta, errStr, finishAt, lastErr == nil)
-	}
+	s.finalizeExecutionLogAfterRun(ctx, execLog.ID, lastMsg, lastErr)
 
-	out := ExecuteRuleOutput{Elapsed: elapsed}
+	out := ExecuteRuleOutput{Elapsed: elapsed, ExecutionID: execLog.ID}
 	if lastErr != nil {
 		out.Success = false
 		out.Error = lastErr.Error()
@@ -195,40 +293,12 @@ func (s *Service) ExecuteRuleDefinition(definition string, input ExecuteRuleInpu
 	}
 
 	start := time.Now()
-	var lastMsg types.RuleMsg
-	var lastErr error
-	var mu sync.Mutex
-	engine.OnMsgAndWait(
-		types.NewMsg(time.Now().UnixMilli(), msgType, types.JSON, metadata, data),
-		types.WithOnEnd(func(ctx types.RuleContext, msg types.RuleMsg, err error, relationType string) {
-			mu.Lock()
-			lastMsg = msg
-			lastErr = err
-			mu.Unlock()
-		}),
-	)
+	lastMsg, lastErr := runOnMsgAndWait(engine, msgType, metadata, data)
 	elapsed := time.Since(start).Milliseconds()
-	mu.Lock()
-	finishAt := time.Now().UTC().Format("2006-01-02T15:04:05Z07:00")
-	mu.Unlock()
 
-	if s.execLogStore != nil && execLog.ID != "" {
-		outData := ""
-		outMeta := "{}"
-		if lastErr == nil && lastMsg.GetData() != "" {
-			outData = lastMsg.GetData()
-			if lastMsg.Metadata != nil {
-				outMeta = MetadataToJSON(lastMsg.Metadata.GetReadOnlyValues())
-			}
-		}
-		errStr := ""
-		if lastErr != nil {
-			errStr = lastErr.Error()
-		}
-		_ = s.execLogStore.UpdateExecutionLog(ctx, execLog.ID, outData, outMeta, errStr, finishAt, lastErr == nil)
-	}
+	s.finalizeExecutionLogAfterRun(ctx, execLog.ID, lastMsg, lastErr)
 
-	out := ExecuteRuleOutput{Elapsed: elapsed}
+	out := ExecuteRuleOutput{Elapsed: elapsed, ExecutionID: execLog.ID}
 	if lastErr != nil {
 		out.Success = false
 		out.Error = lastErr.Error()

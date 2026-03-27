@@ -13,6 +13,7 @@ import {
   ListExecutionLogs,
   ListRuleGoRules,
   LoadRuleChain,
+  StartExecuteRule,
   UnloadRuleChain,
   UpdateRuleGoRule,
 } from "../../../wailsjs/go/rulego/Service";
@@ -67,17 +68,38 @@ export type ExecuteRuleOutput = {
   data: string;
   error: string;
   elapsed: number;
+  execution_id?: string;
 };
 
 export async function executeRuleGoRule(
   ruleId: string,
   input: ExecuteRuleInput
 ): Promise<ExecuteRuleOutput> {
-  return ExecuteRule(ruleId, {
+  const res = await ExecuteRule(ruleId, {
     message_type: input.message_type ?? "default",
     metadata: input.metadata ?? {},
     data: input.data ?? "{}",
   });
+  return {
+    success: res.success,
+    data: res.data ?? "",
+    error: res.error ?? "",
+    elapsed: res.elapsed ?? 0,
+    execution_id: res.execution_id ?? "",
+  };
+}
+
+/** 异步启动规则链执行，立即返回 execution_id，供轮询 GetExecutionLog 查看节点进度 */
+export async function startExecuteRuleGoRule(
+  ruleId: string,
+  input: ExecuteRuleInput
+): Promise<{ execution_id: string }> {
+  const res = await StartExecuteRule(ruleId, {
+    message_type: input.message_type ?? "default",
+    metadata: input.metadata ?? {},
+    data: input.data ?? "{}",
+  });
+  return { execution_id: res.execution_id ?? "" };
 }
 
 /** 使用给定规则链定义执行一次（模拟测试），不写入数据库，用于可视化编辑器调试 */

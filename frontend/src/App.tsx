@@ -3,7 +3,13 @@ import { Layout } from "./shared/components";
 import { RouteRewritePage } from "./modules/route-rewrite";
 import { CurlComparePage } from "./modules/curl-compare";
 import { ModelManagementPage } from "./modules/model-management";
-import { RuleGoPage, RuleGoScratchEditorPage, RuleGoLogsPage, RuleGoLogDetailPage } from "./modules/rulego";
+import {
+  RuleGoPage,
+  RuleGoScratchEditorPage,
+  RuleGoLogsPage,
+  RuleGoLogDetailPage,
+  RuleGoExecuteRulePage,
+} from "./modules/rulego";
 import { SkillRepoPage } from "./modules/skill-repo";
 import { PlaceholderPage } from "./modules/placeholder";
 import { AgentChatPage } from "./modules/agent/pages/AgentChatPage";
@@ -30,6 +36,7 @@ export default function App() {
           <Route path="/rulego" element={<RuleGoPage />} />
           <Route path="/rulego/editor" element={<RuleGoScratchEditorPage />} />
           <Route path="/rulego/editor/:id" element={<RuleGoScratchEditorPage />} />
+          <Route path="/rulego/execute" element={<RuleGoExecuteRulePage />} />
           <Route path="/rulego/logs" element={<RuleGoLogsPage />} />
           <Route path="/rulego/logs/:id" element={<RuleGoLogDetailPage />} />
           <Route path="/skill-repo" element={<SkillRepoPage />} />

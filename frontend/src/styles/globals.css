@@ -2646,6 +2646,11 @@ body {
   color: #991b1b;
 }
 
+.rulego-log-status.pending {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
 .rulego-log-time {
   font-size: 13px;
   color: #64748b;

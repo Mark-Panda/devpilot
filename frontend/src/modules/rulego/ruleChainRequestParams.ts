@@ -195,6 +195,11 @@ function nodeToJsonValue(node: RuleChainParamNode): unknown {
   return defaultValueForLeafType(node.type);
 }
 
+/** 与预览生成一致：单节点对应的示例 JSON 值（供执行规则等表单初始化） */
+export function paramNodeToSampleJsonValue(node: RuleChainParamNode): unknown {
+  return nodeToJsonValue(node);
+}
+
 export function buildRuleChainParamsPreviewValue(nodes: RuleChainParamNode[]): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const node of nodes) {

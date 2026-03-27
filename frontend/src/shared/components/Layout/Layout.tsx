@@ -20,6 +20,7 @@ const menuGroups: { group?: string; items: { path: string; label: string; end?: 
     group: "规则引擎",
     items: [
       { path: "/rulego", label: "规则管理", end: true },
+      { path: "/rulego/execute", label: "执行规则" },
       { path: "/rulego/logs", label: "执行日志" },
     ],
   },
