@@ -4339,7 +4339,7 @@ export default function RuleGoScratchEditorPage() {
     setAgentQuestionAnswers((prev) => ({ ...next, ...prev }));
   };
 
-  const handleApplyAgentSelections = () => {
+  const applyAgentPreviewSelectionToWorkspace = (opts: { closeModal: boolean }) => {
     const ws = workspaceRef.current;
     if (!ws) {
       setAgentError("工作区尚未初始化");
@@ -4355,11 +4355,27 @@ export default function RuleGoScratchEditorPage() {
       setJson(JSON.stringify(ScratchBlocks.serialization.workspaces.save(ws), null, 2));
       setTriggerLayoutError(validateRuleGoTriggerLayout(ws));
       setBlockCount(ws.getTopBlocks(true).length);
-      setAgentModalOpen(false);
+      if (opts.closeModal) {
+        setAgentModalOpen(false);
+      } else {
+        const appliedIds = agentPreviewItems
+          .filter((i) => i.valid && agentSelectedIds.has(i.id))
+          .map((i) => i.id);
+        if (appliedIds.length) {
+          setAgentSelectedIds((prev) => {
+            const next = new Set(prev);
+            appliedIds.forEach((id) => next.delete(id));
+            return next;
+          });
+        }
+      }
     } catch (err) {
       setAgentError(err instanceof Error ? err.message : String(err));
     }
   };
+
+  const handleAddAgentSelectionsToCanvas = () => applyAgentPreviewSelectionToWorkspace({ closeModal: false });
+  const handleApplyAgentSelections = () => applyAgentPreviewSelectionToWorkspace({ closeModal: true });
 
   const workspaceWs = workspaceRef.current as (WorkspaceSvg & { undo?: () => void; redo?: () => void }) | null;
   const agentQuestionTotal = agentPlanResult?.questions?.length ?? 0;
@@ -4367,6 +4383,17 @@ export default function RuleGoScratchEditorPage() {
     (q) => String(agentQuestionAnswers[q] ?? "").trim().length > 0
   ).length;
   const agentAllQuestionsAnswered = agentQuestionTotal > 0 && agentQuestionAnswered === agentQuestionTotal;
+  const agentApplyBlockedByClarification =
+    agentPlanResult?.need_clarification === true &&
+    agentQuestionTotal > 0 &&
+    !agentAllQuestionsAnswered;
+  const agentHasApplicableSelection = agentPreviewItems.some((i) => i.valid && agentSelectedIds.has(i.id));
+  const agentApplyDisabled = agentApplyBlockedByClarification || !agentHasApplicableSelection;
+  const agentApplyDisabledTitle = agentApplyBlockedByClarification
+    ? "请先回答 Agent 追问后再应用"
+    : !agentHasApplicableSelection
+      ? "请至少勾选一项有效预览"
+      : undefined;
 
   useEffect(() => {
     if (!agentPlanResult?.need_clarification) {
@@ -4745,7 +4772,7 @@ export default function RuleGoScratchEditorPage() {
 
       {agentModalOpen && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setAgentModalOpen(false)}>
-          <div className="modal rulego-agent-modal" style={{ maxWidth: 820 }} onClick={(e) => e.stopPropagation()}>
+          <div className="modal rulego-agent-modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h3>Agent 对话编排</h3>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -4860,6 +4887,7 @@ export default function RuleGoScratchEditorPage() {
               </div>
               {agentPlanResult ? (
                 <div className="rulego-agent-preview rulego-agent-result-panel">
+                  <div className="rulego-agent-result-upper">
                   {agentPlanResult.thought ? (
                     <div className="rulego-agent-thought">
                       <div className="rulego-agent-thought-title">Agent 思考</div>
@@ -4966,6 +4994,8 @@ export default function RuleGoScratchEditorPage() {
                   {agentPlanResult.warnings?.length ? (
                     <div className="form-hint">注意: {agentPlanResult.warnings.join("；")}</div>
                   ) : null}
+                  </div>
+                  <div className="rulego-agent-result-preview-main">
                   <div className="rulego-agent-preview-toolbar">
                     <div className="form-hint">预览项过滤</div>
                     <div className="rulego-agent-preview-filter">
@@ -5024,13 +5054,23 @@ export default function RuleGoScratchEditorPage() {
                     </button>
                     <button
                       type="button"
+                      className="text-button"
+                      onClick={handleAddAgentSelectionsToCanvas}
+                      disabled={agentApplyDisabled}
+                      title={agentApplyDisabled ? agentApplyDisabledTitle : "合并到当前画布，不关闭对话框；已勾选项在成功后自动取消勾选"}
+                    >
+                      添加到画布
+                    </button>
+                    <button
+                      type="button"
                       className="primary-button"
                       onClick={handleApplyAgentSelections}
-                      disabled={agentPlanResult.need_clarification === true}
-                      title={agentPlanResult.need_clarification ? "请先回答 Agent 追问后再应用" : undefined}
+                      disabled={agentApplyDisabled}
+                      title={agentApplyDisabled ? agentApplyDisabledTitle : undefined}
                     >
                       应用所选项
                     </button>
+                  </div>
                   </div>
                 </div>
               ) : null}
