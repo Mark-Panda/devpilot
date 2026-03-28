@@ -66,3 +66,13 @@ alwaysApply: false
 - x/rpaScreenCapture
 
 自定义节点实现见 `backend/internal/services/rulego/node_*.go`，通过 `rulego.Registry.Register` 在 init 中注册。
+
+## 用户可配置字符串与 `${}` 模板（强制约定）
+
+凡节点配置中**由用户在 DSL/编辑器里填写的字符串类字段**（URL、路径、查询、密钥/令牌、请求体片段、展示文案等），**均须**在运行时按当前消息与环境做 **`${...}` 模板渲染**，除非该字段在语义上必须是静态常量且渲染会破坏协议（极少见，需在代码注释中说明理由）。
+
+- **实现方式**：与 `opensearch/search`、`feishu/imMessage` 等一致，在 `Init` 中用 `github.com/rulego/rulego/utils/el.NewTemplate` 编译配置字符串；在 `OnMsg` 中用 `github.com/rulego/rulego/components/base.NodeUtils.GetEvnAndMetadata(ctx, msg)` 得到 `env`，再对各字段 `ExecuteAsString(env)`，在渲染结果上再做 `TrimSpace` 等校验。
+- **变量来源**：`env` 含 RuleGo 内置键与消息的 `metadata`（如 `msg.*`、元数据键等），具体以 RuleGo `GetEvnAndMetadata` 为准；与 `restApiCall` 模板、`ai/llm` 中 `ReplacePlaceholders` 所用 metadata 键同一套语境。
+- **校验时机**：静态必填项在 `Init` 中只校验「模板字符串非空」（若允许纯变量则不能为空模板）；**渲染后不得为空**的字段在 `OnMsg` 中校验（参考 `opensearch/search` 对 `endpoint` 的做法）。
+- **新增节点自检清单**：每个用户可编辑字符串字段是否已 `NewTemplate` + `ExecuteAsString`；敏感字段（令牌等）日志中勿输出渲染后的完整值。
+- **前端**：在 `RuleGoScratchEditorPage.tsx` 的配置表单中，对支持模板的字段加简短说明（如「支持 `${...}`，变量来自消息 metadata / RuleGo 环境」）。

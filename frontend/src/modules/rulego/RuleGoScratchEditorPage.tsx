@@ -1969,7 +1969,8 @@ function BlockConfigModal({
             />
           </label>
           <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
-            支持完整 Router JSON（按 data 下标取项，下标来自 metadata 的 api_route_tracer_service_index 或 for 注入的 _loopIndex）；也支持 for 遍历 msg.data 时传入的单条 service 对象。
+            工作目录支持 <code>{"${...}"}</code> 模板（RuleGo 环境与消息 <code>metadata</code>）。支持完整 Router JSON（按 data 下标取项，下标来自 metadata 的{" "}
+            <code>api_route_tracer_service_index</code> 或 for 注入的 <code>_loopIndex</code>）；也支持 for 遍历 msg.data 时传入的单条 service 对象。
           </p>
         </>
       )}
@@ -2172,7 +2173,8 @@ function BlockConfigModal({
             />
           </label>
           <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
-            调用 <code>/.api/graphql</code>，使用官方 search 查询；消息 data 可为纯文本或 JSON{" "}
+            实例地址、访问令牌、默认搜索词均支持 <code>{"${...}"}</code> 模板，运行时由 RuleGo 环境与消息{" "}
+            <code>metadata</code> 渲染（与 OpenSearch、飞书等节点一致）。调用 <code>/.api/graphql</code>；消息 data 可为纯文本或 JSON{" "}
             <code>{"{\"query\":\"repo:foo/bar func\"}"}</code>。鉴权头为 <code>Authorization: token …</code>。
           </p>
         </>

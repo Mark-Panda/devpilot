@@ -59,7 +59,7 @@ alwaysApply: false
 
 1. 在 `rulego-blocks/blocks/` 新建 `xxx.ts`，实现 `BlockTypeDef` 并 `registerBlockType(def)`
 2. 在 `rulego-blocks/index.ts` 中 `import "./blocks/xxx"`，并在 `toolbox.contents` 对应 category 的 `contents` 中增加 `{ kind: "block", type: "rulego_xxx" }`
-3. 若需在「块配置」模态中编辑：在 `RuleGoScratchEditorPage.tsx` 的 `BlockConfigModal` 内按 `block.type` 增加表单字段的读取（useEffect 中 setForm）与回写（handleSubmit 中 set）
+3. 若需在「块配置」模态中编辑：在 `RuleGoScratchEditorPage.tsx` 的 `BlockConfigModal` 内按 `block.type` 增加表单字段的读取（useEffect 中 setForm）与回写（handleSubmit 中 set）；**凡用户输入的配置字符串**，后端节点须支持 `${...}` 模板（见 `rulego-backend-nodes.mdc` 约定），表单中宜加一行提示说明
 4. 在 `BlockLibraryPanel.tsx` 的 `BLOCK_LABELS` 中增加该块的显示名
 
 ## 注意

@@ -20,6 +20,8 @@ import (
 
 	"github.com/rulego/rulego"
 	"github.com/rulego/rulego/api/types"
+	"github.com/rulego/rulego/components/base"
+	"github.com/rulego/rulego/utils/el"
 )
 
 // --- sourcegraph/search：Sourcegraph GraphQL 代码搜索（与 api-route-tracer 编排同文件维护） ---
@@ -28,6 +30,10 @@ import (
 // 文档：https://docs.sourcegraph.com/api/graphql
 type SourcegraphSearchNode struct {
 	cfg sourcegraphSearchConfig
+
+	endpointTmpl    el.Template
+	accessTokenTmpl el.Template
+	defaultQueryTmpl el.Template
 }
 
 type sourcegraphSearchConfig struct {
@@ -45,14 +51,27 @@ func (n *SourcegraphSearchNode) Init(_ types.Config, configuration types.Configu
 	if err := mapConfigurationToStruct(configuration, &n.cfg); err != nil {
 		return err
 	}
-	n.cfg.Endpoint = strings.TrimRight(strings.TrimSpace(n.cfg.Endpoint), "/")
+	n.cfg.Endpoint = strings.TrimSpace(n.cfg.Endpoint)
 	n.cfg.AccessToken = strings.TrimSpace(n.cfg.AccessToken)
 	n.cfg.DefaultSearchQuery = strings.TrimSpace(n.cfg.DefaultSearchQuery)
 	if n.cfg.Endpoint == "" {
-		return errors.New("sourcegraph/search: endpoint 不能为空（例如 https://sourcegraph.com）")
+		return errors.New("sourcegraph/search: endpoint 不能为空（例如 https://sourcegraph.com，或含 ${...} 的模板）")
 	}
 	if n.cfg.TimeoutSec <= 0 {
 		n.cfg.TimeoutSec = 30
+	}
+	var err error
+	n.endpointTmpl, err = el.NewTemplate(n.cfg.Endpoint)
+	if err != nil {
+		return fmt.Errorf("sourcegraph/search: endpoint 模板: %w", err)
+	}
+	n.accessTokenTmpl, err = el.NewTemplate(n.cfg.AccessToken)
+	if err != nil {
+		return fmt.Errorf("sourcegraph/search: accessToken 模板: %w", err)
+	}
+	n.defaultQueryTmpl, err = el.NewTemplate(n.cfg.DefaultSearchQuery)
+	if err != nil {
+		return fmt.Errorf("sourcegraph/search: defaultSearchQuery 模板: %w", err)
 	}
 	return nil
 }
@@ -87,12 +106,20 @@ const sourcegraphSearchGQL = `query RuleGoSourcegraphSearch($query: String!) {
 }`
 
 func (n *SourcegraphSearchNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) {
-	q := resolveSourcegraphQuery(msg.GetData(), n.cfg.DefaultSearchQuery)
+	env := base.NodeUtils.GetEvnAndMetadata(ctx, msg)
+	endpoint := strings.TrimRight(strings.TrimSpace(n.endpointTmpl.ExecuteAsString(env)), "/")
+	accessToken := strings.TrimSpace(n.accessTokenTmpl.ExecuteAsString(env))
+	defaultQ := strings.TrimSpace(n.defaultQueryTmpl.ExecuteAsString(env))
+	q := resolveSourcegraphQuery(msg.GetData(), defaultQ)
 	if q == "" {
 		ctx.TellFailure(msg, errors.New("sourcegraph/search: 搜索词为空（请在消息 data 中传入字符串或 JSON {\"query\":\"...\"}，或配置 defaultSearchQuery）"))
 		return
 	}
-	gqlURL, err := url.JoinPath(n.cfg.Endpoint, ".api", "graphql")
+	if endpoint == "" {
+		ctx.TellFailure(msg, errors.New("sourcegraph/search: 渲染后 endpoint 为空"))
+		return
+	}
+	gqlURL, err := url.JoinPath(endpoint, ".api", "graphql")
 	if err != nil {
 		ctx.TellFailure(msg, fmt.Errorf("sourcegraph/search: 拼接 GraphQL URL 失败: %w", err))
 		return
@@ -118,8 +145,8 @@ func (n *SourcegraphSearchNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) 
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
-	if n.cfg.AccessToken != "" {
-		req.Header.Set("Authorization", "token "+n.cfg.AccessToken)
+	if accessToken != "" {
+		req.Header.Set("Authorization", "token "+accessToken)
 	}
 
 	resp, err := http.DefaultClient.Do(req)
@@ -161,7 +188,12 @@ func (n *SourcegraphSearchNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) 
 	ctx.TellSuccess(out)
 }
 
-func (n *SourcegraphSearchNode) Destroy() { n.cfg = sourcegraphSearchConfig{} }
+func (n *SourcegraphSearchNode) Destroy() {
+	n.cfg = sourcegraphSearchConfig{}
+	n.endpointTmpl = nil
+	n.accessTokenTmpl = nil
+	n.defaultQueryTmpl = nil
+}
 
 func resolveSourcegraphQuery(data string, defaultQ string) string {
 	data = strings.TrimSpace(data)
@@ -192,6 +224,8 @@ type apiRouteTracerGitPrepareConfig struct {
 
 type apiRouteTracerGitPrepareNode struct {
 	cfg apiRouteTracerGitPrepareConfig
+
+	workDirTmpl el.Template
 }
 
 func (n *apiRouteTracerGitPrepareNode) Type() string { return "apiRouteTracer/gitPrepare" }
@@ -204,7 +238,12 @@ func (n *apiRouteTracerGitPrepareNode) Init(_ types.Config, configuration types.
 	}
 	n.cfg.WorkDir = strings.TrimSpace(n.cfg.WorkDir)
 	if n.cfg.WorkDir == "" {
-		return errors.New("gitPrepare: workDir 不能为空")
+		return errors.New("gitPrepare: workDir 不能为空（可为含 ${...} 的模板）")
+	}
+	var err error
+	n.workDirTmpl, err = el.NewTemplate(n.cfg.WorkDir)
+	if err != nil {
+		return fmt.Errorf("gitPrepare: workDir 模板: %w", err)
 	}
 	return nil
 }
@@ -230,7 +269,12 @@ func (n *apiRouteTracerGitPrepareNode) OnMsg(ctx types.RuleContext, msg types.Ru
 		ctx.TellFailure(msg, errors.New("gitPrepare: gitlabUrl 为空"))
 		return
 	}
-	workDir := filepath.Clean(n.cfg.WorkDir)
+	env := base.NodeUtils.GetEvnAndMetadata(ctx, msg)
+	workDir := filepath.Clean(strings.TrimSpace(n.workDirTmpl.ExecuteAsString(env)))
+	if workDir == "" || workDir == "." {
+		ctx.TellFailure(msg, errors.New("gitPrepare: 渲染后 workDir 为空"))
+		return
+	}
 	servicePath := filepath.Join(workDir, name)
 
 	out := msg.Copy()
@@ -272,7 +316,10 @@ func (n *apiRouteTracerGitPrepareNode) OnMsg(ctx types.RuleContext, msg types.Ru
 	ctx.TellSuccess(out)
 }
 
-func (n *apiRouteTracerGitPrepareNode) Destroy() { n.cfg = apiRouteTracerGitPrepareConfig{} }
+func (n *apiRouteTracerGitPrepareNode) Destroy() {
+	n.cfg = apiRouteTracerGitPrepareConfig{}
+	n.workDirTmpl = nil
+}
 
 type apiRouteTracerService struct {
 	ServiceName string `json:"serviceName"`
