@@ -25,6 +25,27 @@ func EnabledFromDefinition(definition string) bool {
 	return !*parsed.RuleChain.Disabled
 }
 
+// SubRuleChainFromDefinition 为 true 表示 DSL 中 ruleChain.root === false（子规则链）。
+// 与前端 getRuleChainRootKind(definition)==="sub" 一致；解析失败或缺省 root 视为根链。
+func SubRuleChainFromDefinition(definition string) bool {
+	definition = strings.TrimSpace(definition)
+	if definition == "" {
+		return false
+	}
+	var parsed struct {
+		RuleChain *struct {
+			Root *bool `json:"root"`
+		} `json:"ruleChain"`
+	}
+	if err := json.Unmarshal([]byte(definition), &parsed); err != nil || parsed.RuleChain == nil {
+		return false
+	}
+	if parsed.RuleChain.Root == nil {
+		return false
+	}
+	return !*parsed.RuleChain.Root
+}
+
 // AlignDefinitionRuleChainID 将 DSL 顶层 ruleChain.id 设为 engineID（与 rulego.New(engineID, ...) 一致）。
 //
 // RuleGo 在加载 metadata.endpoints 时，EndpointAspect.OnCreated 里 bindTo 使用的 ruleEngineId 来自

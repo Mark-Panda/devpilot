@@ -11,6 +11,8 @@ import (
 
 	"devpilot/backend/internal/llm"
 	"devpilot/backend/internal/store/models"
+
+	"gopkg.in/yaml.v3"
 )
 
 // createSkillToolName 用于“根据规则链生成技能”流程的工具名，与 initSkills/skill-creator 的 name 一致。
@@ -45,6 +47,12 @@ func (s *Service) GenerateSkillFromRuleChain(ruleID string, baseURL, apiKey, mod
 	if rule.Definition == "" {
 		log.Printf("[rulego] GenerateSkillFromRuleChain 规则链定义为空 ruleID=%s", ruleID)
 		return "", fmt.Errorf("规则链定义为空")
+	}
+	if SubRuleChainFromDefinition(rule.Definition) {
+		return "", fmt.Errorf("子规则链不支持生成技能，请改为主规则链后再试")
+	}
+	if !EnabledFromDefinition(rule.Definition) {
+		return "", fmt.Errorf("未启用的规则链不支持生成技能，请先开启规则链")
 	}
 
 	skillDir := filepath.Join(llm.DefaultSkillDir(), createSkillToolName)
@@ -163,18 +171,41 @@ func (e *createSkillExecutor) writeSkillFile(name, description, body string) (st
 	return "技能已创建：" + dirName, nil
 }
 
+// ruleChainSkillFrontmatter 与 llm.Skill 的 YAML 字段一致；用 yaml.Marshal 生成 frontmatter，
+// 避免模型返回的 description 中含 `:`、`*`、换行等导致手写 YAML 无法被解析（skill_repo 会跳过该目录）。
+type ruleChainSkillFrontmatter struct {
+	Name          string `yaml:"name"`
+	Description   string `yaml:"description"`
+	RuleChainID   string `yaml:"rule_chain_id"`
+}
+
 func buildSkillMDContent(name, description, body, ruleChainID string) string {
-	var b strings.Builder
-	b.WriteString("---\n")
-	b.WriteString("name: ")
-	b.WriteString(strings.ReplaceAll(name, "\n", " "))
-	b.WriteString("\ndescription: ")
-	b.WriteString(strings.ReplaceAll(description, "\n", " "))
-	b.WriteString("\nrule_chain_id: ")
-	b.WriteString(ruleChainID)
-	b.WriteString("\n---\n\n")
-	b.WriteString(body)
-	return b.String()
+	name = strings.TrimSpace(strings.ReplaceAll(name, "\n", " "))
+	description = strings.TrimSpace(description)
+	ruleChainID = strings.TrimSpace(ruleChainID)
+	fm := ruleChainSkillFrontmatter{
+		Name:        name,
+		Description: description,
+		RuleChainID: ruleChainID,
+	}
+	header, err := yaml.Marshal(&fm)
+	if err != nil {
+		// 理论上仅含字符串不会失败；兜底仍写文件，避免阻断流程
+		return "---\nname: " + yamlScalarFallback(name) +
+			"\ndescription: " + yamlScalarFallback(description) +
+			"\nrule_chain_id: " + yamlScalarFallback(ruleChainID) +
+			"\n---\n\n" + body
+	}
+	h := strings.TrimSuffix(string(header), "\n")
+	return "---\n" + h + "\n---\n\n" + body
+}
+
+// yamlScalarFallback 生成可被 yaml.v3 解析的双引号标量（UTF-8 安全）。
+func yamlScalarFallback(s string) string {
+	s = strings.ReplaceAll(s, `\`, `\\`)
+	s = strings.ReplaceAll(s, `"`, `\"`)
+	s = strings.ReplaceAll(s, "\n", `\n`)
+	return `"` + s + `"`
 }
 
 func buildCreateSkillUserMessage(rule models.RuleGoRule) string {

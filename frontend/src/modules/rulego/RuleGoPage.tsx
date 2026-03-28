@@ -151,7 +151,7 @@ export default function RuleGoPage() {
                       <span className="rulego-enable-switch-thumb" aria-hidden />
                     </button>
                   ) : null}
-                  {effectiveEnabled && hasDefinition ? (
+                  {effectiveEnabled && hasDefinition && rootKind === "root" ? (
                     <button
                       className="text-button"
                       type="button"

@@ -115,6 +115,17 @@ func (s *Service) UpdateRuleGoRule(id string, input UpdateRuleGoRuleInput) (mode
 	if err != nil {
 		return models.RuleGoRule{}, err
 	}
+	// 子规则链不保留「创建技能」产物；从主链改为子链时需清理目录与 skill_dir_name
+	if SubRuleChainFromDefinition(result.Definition) && strings.TrimSpace(result.SkillDirName) != "" {
+		if err := s.DeleteSkillForRuleChain(id); err != nil {
+			return models.RuleGoRule{}, fmt.Errorf("规则已更新但清理子链不应保留的技能失败: %w", err)
+		}
+		refreshed, gerr := s.store.GetByID(ctx, id)
+		if gerr != nil {
+			return models.RuleGoRule{}, fmt.Errorf("规则已更新但重新读取失败: %w", gerr)
+		}
+		result = refreshed
+	}
 	enabled := EnabledFromDefinition(result.Definition)
 	if enabled && result.Definition != "" {
 		if err := s.LoadRuleChain(id); err != nil {

@@ -50,3 +50,18 @@ func TestAlignDefinitionRuleChainID_invalidJSON(t *testing.T) {
 		t.Fatalf("invalid json should be returned as-is")
 	}
 }
+
+func TestSubRuleChainFromDefinition(t *testing.T) {
+	if !SubRuleChainFromDefinition(`{"ruleChain":{"root":false,"name":"x"},"metadata":{}}`) {
+		t.Fatal("root:false should be sub chain")
+	}
+	if SubRuleChainFromDefinition(`{"ruleChain":{"root":true,"name":"x"},"metadata":{}}`) {
+		t.Fatal("root:true should not be sub")
+	}
+	if SubRuleChainFromDefinition(`{"ruleChain":{"name":"x"},"metadata":{}}`) {
+		t.Fatal("missing root should default to main chain")
+	}
+	if SubRuleChainFromDefinition("") {
+		t.Fatal("empty definition is not sub")
+	}
+}

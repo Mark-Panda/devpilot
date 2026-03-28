@@ -98,6 +98,28 @@ func LoadSkillFromDir(dir string) (*Skill, error) {
 	return s, nil
 }
 
+// parseSkillFrontmatterLoose 在 YAML 严格解析失败时使用：按行提取 name / description / rule_chain_id。
+// 兼容旧版手写 frontmatter：description 单行内含有「: 」等字符时 yaml.Unmarshal 会报错（如 "Required parameter: query"）。
+func parseSkillFrontmatterLoose(front string) (name, description, ruleChainID string, ok bool) {
+	front = strings.ReplaceAll(strings.TrimSpace(front), "\r\n", "\n")
+	for _, line := range strings.Split(front, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		switch {
+		case strings.HasPrefix(trimmed, "name:"):
+			name = strings.TrimSpace(strings.TrimPrefix(trimmed, "name:"))
+		case strings.HasPrefix(trimmed, "rule_chain_id:"):
+			ruleChainID = strings.TrimSpace(strings.TrimPrefix(trimmed, "rule_chain_id:"))
+		case strings.HasPrefix(trimmed, "description:"):
+			description = strings.TrimSpace(strings.TrimPrefix(trimmed, "description:"))
+		}
+	}
+	ok = name != "" || description != "" || ruleChainID != ""
+	return name, description, ruleChainID, ok
+}
+
 // parseSkillMD 解析 SKILL.md 内容：首段为 YAML frontmatter（---...---），其余为 Content。
 func parseSkillMD(data []byte) (*Skill, error) {
 	content := string(data)
@@ -117,7 +139,13 @@ func parseSkillMD(data []byte) (*Skill, error) {
 	s := &Skill{Content: body}
 	if front != "" {
 		if err := yaml.Unmarshal([]byte(front), s); err != nil {
-			return s, err // 仍返回已有 body
+			n, d, r, ok := parseSkillFrontmatterLoose(front)
+			if !ok {
+				return s, err
+			}
+			s.Name = n
+			s.Description = d
+			s.RuleChainID = r
 		}
 	}
 	return s, nil

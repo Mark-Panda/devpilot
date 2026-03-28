@@ -3,6 +3,7 @@ package llm
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -28,6 +29,31 @@ Do this and that.
 	}
 	if s.Content != "# Test Skill\n\nDo this and that." {
 		t.Errorf("content: got %q", s.Content)
+	}
+}
+
+// 旧版规则链技能曾把 description 写成未加引号的单行 YAML，其中含「Required parameter: query」等子串会破坏 yaml.Unmarshal。
+func TestParseSkillMD_looseFallbackWhenDescriptionContainsColon(t *testing.T) {
+	data := []byte(`---
+name: query-channel-platform-server-logs
+description: Query Volcano TLS logs for the channel-platform-server service. Use when users need to search, retrieve, or analyze logs from the channel-platform-server service in Volcano Cloud TLS. Required parameter: query (string, required) - the Volcano Cloud log query statement to execute.
+rule_chain_id: 4c4d581e-f80a-4ba9-89e6-ccb3c1be23c2
+---
+
+# Body
+`)
+	s, err := parseSkillMD(data)
+	if err != nil {
+		t.Fatalf("expected loose fallback, got err: %v", err)
+	}
+	if s.Name != "query-channel-platform-server-logs" {
+		t.Errorf("name: %q", s.Name)
+	}
+	if !strings.Contains(s.Description, "Required parameter: query") {
+		t.Errorf("description should preserve colon phrase, got: %q", s.Description)
+	}
+	if s.RuleChainID != "4c4d581e-f80a-4ba9-89e6-ccb3c1be23c2" {
+		t.Errorf("rule_chain_id: %q", s.RuleChainID)
 	}
 }
 
