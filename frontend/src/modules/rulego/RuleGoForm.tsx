@@ -48,6 +48,7 @@ type FormValues = {
   editorJson: string;
   requestMetadataParamsJson: string;
   requestMessageBodyParamsJson: string;
+  responseMessageBodyParamsJson: string;
   debugMode: boolean;
   root: boolean;
 };
@@ -82,6 +83,7 @@ export default function RuleGoForm({
       editorJson: initial?.editorJson ?? "",
       requestMetadataParamsJson: initial?.requestMetadataParamsJson?.trim() || emptyRuleChainParamsJson(),
       requestMessageBodyParamsJson: initial?.requestMessageBodyParamsJson?.trim() || emptyRuleChainParamsJson(),
+      responseMessageBodyParamsJson: initial?.responseMessageBodyParamsJson?.trim() || emptyRuleChainParamsJson(),
       debugMode: flags.debugMode,
       root: flags.root,
     };
@@ -98,6 +100,7 @@ export default function RuleGoForm({
       editorJson: initial?.editorJson ?? "",
       requestMetadataParamsJson: initial?.requestMetadataParamsJson?.trim() || emptyRuleChainParamsJson(),
       requestMessageBodyParamsJson: initial?.requestMessageBodyParamsJson?.trim() || emptyRuleChainParamsJson(),
+      responseMessageBodyParamsJson: initial?.responseMessageBodyParamsJson?.trim() || emptyRuleChainParamsJson(),
       debugMode: flags.debugMode,
       root: flags.root,
     });
@@ -149,6 +152,7 @@ export default function RuleGoForm({
       editorJson: showEditorJson ? values.editorJson.trim() : (initial?.editorJson ?? ""),
       requestMetadataParamsJson: values.requestMetadataParamsJson.trim(),
       requestMessageBodyParamsJson: values.requestMessageBodyParamsJson.trim(),
+      responseMessageBodyParamsJson: values.responseMessageBodyParamsJson.trim(),
       debugMode: values.debugMode,
       root: values.root,
     };
@@ -210,6 +214,17 @@ export default function RuleGoForm({
           />
           <small className="form-hint">
             对应执行时的 data 载荷字段说明；可与元数据配合描述入参
+          </small>
+        </div>
+        <div className="form-field form-field-full">
+          <span>规则链响应参数 — 消息体（JSON 结构说明）</span>
+          <RuleChainRequestParamsEditor
+            title="响应消息体（输出 data）"
+            value={values.responseMessageBodyParamsJson}
+            onChange={(json) => setValues({ ...values, responseMessageBodyParamsJson: json })}
+          />
+          <small className="form-hint">
+            与请求体使用同一套参数表格式，描述规则链成功执行后输出消息体（data）的字段含义；供文档与生成技能时写入 description，不参与执行时校验
           </small>
         </div>
         {showDefinition ? (

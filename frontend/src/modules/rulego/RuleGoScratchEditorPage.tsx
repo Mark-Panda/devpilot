@@ -4757,6 +4757,7 @@ export default function RuleGoScratchEditorPage() {
           editorJson: editorJsonPayload.trim(),
           requestMetadataParamsJson: editingRule.requestMetadataParamsJson ?? "[]",
           requestMessageBodyParamsJson: editingRule.requestMessageBodyParamsJson ?? "[]",
+          responseMessageBodyParamsJson: editingRule.responseMessageBodyParamsJson ?? "[]",
         });
       } else {
         const created = await create({
@@ -4766,6 +4767,7 @@ export default function RuleGoScratchEditorPage() {
           editorJson: editorJsonPayload.trim(),
           requestMetadataParamsJson: "[]",
           requestMessageBodyParamsJson: "[]",
+          responseMessageBodyParamsJson: "[]",
         });
         const newId = (created.id ?? "").trim();
         if (!newId) {

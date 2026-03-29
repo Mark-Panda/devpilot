@@ -217,9 +217,13 @@ func buildCreateSkillUserMessage(rule models.RuleGoRule) string {
 	b.WriteString(rule.Name)
 	b.WriteString("\n\n规则链描述：")
 	b.WriteString(rule.Description)
-	paramsBlock := formatRuleChainParamsForSkillDescription(rule.RequestMetadataParamsJSON, rule.RequestMessageBodyParamsJSON)
+	paramsBlock := formatRuleChainParamsForSkillDescription(
+		rule.RequestMetadataParamsJSON,
+		rule.RequestMessageBodyParamsJSON,
+		rule.ResponseMessageBodyParamsJSON,
+	)
 	if paramsBlock != "" {
-		b.WriteString("\n\n以下「规则链请求参数」章节必须完整并入你在 skill-creator 中提交的 description 字段（可与触发场景说明合并为一段连贯英文描述，但不要省略参数名、类型、是否必填与说明）：\n\n")
+		b.WriteString("\n\n以下「规则链入参与出参说明」章节必须完整并入你在 skill-creator 中提交的 description 字段（可与触发场景说明合并为一段连贯英文描述，但不要省略参数名、类型、是否必填与说明）：\n\n")
 		b.WriteString(paramsBlock)
 	}
 	b.WriteString("\n\n规则链 DSL（JSON）：\n")

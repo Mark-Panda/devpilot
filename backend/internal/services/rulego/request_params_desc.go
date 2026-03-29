@@ -28,15 +28,19 @@ func parseRuleChainParamsJSONArray(raw string) ([]ruleChainParamItem, error) {
 	return items, nil
 }
 
-// formatRuleChainParamsForSkillDescription 将元数据/消息体参数表格式化为 Markdown，供生成技能时并入 description。
-func formatRuleChainParamsForSkillDescription(metadataJSON, messageBodyJSON string) string {
+// formatRuleChainParamsForSkillDescription 将元数据、请求消息体、响应消息体参数表格式化为 Markdown，供生成技能时并入 description。
+func formatRuleChainParamsForSkillDescription(metadataJSON, messageBodyJSON, responseBodyJSON string) string {
 	meta, err1 := parseRuleChainParamsJSONArray(metadataJSON)
 	body, err2 := parseRuleChainParamsJSONArray(messageBodyJSON)
+	resp, err3 := parseRuleChainParamsJSONArray(responseBodyJSON)
 	if err1 != nil {
 		meta = nil
 	}
 	if err2 != nil {
 		body = nil
+	}
+	if err3 != nil {
+		resp = nil
 	}
 	var b strings.Builder
 	flatten := func(items []ruleChainParamItem) []ruleChainParamItem {
@@ -103,5 +107,6 @@ func formatRuleChainParamsForSkillDescription(metadataJSON, messageBodyJSON stri
 	}
 	writeSection("元数据（metadata）参数", meta)
 	writeSection("消息体（data）参数", body)
+	writeSection("响应消息体（输出 data）参数", resp)
 	return strings.TrimSpace(b.String())
 }

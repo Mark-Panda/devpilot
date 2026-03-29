@@ -8,7 +8,7 @@ import (
 func TestFormatRuleChainParamsForSkillDescription(t *testing.T) {
 	meta := `[{"key":"trace_id","value":"","type":"string","required":true,"description":"链路 ID"}]`
 	body := `[{"key":"count","value":"0","type":"number","required":false,"description":"数量"}]`
-	out := formatRuleChainParamsForSkillDescription(meta, body)
+	out := formatRuleChainParamsForSkillDescription(meta, body, "")
 	if out == "" {
 		t.Fatal("expected non-empty")
 	}
@@ -20,7 +20,15 @@ func TestFormatRuleChainParamsForSkillDescription(t *testing.T) {
 }
 
 func TestFormatRuleChainParamsForSkillDescription_empty(t *testing.T) {
-	if formatRuleChainParamsForSkillDescription("", "") != "" {
+	if formatRuleChainParamsForSkillDescription("", "", "") != "" {
 		t.Fatal("expected empty")
+	}
+}
+
+func TestFormatRuleChainParamsForSkillDescription_responseBody(t *testing.T) {
+	resp := `[{"key":"result","value":"","type":"object","required":true,"description":"业务结果"}]`
+	out := formatRuleChainParamsForSkillDescription("", "", resp)
+	if !strings.Contains(out, "响应消息体") || !strings.Contains(out, "result") {
+		t.Fatalf("expected response section: %q", out)
 	}
 }

@@ -32,6 +32,7 @@ type RuleGoInput = {
   editorJson: string;
   requestMetadataParamsJson: string;
   requestMessageBodyParamsJson: string;
+  responseMessageBodyParamsJson: string;
 };
 
 export function useRuleGoRules() {
@@ -54,6 +55,7 @@ export function useRuleGoRules() {
           editorJson: rule.editor_json,
           requestMetadataParamsJson: pickOptionalStringField(rule, "request_metadata_params_json"),
           requestMessageBodyParamsJson: pickOptionalStringField(rule, "request_message_body_params_json"),
+          responseMessageBodyParamsJson: pickOptionalStringField(rule, "response_message_body_params_json"),
           skillDirName: rule.skill_dir_name || undefined,
         }))
       );
@@ -72,6 +74,7 @@ export function useRuleGoRules() {
       editor_json: input.editorJson,
       request_metadata_params_json: input.requestMetadataParamsJson,
       request_message_body_params_json: input.requestMessageBodyParamsJson,
+      response_message_body_params_json: input.responseMessageBodyParamsJson,
     });
     let id = ruleIdFromWailsModel(result);
     if (!id) {
@@ -93,6 +96,7 @@ export function useRuleGoRules() {
       editorJson: result.editor_json,
       requestMetadataParamsJson: pickOptionalStringField(result, "request_metadata_params_json"),
       requestMessageBodyParamsJson: pickOptionalStringField(result, "request_message_body_params_json"),
+      responseMessageBodyParamsJson: pickOptionalStringField(result, "response_message_body_params_json"),
       skillDirName: result.skill_dir_name || undefined,
     };
     addRule(rule);
@@ -107,6 +111,7 @@ export function useRuleGoRules() {
       editor_json: input.editorJson,
       request_metadata_params_json: input.requestMetadataParamsJson,
       request_message_body_params_json: input.requestMessageBodyParamsJson,
+      response_message_body_params_json: input.responseMessageBodyParamsJson,
     });
     updateRule(id, {
       name: input.name,
@@ -115,6 +120,7 @@ export function useRuleGoRules() {
       editorJson: result.editor_json,
       requestMetadataParamsJson: pickOptionalStringField(result, "request_metadata_params_json"),
       requestMessageBodyParamsJson: pickOptionalStringField(result, "request_message_body_params_json"),
+      responseMessageBodyParamsJson: pickOptionalStringField(result, "response_message_body_params_json"),
       skillDirName: result.skill_dir_name || undefined,
     });
   };

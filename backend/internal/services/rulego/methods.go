@@ -30,21 +30,23 @@ func NewService(store *Store, execLogStore *ExecutionLogStore, llmConfigLister L
 }
 
 type CreateRuleGoRuleInput struct {
-	Name                         string `json:"name"`
-	Description                  string `json:"description"`
-	Definition                   string `json:"definition"`
-	EditorJSON                   string `json:"editor_json"`
-	RequestMetadataParamsJSON    string `json:"request_metadata_params_json"`
-	RequestMessageBodyParamsJSON string `json:"request_message_body_params_json"`
+	Name                          string `json:"name"`
+	Description                   string `json:"description"`
+	Definition                    string `json:"definition"`
+	EditorJSON                    string `json:"editor_json"`
+	RequestMetadataParamsJSON     string `json:"request_metadata_params_json"`
+	RequestMessageBodyParamsJSON  string `json:"request_message_body_params_json"`
+	ResponseMessageBodyParamsJSON string `json:"response_message_body_params_json"`
 }
 
 type UpdateRuleGoRuleInput struct {
-	Name                         string `json:"name"`
-	Description                  string `json:"description"`
-	Definition                   string `json:"definition"`
-	EditorJSON                   string `json:"editor_json"`
-	RequestMetadataParamsJSON    string `json:"request_metadata_params_json"`
-	RequestMessageBodyParamsJSON string `json:"request_message_body_params_json"`
+	Name                          string `json:"name"`
+	Description                   string `json:"description"`
+	Definition                    string `json:"definition"`
+	EditorJSON                    string `json:"editor_json"`
+	RequestMetadataParamsJSON     string `json:"request_metadata_params_json"`
+	RequestMessageBodyParamsJSON  string `json:"request_message_body_params_json"`
+	ResponseMessageBodyParamsJSON string `json:"response_message_body_params_json"`
 }
 
 func (s *Service) ListRuleGoRules() ([]models.RuleGoRule, error) {
@@ -54,12 +56,13 @@ func (s *Service) ListRuleGoRules() ([]models.RuleGoRule, error) {
 func (s *Service) CreateRuleGoRule(input CreateRuleGoRuleInput) (models.RuleGoRule, error) {
 	ctx := context.Background()
 	rule := models.RuleGoRule{
-		Name:                         strings.TrimSpace(input.Name),
-		Description:                  strings.TrimSpace(input.Description),
-		Definition:                   strings.TrimSpace(input.Definition),
-		EditorJSON:                   strings.TrimSpace(input.EditorJSON),
-		RequestMetadataParamsJSON:    strings.TrimSpace(input.RequestMetadataParamsJSON),
-		RequestMessageBodyParamsJSON: strings.TrimSpace(input.RequestMessageBodyParamsJSON),
+		Name:                          strings.TrimSpace(input.Name),
+		Description:                   strings.TrimSpace(input.Description),
+		Definition:                    strings.TrimSpace(input.Definition),
+		EditorJSON:                    strings.TrimSpace(input.EditorJSON),
+		RequestMetadataParamsJSON:     strings.TrimSpace(input.RequestMetadataParamsJSON),
+		RequestMessageBodyParamsJSON:  strings.TrimSpace(input.RequestMessageBodyParamsJSON),
+		ResponseMessageBodyParamsJSON: strings.TrimSpace(input.ResponseMessageBodyParamsJSON),
 	}
 	if err := validateRule(rule); err != nil {
 		return models.RuleGoRule{}, err
@@ -68,6 +71,9 @@ func (s *Service) CreateRuleGoRule(input CreateRuleGoRuleInput) (models.RuleGoRu
 		return models.RuleGoRule{}, err
 	}
 	if err := validateRuleChainParamsJSON(rule.RequestMessageBodyParamsJSON); err != nil {
+		return models.RuleGoRule{}, err
+	}
+	if err := validateRuleChainParamsJSON(rule.ResponseMessageBodyParamsJSON); err != nil {
 		return models.RuleGoRule{}, err
 	}
 
@@ -95,16 +101,17 @@ func (s *Service) UpdateRuleGoRule(id string, input UpdateRuleGoRuleInput) (mode
 	}
 
 	rule := models.RuleGoRule{
-		ID:                           id,
-		Name:                         strings.TrimSpace(input.Name),
-		Description:                  strings.TrimSpace(input.Description),
-		Definition:                   strings.TrimSpace(input.Definition),
-		EditorJSON:                   strings.TrimSpace(input.EditorJSON),
-		RequestMetadataParamsJSON:    strings.TrimSpace(input.RequestMetadataParamsJSON),
-		RequestMessageBodyParamsJSON: strings.TrimSpace(input.RequestMessageBodyParamsJSON),
-		SkillDirName:                 existing.SkillDirName, // 保留关联技能目录，仅通过 GenerateSkillFromRuleChain / DeleteSkillForRuleChain 变更
-		CreatedAt:                    existing.CreatedAt,
-		UpdatedAt:                    time.Now().UTC().Format(time.RFC3339),
+		ID:                            id,
+		Name:                          strings.TrimSpace(input.Name),
+		Description:                   strings.TrimSpace(input.Description),
+		Definition:                    strings.TrimSpace(input.Definition),
+		EditorJSON:                    strings.TrimSpace(input.EditorJSON),
+		RequestMetadataParamsJSON:     strings.TrimSpace(input.RequestMetadataParamsJSON),
+		RequestMessageBodyParamsJSON:  strings.TrimSpace(input.RequestMessageBodyParamsJSON),
+		ResponseMessageBodyParamsJSON: strings.TrimSpace(input.ResponseMessageBodyParamsJSON),
+		SkillDirName:                  existing.SkillDirName, // 保留关联技能目录，仅通过 GenerateSkillFromRuleChain / DeleteSkillForRuleChain 变更
+		CreatedAt:                     existing.CreatedAt,
+		UpdatedAt:                     time.Now().UTC().Format(time.RFC3339),
 	}
 	if err := validateRule(rule); err != nil {
 		return models.RuleGoRule{}, err
@@ -113,6 +120,9 @@ func (s *Service) UpdateRuleGoRule(id string, input UpdateRuleGoRuleInput) (mode
 		return models.RuleGoRule{}, err
 	}
 	if err := validateRuleChainParamsJSON(rule.RequestMessageBodyParamsJSON); err != nil {
+		return models.RuleGoRule{}, err
+	}
+	if err := validateRuleChainParamsJSON(rule.ResponseMessageBodyParamsJSON); err != nil {
 		return models.RuleGoRule{}, err
 	}
 

@@ -22,16 +22,17 @@ func CreateRuleGoRule(ctx context.Context, db *DB, input models.RuleGoRule) (mod
 	now := time.Now().UTC().Format(time.RFC3339)
 
 	rule := models.RuleGoRule{
-		ID:                           id,
-		Name:                         input.Name,
-		Description:                  input.Description,
-		Definition:                   input.Definition,
-		EditorJSON:                   input.EditorJSON,
-		RequestMetadataParamsJSON:    input.RequestMetadataParamsJSON,
-		RequestMessageBodyParamsJSON: input.RequestMessageBodyParamsJSON,
-		SkillDirName:                 input.SkillDirName,
-		CreatedAt:                    now,
-		UpdatedAt:                    now,
+		ID:                            id,
+		Name:                          input.Name,
+		Description:                   input.Description,
+		Definition:                    input.Definition,
+		EditorJSON:                    input.EditorJSON,
+		RequestMetadataParamsJSON:     input.RequestMetadataParamsJSON,
+		RequestMessageBodyParamsJSON:  input.RequestMessageBodyParamsJSON,
+		ResponseMessageBodyParamsJSON: input.ResponseMessageBodyParamsJSON,
+		SkillDirName:                  input.SkillDirName,
+		CreatedAt:                     now,
+		UpdatedAt:                     now,
 	}
 
 	if err := putRuleGoRule(db, rule); err != nil {
@@ -79,6 +80,7 @@ func UpdateRuleGoRule(ctx context.Context, db *DB, id string, patch models.RuleG
 	existing.EditorJSON = patch.EditorJSON
 	existing.RequestMetadataParamsJSON = patch.RequestMetadataParamsJSON
 	existing.RequestMessageBodyParamsJSON = patch.RequestMessageBodyParamsJSON
+	existing.ResponseMessageBodyParamsJSON = patch.ResponseMessageBodyParamsJSON
 	existing.SkillDirName = patch.SkillDirName
 	existing.UpdatedAt = time.Now().UTC().Format(time.RFC3339)
 

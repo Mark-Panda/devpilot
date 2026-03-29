@@ -82,6 +82,7 @@ export default function RuleGoPage() {
                 editorJson: rule.editorJson,
                 requestMetadataParamsJson: rule.requestMetadataParamsJson ?? "[]",
                 requestMessageBodyParamsJson: rule.requestMessageBodyParamsJson ?? "[]",
+                responseMessageBodyParamsJson: rule.responseMessageBodyParamsJson ?? "[]",
               };
               return (
               <div className="table-row" key={rule.id}>
