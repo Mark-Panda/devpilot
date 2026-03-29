@@ -4051,6 +4051,22 @@ export default function RuleGoScratchEditorPage() {
   const navigate = useNavigate();
   const { rules, create, update } = useRuleGoRules();
   const workspaceRef = useRef<WorkspaceSvg | null>(null);
+  /** 程序化 load 画布时跳过 handleChange，避免只更新 dsl、未同步 savedDsl 而长期显示「未保存」 */
+  const suppressWorkspaceDslSyncRef = useRef(false);
+  /**
+   * workspace 注入的 useEffect 依赖 []，内部 handleChange 若直接闭包引用 buildRuleGoDsl，会永远用「首帧」的 id/editingRule。
+   * 新建页首帧无 id → ruleChain.id 恒为 rule01；保存后跳转真实 id，effect 里 savedDsl 已是 UUID，handleChange 仍写 rule01 → 永久未保存。
+   */
+  const buildRuleGoDslRef = useRef<
+    | ((
+        workspace: WorkspaceSvg,
+        ruleName?: string,
+        debugModeParam?: boolean,
+        rootParam?: boolean,
+        enabledParam?: boolean
+      ) => string)
+    | null
+  >(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -4295,17 +4311,19 @@ export default function RuleGoScratchEditorPage() {
     workspaceRef.current = workspace;
 
     const handleChange = (ev?: { blockId?: string }) => {
+      if (suppressWorkspaceDslSyncRef.current) return;
       ensureRuleGoNodeIdsAreUuid(workspace);
       if (ev?.blockId) lastTouchedBlockIdRef.current = ev.blockId;
       const state = ScratchBlocks.serialization.workspaces.save(workspace);
       setJson(JSON.stringify(state, null, 2));
-      const nextDsl = buildRuleGoDsl(
-        workspace,
-        nameRef.current ?? "",
-        debugModeRef.current,
-        rootRef.current,
-        enabledRef.current
-      );
+      const nextDsl =
+        buildRuleGoDslRef.current?.(
+          workspace,
+          nameRef.current ?? "",
+          debugModeRef.current,
+          rootRef.current,
+          enabledRef.current
+        ) ?? "";
       setDsl(nextDsl);
       setTriggerLayoutErrorRef.current(validateRuleGoTriggerLayout(workspace));
       const topBlocks = workspace.getTopBlocks(true);
@@ -4317,7 +4335,7 @@ export default function RuleGoScratchEditorPage() {
 
     const initialState = ScratchBlocks.serialization.workspaces.save(workspace);
     setJson(JSON.stringify(initialState, null, 2));
-    const initialDsl = buildRuleGoDsl(workspace);
+    const initialDsl = buildRuleGoDslRef.current?.(workspace) ?? "";
     setDsl(initialDsl);
     setSavedDsl(initialDsl);
     handleChange();
@@ -4367,34 +4385,54 @@ export default function RuleGoScratchEditorPage() {
   useEffect(() => {
     if (!workspaceRef.current) return;
 
+    let syncName = "";
+    let syncDebug = false;
+    let syncRoot = true;
+    let syncEnabled = true;
     if (editingRule) {
       setName(editingRule.name);
       setDescription(editingRule.description);
-      setDsl(editingRule.definition);
-      setSavedDsl(editingRule.definition ?? "");
-      setJson(editingRule.editorJson);
+      syncName = editingRule.name;
       try {
         const parsed = JSON.parse(editingRule.definition);
         const chain = parsed?.ruleChain;
-        setDebugMode(Boolean(chain?.debugMode));
-        setRoot(chain?.root !== false);
-        setEnabled(getEnabledFromDefinition(editingRule.definition));
+        syncDebug = Boolean(chain?.debugMode);
+        syncRoot = chain?.root !== false;
+        syncEnabled = getEnabledFromDefinition(editingRule.definition);
+        setDebugMode(syncDebug);
+        setRoot(syncRoot);
+        setEnabled(syncEnabled);
       } catch {
         setDebugMode(false);
         setRoot(true);
         setEnabled(true);
+        syncDebug = false;
+        syncRoot = true;
+        syncEnabled = true;
       }
     } else {
       setName("");
       setDescription("");
       setDebugMode(false);
       setRoot(true);
+      syncName = "";
+      syncDebug = false;
+      syncRoot = true;
+      syncEnabled = true;
     }
 
+    // Blockly 的 change 会同步触发 handleChange；refs 若晚于 state 的 useEffect 更新，会用旧 name/root 生成 DSL，导致 dsl 与 savedDsl 不一致（表现为「已保存仍显示未保存」）。
+    nameRef.current = syncName;
+    debugModeRef.current = syncDebug;
+    rootRef.current = syncRoot;
+    enabledRef.current = syncEnabled;
+
     if (editingRule?.editorJson) {
+      suppressWorkspaceDslSyncRef.current = true;
       try {
         const state = JSON.parse(editingRule.editorJson);
         ScratchBlocks.serialization.workspaces.load(state, workspaceRef.current, { recordUndo: false });
+        ensureRuleGoNodeIdsAreUuid(workspaceRef.current);
         const parsed = (() => {
           try {
             return JSON.parse(editingRule.definition);
@@ -4411,15 +4449,25 @@ export default function RuleGoScratchEditorPage() {
           chain?.root !== false,
           dslEnabledForLoad
         );
+        const savedState = ScratchBlocks.serialization.workspaces.save(workspaceRef.current);
+        setJson(JSON.stringify(savedState, null, 2));
         setDsl(loadedDsl);
         setSavedDsl(loadedDsl);
+        setTriggerLayoutError(validateRuleGoTriggerLayout(workspaceRef.current));
+        setBlockCount(workspaceRef.current.getTopBlocks(true).length);
+        const scaleAfterLoad =
+          (workspaceRef.current as WorkspaceSvg & { getScale?: () => number }).getScale?.() ?? 1;
+        setZoomPercent(Math.round(scaleAfterLoad * 100));
         return;
       } catch {
         // ignore malformed json
+      } finally {
+        suppressWorkspaceDslSyncRef.current = false;
       }
     }
 
     if (editingRule?.definition) {
+      suppressWorkspaceDslSyncRef.current = true;
       try {
         const ruleDsl = JSON.parse(editingRule.definition);
         loadWorkspaceFromRuleGoDsl(ruleDsl, workspaceRef.current);
@@ -4433,10 +4481,19 @@ export default function RuleGoScratchEditorPage() {
           chain?.root !== false,
           dslEnabledForLoad
         );
+        const savedState = ScratchBlocks.serialization.workspaces.save(workspaceRef.current);
+        setJson(JSON.stringify(savedState, null, 2));
         setDsl(loadedDsl);
         setSavedDsl(loadedDsl);
+        setTriggerLayoutError(validateRuleGoTriggerLayout(workspaceRef.current));
+        setBlockCount(workspaceRef.current.getTopBlocks(true).length);
+        const scaleAfterLoad =
+          (workspaceRef.current as WorkspaceSvg & { getScale?: () => number }).getScale?.() ?? 1;
+        setZoomPercent(Math.round(scaleAfterLoad * 100));
       } catch (err) {
         setError((err as Error).message || "DSL 解析失败");
+      } finally {
+        suppressWorkspaceDslSyncRef.current = false;
       }
     }
   }, [editingRule]);
@@ -4514,13 +4571,40 @@ export default function RuleGoScratchEditorPage() {
           requestMetadataParamsJson: "[]",
           requestMessageBodyParamsJson: "[]",
         });
-        // 新建保存后跳转到该规则的编辑 URL，后续点击保存会走 update 而非再次 create
-        navigate(`/rulego/editor/${created.id}`, { replace: true });
+        const newId = (created.id ?? "").trim();
+        if (!newId) {
+          throw new Error("未获得新规则 ID");
+        }
+        // 先落成功态再导航，避免立即卸载导致后续 setState 与路由切换竞态，被误判为保存失败
+        setSaveFeedback({ type: "success" });
+        const persistedDslCreate = nextDsl.trim();
+        setDsl(persistedDslCreate);
+        setSavedDsl(persistedDslCreate);
+        nameRef.current = trimmedName;
+        debugModeRef.current = useDebugMode;
+        rootRef.current = useRoot;
+        enabledRef.current = useEnabled;
+        queueMicrotask(() => {
+          navigate(`/rulego/editor/${newId}`, { replace: true });
+        });
       }
-      setSaveFeedback({ type: "success" });
-      setSavedDsl(nextDsl.trim());
+      if (editingRule) {
+        setSaveFeedback({ type: "success" });
+        const persistedDsl = nextDsl.trim();
+        setDsl(persistedDsl);
+        setSavedDsl(persistedDsl);
+        nameRef.current = trimmedName;
+        debugModeRef.current = useDebugMode;
+        rootRef.current = useRoot;
+        enabledRef.current = useEnabled;
+      }
     } catch (err) {
-      const msg = (err as Error).message || "保存失败";
+      const msg =
+        err instanceof Error && err.message
+          ? err.message
+          : typeof err === "string"
+            ? err
+            : String(err ?? "保存失败");
       setError(msg);
       setSaveFeedback({ type: "error", message: msg });
     } finally {
@@ -4528,11 +4612,54 @@ export default function RuleGoScratchEditorPage() {
     }
   };
 
+  /**
+   * 未操作时仍可能「脏」的原因：
+   * - metadata.nodes[].additionalInfo.position（积木坐标）
+   * - metadata.endpoints[].additionalInfo.position（端点块同样用 getRelativeToSurfaceXY）
+   * - JSON 键插入顺序不一致
+   */
+  const stripRuleGoNoiseForCompare = (parsed: unknown): unknown => {
+    const walk = (v: unknown): unknown => {
+      if (Array.isArray(v)) return v.map(walk);
+      if (!v || typeof v !== "object") return v;
+      const o = v as Record<string, unknown>;
+      const out: Record<string, unknown> = {};
+      for (const key of Object.keys(o)) {
+        let child = o[key];
+        if (key === "additionalInfo" && child && typeof child === "object") {
+          const ai = { ...(child as Record<string, unknown>) };
+          delete ai.position;
+          if (Object.keys(ai).length === 0) continue;
+          child = ai;
+        } else {
+          child = walk(child);
+        }
+        out[key] = child;
+      }
+      return out;
+    };
+    return walk(parsed);
+  };
+
+  const stableSortedDeep = (v: unknown): unknown => {
+    if (Array.isArray(v)) return v.map(stableSortedDeep);
+    if (v !== null && typeof v === "object") {
+      const o = v as Record<string, unknown>;
+      const keys = Object.keys(o).sort();
+      const out: Record<string, unknown> = {};
+      for (const k of keys) {
+        out[k] = stableSortedDeep(o[k]);
+      }
+      return out;
+    }
+    return v;
+  };
+
   const normalizeDslForCompare = (s: string) => {
     const t = (s ?? "").trim();
     if (!t) return "";
     try {
-      return JSON.stringify(JSON.parse(t));
+      return JSON.stringify(stableSortedDeep(stripRuleGoNoiseForCompare(JSON.parse(t))));
     } catch {
       return t;
     }
@@ -5085,6 +5212,7 @@ export default function RuleGoScratchEditorPage() {
       2
     );
   };
+  buildRuleGoDslRef.current = buildRuleGoDsl;
 
   const handleApplyImportDsl = () => {
     setImportDslError(null);
@@ -5113,35 +5241,41 @@ export default function RuleGoScratchEditorPage() {
       ruleChain?: { name?: string; debugMode?: boolean; root?: boolean };
       metadata: unknown;
     };
-    try {
-      loadWorkspaceFromRuleGoDsl(ruleDsl, ws);
-    } catch (err) {
-      setImportDslError((err as Error).message || "加载 DSL 到画布失败");
-      return;
-    }
-    ensureRuleGoNodeIdsAreUuid(ws);
     const chain = ruleDsl.ruleChain;
     const importedName =
       typeof chain?.name === "string" && chain.name.trim() ? chain.name.trim() : "";
     const nextName = importedName || name;
-    if (importedName) setName(importedName);
     const nextDebug = Boolean(chain?.debugMode);
     const nextRoot = chain?.root !== false;
-    setDebugMode(nextDebug);
-    setRoot(nextRoot);
     const dslStr = JSON.stringify(parsed);
     const nextEnabled = getEnabledFromDefinition(dslStr);
-    setEnabled(nextEnabled);
-    const loadedDsl = buildRuleGoDsl(ws, nextName, nextDebug, nextRoot, nextEnabled);
-    setDsl(loadedDsl);
-    setSavedDsl(loadedDsl);
-    setJson(JSON.stringify(ScratchBlocks.serialization.workspaces.save(ws), null, 2));
-    setSelectedBlockId(null);
-    setError(null);
-    setTriggerLayoutError(validateRuleGoTriggerLayout(ws));
-    setBlockCount(ws.getTopBlocks(true).length);
-    setImportDslOpen(false);
-    setImportDslText("");
+    nameRef.current = nextName;
+    debugModeRef.current = nextDebug;
+    rootRef.current = nextRoot;
+    enabledRef.current = nextEnabled;
+    suppressWorkspaceDslSyncRef.current = true;
+    try {
+      loadWorkspaceFromRuleGoDsl(ruleDsl, ws);
+      ensureRuleGoNodeIdsAreUuid(ws);
+      if (importedName) setName(importedName);
+      setDebugMode(nextDebug);
+      setRoot(nextRoot);
+      setEnabled(nextEnabled);
+      const loadedDsl = buildRuleGoDsl(ws, nextName, nextDebug, nextRoot, nextEnabled);
+      setDsl(loadedDsl);
+      setSavedDsl(loadedDsl);
+      setJson(JSON.stringify(ScratchBlocks.serialization.workspaces.save(ws), null, 2));
+      setSelectedBlockId(null);
+      setError(null);
+      setTriggerLayoutError(validateRuleGoTriggerLayout(ws));
+      setBlockCount(ws.getTopBlocks(true).length);
+      setImportDslOpen(false);
+      setImportDslText("");
+    } catch (err) {
+      setImportDslError((err as Error).message || "加载 DSL 到画布失败");
+    } finally {
+      suppressWorkspaceDslSyncRef.current = false;
+    }
   };
 
   const getSupportedAgentNodeTypes = useCallback((): string[] => {

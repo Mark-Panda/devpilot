@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -76,7 +77,11 @@ func (s *Service) CreateRuleGoRule(input CreateRuleGoRuleInput) (models.RuleGoRu
 	}
 	if EnabledFromDefinition(result.Definition) && result.Definition != "" {
 		if err := s.LoadRuleChain(result.ID); err != nil {
-			return result, fmt.Errorf("规则已保存但加载到引擎失败: %w", err)
+			// 存储已成功；LoadRuleChain 仅影响运行池。失败时仍返回 nil error，避免前端误判「保存失败」。
+			log.Printf(
+				"[rulego] CreateRuleGoRule: 持久化已成功 id=%s（数据已落库）；运行引擎未加载本链（与保存是否成功无关，测试/执行前需修复 DSL 或节点配置，例如补齐凭证）: %v",
+				result.ID, err,
+			)
 		}
 	}
 	return result, nil
@@ -129,7 +134,10 @@ func (s *Service) UpdateRuleGoRule(id string, input UpdateRuleGoRuleInput) (mode
 	enabled := EnabledFromDefinition(result.Definition)
 	if enabled && result.Definition != "" {
 		if err := s.LoadRuleChain(id); err != nil {
-			return result, fmt.Errorf("规则已更新但加载到引擎失败: %w", err)
+			log.Printf(
+				"[rulego] UpdateRuleGoRule: 持久化已成功 id=%s（数据已落库）；运行引擎未加载本链（与保存是否成功无关）: %v",
+				id, err,
+			)
 		}
 	} else {
 		if err := s.UnloadRuleChain(id); err != nil {

@@ -17,6 +17,14 @@ function pickOptionalStringField(obj: unknown, key: string): string | undefined 
   return typeof v === "string" && v.trim() !== "" ? v : undefined;
 }
 
+/** Wails/JSON 偶发字段名不一致时仍能取到规则 ID */
+function ruleIdFromWailsModel(rule: unknown): string {
+  if (!rule || typeof rule !== "object") return "";
+  const r = rule as Record<string, unknown>;
+  const v = r.id ?? r.ID ?? r.Id;
+  return typeof v === "string" && v.trim() !== "" ? v.trim() : "";
+}
+
 type RuleGoInput = {
   name: string;
   description: string;
@@ -39,7 +47,7 @@ export function useRuleGoRules() {
       const list = Array.isArray(data) ? data : [];
       setRules(
         list.map((rule) => ({
-          id: rule.id,
+          id: ruleIdFromWailsModel(rule) || rule.id,
           name: rule.name,
           description: rule.description,
           definition: rule.definition,
@@ -65,8 +73,20 @@ export function useRuleGoRules() {
       request_metadata_params_json: input.requestMetadataParamsJson,
       request_message_body_params_json: input.requestMessageBodyParamsJson,
     });
+    let id = ruleIdFromWailsModel(result);
+    if (!id) {
+      await refresh();
+      const { rules: fresh } = useRuleGoStore.getState();
+      const match = fresh.find(
+        (r) =>
+          r.name.trim() === input.name.trim() && r.definition.trim() === input.definition.trim()
+      );
+      if (match) return match;
+      console.error("[rulego] CreateRuleGoRule 返回无 id，且列表中未匹配到新建项", result);
+      throw new Error("服务端未返回规则 ID，请到规则列表查看是否已创建");
+    }
     const rule: RuleGoRule = {
-      id: result.id,
+      id,
       name: result.name,
       description: result.description,
       definition: result.definition,
