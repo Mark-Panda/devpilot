@@ -9,7 +9,7 @@ export function isRuleGoTriggerBlockType(blockType: string): boolean {
 
 /**
  * 规则链触发器约束：画布上必须有且仅有一个触发器积木，且必须作为语句链首块（无上一块衔接）。
- * 触发器包括「开始」与各类 Endpoint 触发器（metadata.endpoints 对应块）。
+ * 触发器包括「触发-手动开始」与各类 Endpoint 触发器（metadata.endpoints 对应块）。
  */
 export function validateRuleGoTriggerLayout(workspace: WorkspaceSvg): string | null {
   const all = workspace.getAllBlocks(false) as Block[];
@@ -20,10 +20,10 @@ export function validateRuleGoTriggerLayout(workspace: WorkspaceSvg): string | n
     }
   }
   if (triggers.length === 0) {
-    return "规则链开头必须有一个触发器：请放置「开始」或一种 Endpoint 触发器作为链首。";
+    return "规则链开头必须有一个触发器：请放置「触发-手动开始」或一种 Endpoint 触发器作为链首。";
   }
   if (triggers.length > 1) {
-    return "整个画布只能有一个触发器（「开始」与 Endpoint 触发器不可同时出现多块）。";
+    return "整个画布只能有一个触发器（「触发-手动开始」与 Endpoint 触发器不可同时出现多块）。";
   }
   const head = triggers[0];
   const prev = head.previousConnection?.targetBlock?.() ?? null;

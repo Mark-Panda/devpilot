@@ -16,7 +16,7 @@ const def: BlockTypeDef = {
       init: function (this: Block) {
         (this as Block)
           .appendDummyInput("HEAD")
-          .appendField(new (BlocklyF as any).FieldTextInput("开始"), "NODE_NAME");
+          .appendField(new (BlocklyF as any).FieldTextInput("触发-手动开始"), "NODE_NAME");
         const config = (this as Block).appendDummyInput("CONFIG");
         config.appendField(new (BlocklyF as any).FieldTextInput("start1"), "NODE_ID");
         if (config.setVisible) config.setVisible(false);

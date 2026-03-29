@@ -1804,18 +1804,6 @@ body {
   min-height: 640px;
 }
 
-.rulego-editor-side {
-  background: #ffffff;
-  border-radius: 12px;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.08);
-  overflow: hidden;
-  min-height: 0;
-}
-
 .rulego-editor-side textarea {
   font-family: "SFMono-Regular", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }
@@ -1867,9 +1855,9 @@ body {
   stroke: #334155 !important;
 }
 
-/* Blockly 工作区网格：加深 pattern 内线段，在深色背景上更易辨认 */
+/* Blockly 工作区网格：与 inject grid 选项一致，略淡以免抢积木视觉 */
 .rulego-editor-canvas defs pattern[id^="blocklyGridPattern"] line {
-  stroke: rgba(148, 163, 184, 0.4) !important;
+  stroke: rgba(148, 163, 184, 0.28) !important;
   stroke-width: 1px;
 }
 
@@ -1908,7 +1896,7 @@ body {
   background: rgba(148, 163, 184, 0.25) !important;
 }
 
-/* 可视化规则编辑器 - 图中类似布局（三栏 + 顶部工具栏），统一深色背景 */
+/* 规则编辑器 - 图中类似布局（三栏 + 顶部工具栏），统一深色背景 */
 .rulego-editor-visual {
   min-height: 100%;
   display: flex;
@@ -1919,27 +1907,81 @@ body {
 
 .rulego-editor-layout-constraint.form-error {
   margin: 0 16px 10px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  background: rgba(220, 38, 38, 0.08);
-  border: 1px solid rgba(220, 38, 38, 0.25);
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: rgba(220, 38, 38, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.35);
+  color: #fecaca;
+  font-size: 13px;
+  line-height: 1.45;
 }
 
 .rulego-editor-header-bar {
   display: flex;
   align-items: center;
-  gap: 16px;
-  padding: 12px 20px;
-  background: #1e293b;
+  gap: 14px 18px;
+  padding: 12px 18px 14px;
+  background: linear-gradient(180deg, #243047 0%, #1e293b 100%);
   color: #e2e8f0;
   border-radius: 12px 12px 0 0;
   flex-wrap: wrap;
+  border-bottom: 1px solid #334155;
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.rulego-editor-title-cluster {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1 1 160px;
+  max-width: min(420px, 100%);
+}
+
+.rulego-editor-title-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  min-width: 0;
 }
 
 .rulego-editor-title {
   font-size: 1.125rem;
   font-weight: 600;
   margin: 0;
+  flex-shrink: 0;
+  letter-spacing: -0.01em;
+}
+
+.rulego-editor-rule-name {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: #94a3b8;
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rulego-editor-rule-name--placeholder {
+  color: #64748b;
+  font-style: italic;
+  font-weight: 400;
+}
+
+.rulego-editor-unsaved-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: rgba(245, 158, 11, 0.2);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.35);
   flex-shrink: 0;
 }
 
@@ -1988,13 +2030,31 @@ body {
   background: #334155;
   color: #e2e8f0;
   font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
-.rulego-toolbar-btn:hover {
+.rulego-toolbar-btn:hover:not(:disabled) {
   background: #475569;
   border-color: #475569;
+}
+
+.rulego-toolbar-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #1e293b, 0 0 0 4px rgba(129, 140, 248, 0.65);
+}
+
+.rulego-toolbar-btn:disabled {
+  cursor: not-allowed;
+}
+
+.rulego-toolbar-btn.primary:disabled {
+  opacity: 0.65;
 }
 
 .rulego-toolbar-btn.primary {
@@ -2002,9 +2062,13 @@ body {
   border-color: #6366f1;
 }
 
-.rulego-toolbar-btn.primary:hover {
+.rulego-toolbar-btn.primary:hover:not(:disabled) {
   background: #4f46e5;
   border-color: #4f46e5;
+}
+
+.rulego-toolbar-btn.primary:focus-visible {
+  box-shadow: 0 0 0 2px #1e293b, 0 0 0 4px rgba(165, 180, 252, 0.75);
 }
 
 /* 保存按钮在无变更时：灰色且不可点击 */
@@ -2021,17 +2085,30 @@ body {
   color: #94a3b8;
 }
 
+.rulego-toolbar-btn.save-unchanged:focus-visible {
+  box-shadow: 0 0 0 2px #1e293b, 0 0 0 4px rgba(148, 163, 184, 0.45);
+}
+
 .rulego-toolbar-btn.icon {
   padding: 8px 10px;
+  min-width: 38px;
+  font-size: 15px;
+  line-height: 1;
 }
 
 .rulego-toolbar-btn.text {
   background: transparent;
   border-color: transparent;
+  color: #cbd5e1;
 }
 
-.rulego-toolbar-btn.text:hover {
+.rulego-toolbar-btn.text:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.08);
+  color: #f1f5f9;
+}
+
+.rulego-toolbar-btn.text:focus-visible {
+  box-shadow: 0 0 0 2px #1e293b, 0 0 0 4px rgba(129, 140, 248, 0.55);
 }
 
 .rulego-agent-modal.modal {
@@ -2320,15 +2397,21 @@ body {
 
 .rulego-zoom-label {
   font-size: 12px;
-  color: #94a3b8;
-  min-width: 40px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: #cbd5e1;
+  min-width: 44px;
   text-align: center;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid #334155;
 }
 
 /* 三栏布局：左侧积木库+工作区区域，右侧属性 */
 .rulego-editor-three-col {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
   grid-template-rows: 1fr;
   gap: 0;
   min-height: 640px;
@@ -2352,7 +2435,7 @@ body {
 
 /* 单列积木库布局：左栏积木库（标题+搜索+可折叠列表），右栏工作区+画布 */
 .rulego-editor-canvas-wrap.rulego-editor-single-col-library {
-  grid-template-columns: 240px 1fr;
+  grid-template-columns: minmax(232px, 260px) 1fr;
   grid-template-rows: auto 1fr;
 }
 
@@ -2363,6 +2446,8 @@ body {
   flex-direction: column;
   min-height: 0;
   border-right: 1px solid #334155;
+  background: linear-gradient(180deg, #1a2332 0%, #1e293b 48%);
+  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.03);
 }
 
 .rulego-editor-single-col-library .rulego-editor-library-col .rulego-library-title {
@@ -2375,16 +2460,29 @@ body {
 .rulego-editor-single-col-library .rulego-editor-library-col .rulego-library-search {
   flex-shrink: 0;
   margin: 8px 10px;
-  padding: 8px 10px;
+  padding: 9px 11px;
   border-radius: 8px;
-  border: 1px solid #334155;
-  background: #334155;
+  border: 1px solid #475569;
+  background: #0f172a;
   color: #e2e8f0;
   font-size: 13px;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .rulego-editor-single-col-library .rulego-editor-library-col .rulego-library-search::placeholder {
   color: #64748b;
+}
+
+.rulego-editor-single-col-library .rulego-editor-library-col .rulego-library-search:hover:not(:disabled) {
+  border-color: #64748b;
+}
+
+.rulego-editor-single-col-library .rulego-editor-library-col .rulego-library-search:focus {
+  outline: none;
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.22);
 }
 
 .rulego-editor-single-col-library .rulego-editor-workspace-col {
@@ -2393,6 +2491,7 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
+  background: #1a2332;
 }
 
 .rulego-editor-single-col-library .rulego-editor-workspace-col .rulego-workspace-title {
@@ -2406,6 +2505,8 @@ body {
   flex: 1;
   min-height: 400px;
   min-width: 300px;
+  box-shadow: inset 0 0 0 1px rgba(51, 65, 85, 0.65);
+  border-radius: 0 0 8px 0;
 }
 
 .rulego-editor-single-col-library .rulego-editor-canvas .blocklyToolboxDiv,
@@ -2474,7 +2575,31 @@ body {
   flex: 1;
   min-height: 0;
   overflow-y: auto;
-  padding: 4px 0;
+  overflow-x: hidden;
+  padding: 4px 6px 10px 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.5) transparent;
+}
+
+.rulego-block-library-panel::-webkit-scrollbar {
+  width: 6px;
+}
+
+.rulego-block-library-panel::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.45);
+  border-radius: 6px;
+}
+
+.rulego-block-library-empty {
+  margin: 16px 12px;
+  padding: 14px 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #94a3b8;
+  text-align: center;
+  border-radius: 8px;
+  border: 1px dashed #475569;
+  background: rgba(15, 23, 42, 0.35);
 }
 
 .rulego-block-library-category {
@@ -2488,6 +2613,7 @@ body {
   gap: 8px;
   padding: 10px 12px;
   border: none;
+  border-radius: 0 8px 8px 0;
   border-left: 3px solid;
   background: transparent;
   color: #e2e8f0;
@@ -2495,11 +2621,16 @@ body {
   font-weight: 600;
   text-align: left;
   cursor: pointer;
-  transition: background 0.15s;
+  transition: background 0.15s ease;
 }
 
 .rulego-block-library-category-header:hover {
   background: rgba(255, 255, 255, 0.06);
+}
+
+.rulego-block-library-category-header:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.45);
 }
 
 .rulego-block-library-category-chevron {
@@ -2538,11 +2669,20 @@ body {
   text-align: left;
   cursor: pointer;
   border-radius: 0 6px 6px 0;
-  transition: background 0.15s;
+  transition: background 0.15s ease;
 }
 
 .rulego-block-library-block-item:hover {
   background: rgba(255, 255, 255, 0.1);
+}
+
+.rulego-block-library-block-item:focus {
+  outline: none;
+}
+
+.rulego-block-library-block-item:focus-visible {
+  background: rgba(129, 140, 248, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.35);
 }
 
 .rulego-block-library-block-item-draggable {
@@ -2597,7 +2737,7 @@ body {
   color: #94a3b8;
 }
 
-.rulego-editor-side .rulego-panel-title {
+.rulego-editor-visual .rulego-editor-side .rulego-panel-title {
   color: #e2e8f0;
   padding-bottom: 8px;
   border-bottom: 1px solid #334155;
@@ -2614,27 +2754,40 @@ body {
   color: #94a3b8;
   font-size: 14px;
   padding: 24px;
+  margin: 8px 0;
+  border-radius: 12px;
+  border: 1px dashed #475569;
+  background: rgba(15, 23, 42, 0.35);
 }
 
 .rulego-props-placeholder-icon {
   font-size: 32px;
-  opacity: 0.5;
+  opacity: 0.55;
 }
 
-.rulego-editor-side {
-  background: #1e293b;
+.rulego-editor-visual .rulego-editor-side {
+  background: linear-gradient(180deg, #1f2a3d 0%, #1e293b 40%);
   border-radius: 0 0 12px 0;
   border-left: 1px solid #334155;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  box-shadow: -4px 0 12px rgba(0, 0, 0, 0.2);
+  box-shadow:
+    -6px 0 20px rgba(0, 0, 0, 0.25),
+    inset 3px 0 0 rgba(129, 140, 248, 0.35);
   overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.5) transparent;
 }
 
-.rulego-editor-three-col .rulego-editor-side {
-  border-radius: 0 0 12px 0;
+.rulego-editor-visual .rulego-editor-side::-webkit-scrollbar {
+  width: 6px;
+}
+
+.rulego-editor-visual .rulego-editor-side::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.45);
+  border-radius: 6px;
 }
 
 .block-config-inline {
@@ -2680,50 +2833,231 @@ body {
   border-top: 1px solid #334155;
 }
 
-/* 属性面板内表单统一深色主题 */
-.rulego-editor-side .form-grid,
-.rulego-editor-side .form-field,
-.rulego-editor-side .form-label,
-.rulego-editor-side .form-hint,
-.rulego-editor-side label span {
+/* 属性侧栏：顶栏「属性设置」+ 右上角确定（与表单通过 form 属性关联） */
+.rulego-props-sticky-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 6;
+  margin: -4px 0 10px;
+  padding: 4px 0 12px;
+  border-bottom: 1px solid #334155;
+  background: linear-gradient(180deg, #1f2a3d 0%, #1e293b 55%, #1e293b 100%);
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.45);
+}
+
+.rulego-props-sticky-top-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  color: #f1f5f9;
+  letter-spacing: -0.01em;
+}
+
+.rulego-props-side-error {
+  margin: -4px 0 10px;
+  flex-shrink: 0;
+}
+
+/* 属性面板内表单统一深色主题（仅可视化编辑器侧栏） */
+.rulego-editor-visual .rulego-editor-side .form-grid,
+.rulego-editor-visual .rulego-editor-side .form-field,
+.rulego-editor-visual .rulego-editor-side .form-label,
+.rulego-editor-visual .rulego-editor-side .form-hint,
+.rulego-editor-visual .rulego-editor-side label span {
   color: #e2e8f0;
 }
 
-.rulego-editor-side .form-field input,
-.rulego-editor-side .form-field textarea,
-.rulego-editor-side .form-field select {
+.rulego-editor-visual .rulego-editor-side .form-field input,
+.rulego-editor-visual .rulego-editor-side .form-field textarea,
+.rulego-editor-visual .rulego-editor-side .form-field select {
   background: #334155;
   border-color: #475569;
   color: #e2e8f0;
+  transition:
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
-.rulego-editor-side .form-field input::placeholder,
-.rulego-editor-side .form-field textarea::placeholder {
+.rulego-editor-visual .rulego-editor-side .form-field input::placeholder,
+.rulego-editor-visual .rulego-editor-side .form-field textarea::placeholder {
   color: #94a3b8;
 }
 
-.rulego-editor-side .form-field input.readonly-input {
+.rulego-editor-visual .rulego-editor-side .form-field input.readonly-input {
   background: #1e293b;
   color: #94a3b8;
 }
 
-.rulego-editor-side .form-hint,
-.rulego-editor-side small.form-hint {
+.rulego-editor-visual .rulego-editor-side .form-field input:focus,
+.rulego-editor-visual .rulego-editor-side .form-field select:focus,
+.rulego-editor-visual .rulego-editor-side .form-field textarea:focus {
+  outline: none;
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.22);
+}
+
+.rulego-editor-visual .rulego-editor-side .form-hint,
+.rulego-editor-visual .rulego-editor-side small.form-hint {
   color: #94a3b8;
 }
 
-.rulego-editor-side .form-hint a {
-  color: #93c5fd;
+.rulego-editor-visual .rulego-editor-side .form-hint a {
+  color: #a5b4fc;
 }
 
-.rulego-editor-side .form-error {
+.rulego-editor-visual .rulego-editor-side .form-hint a:hover {
+  color: #c7d2fe;
+}
+
+.rulego-editor-visual .rulego-editor-side .form-error {
   background: rgba(239, 68, 68, 0.15);
   color: #fca5a5;
   border-color: #ef4444;
 }
 
-.rulego-editor-side .confirm-text {
+.rulego-editor-visual .rulego-editor-side .confirm-text {
   color: #94a3b8;
+}
+
+/* 侧栏块配置：标题与 LLM 等浅色分区在深色下的统一 */
+.rulego-editor-visual .rulego-editor-side .block-config-inline-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+  padding-bottom: 10px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #334155;
+}
+
+.rulego-editor-visual .rulego-editor-side .block-config-inline-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: #f1f5f9;
+  letter-spacing: -0.02em;
+}
+
+.rulego-block-config-type {
+  display: inline-block;
+  max-width: 100%;
+  padding: 3px 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 11px;
+  font-weight: 500;
+  color: #c7d2fe;
+  background: rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(129, 140, 248, 0.35);
+  border-radius: 6px;
+  word-break: break-all;
+}
+
+.rulego-editor-visual .rulego-editor-side .block-config-inline-form {
+  padding-right: 4px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(100, 116, 139, 0.5) transparent;
+}
+
+.rulego-editor-visual .rulego-editor-side .block-config-inline-form::-webkit-scrollbar {
+  width: 6px;
+}
+
+.rulego-editor-visual .rulego-editor-side .block-config-inline-form::-webkit-scrollbar-thumb {
+  background: rgba(100, 116, 139, 0.45);
+  border-radius: 6px;
+}
+
+.rulego-editor-visual .rulego-editor-side .rulego-props-submit-btn {
+  flex-shrink: 0;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  background: #6366f1;
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+}
+
+.rulego-editor-visual .rulego-editor-side .rulego-props-submit-btn:hover:not(:disabled) {
+  filter: brightness(1.06);
+  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.42);
+}
+
+.rulego-editor-visual .rulego-editor-side .rulego-props-submit-btn:focus-visible {
+  outline: 2px solid rgba(165, 180, 252, 0.85);
+  outline-offset: 2px;
+}
+
+.rulego-editor-visual .rulego-editor-side .rulego-props-submit-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+  filter: grayscale(0.25);
+  box-shadow: none;
+  background: #475569;
+}
+
+.rulego-props-submit-feedback {
+  margin: -2px 0 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.rulego-editor-visual .rulego-editor-side .rulego-props-submit-feedback.is-success {
+  color: #86efac;
+  background: rgba(34, 197, 94, 0.14);
+  border: 1px solid rgba(74, 222, 128, 0.35);
+}
+
+.rulego-editor-visual .rulego-editor-side .rulego-props-submit-feedback.is-error {
+  color: #fca5a5;
+  background: rgba(239, 68, 68, 0.12);
+  border: 1px solid rgba(248, 113, 113, 0.4);
+}
+
+.rulego-editor-visual .rulego-editor-side .block-config-llm-section,
+.rulego-editor-visual .rulego-editor-side .block-config-llm-section-collapsible {
+  border-bottom-color: #475569;
+}
+
+.rulego-editor-visual .rulego-editor-side .block-config-llm-section-title {
+  color: #94a3b8;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+}
+
+.rulego-editor-visual .rulego-editor-side .block-config-llm-section-toggle {
+  color: #e2e8f0;
+}
+
+.rulego-editor-visual .rulego-editor-side .block-config-llm-section-toggle:hover {
+  color: #f8fafc;
+}
+
+.rulego-editor-visual .rulego-editor-side .block-config-llm-section-chevron {
+  color: #64748b;
+}
+
+.rulego-editor-visual .rulego-editor-side .llm-config-section-title {
+  color: #94a3b8;
+  border-bottom-color: #475569;
+}
+
+.rulego-editor-visual .rulego-editor-side .llm-config-section-card {
+  background: rgba(15, 23, 42, 0.55);
+  border-color: #475569;
+}
+
+.rulego-editor-visual .rulego-editor-side .block-config-llm-section-toggle:focus-visible {
+  outline: none;
+  border-radius: 6px;
+  box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.45);
 }
 
 /* JS 脚本编辑器：强制文字深色、白底，避免被 rulego-editor-side 等父级浅色覆盖 */

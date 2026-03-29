@@ -63,65 +63,66 @@ const OPENSEARCH_RECENT_ENDPOINTS_LIMIT = 5;
 const OPENSEARCH_RECENT_INDEXES_KEY = "rulego.opensearch.recent_indexes";
 const OPENSEARCH_RECENT_INDEXES_LIMIT = 10;
 
+/** 深色画布上略压深 primary，提高与白字对比；secondary/tertiary 保持层次 */
 const scratchTheme = new ScratchBlocks.Theme(
   "scratch",
   {
     rulego_trigger: {
-      colourPrimary: "#ef4444",
-      colourSecondary: "#f87171",
-      colourTertiary: "#fca5a5",
+      colourPrimary: "#dc2626",
+      colourSecondary: "#ef4444",
+      colourTertiary: "#f87171",
     },
     rulego_action: {
-      colourPrimary: "#3b82f6",
-      colourSecondary: "#60a5fa",
-      colourTertiary: "#93c5fd",
+      colourPrimary: "#2563eb",
+      colourSecondary: "#3b82f6",
+      colourTertiary: "#60a5fa",
     },
     rulego_condition: {
-      colourPrimary: "#14b8a6",
-      colourSecondary: "#2dd4bf",
-      colourTertiary: "#5eead4",
-    },
-    rulego_data: {
-      colourPrimary: "#f59e0b",
-      colourSecondary: "#fbbf24",
-      colourTertiary: "#fde68a",
-    },
-    rulego_flow: {
-      colourPrimary: "#8b5cf6",
-      colourSecondary: "#a78bfa",
-      colourTertiary: "#c4b5fd",
-    },
-    rulego_db: {
       colourPrimary: "#0d9488",
       colourSecondary: "#14b8a6",
-      colourTertiary: "#5eead4",
+      colourTertiary: "#2dd4bf",
     },
-    rulego_file: {
-      colourPrimary: "#b45309",
-      colourSecondary: "#d97706",
+    rulego_data: {
+      colourPrimary: "#d97706",
+      colourSecondary: "#f59e0b",
       colourTertiary: "#fbbf24",
     },
+    rulego_flow: {
+      colourPrimary: "#7c3aed",
+      colourSecondary: "#8b5cf6",
+      colourTertiary: "#a78bfa",
+    },
+    rulego_db: {
+      colourPrimary: "#0f766e",
+      colourSecondary: "#0d9488",
+      colourTertiary: "#14b8a6",
+    },
+    rulego_file: {
+      colourPrimary: "#92400e",
+      colourSecondary: "#b45309",
+      colourTertiary: "#d97706",
+    },
     rulego_tracer: {
-      colourPrimary: "#0891b2",
-      colourSecondary: "#06b6d4",
-      colourTertiary: "#67e8f9",
+      colourPrimary: "#0e7490",
+      colourSecondary: "#0891b2",
+      colourTertiary: "#06b6d4",
     },
     rulego_rpa: {
-      colourPrimary: "#6366f1",
-      colourSecondary: "#818cf8",
-      colourTertiary: "#a5b4fc",
+      colourPrimary: "#4f46e5",
+      colourSecondary: "#6366f1",
+      colourTertiary: "#818cf8",
     },
   },
   {
-    rulego_trigger: { colour: "#ef4444" },
-    rulego_action: { colour: "#3b82f6" },
-    rulego_condition: { colour: "#14b8a6" },
-    rulego_data: { colour: "#f59e0b" },
-    rulego_flow: { colour: "#8b5cf6" },
-    rulego_db: { colour: "#0d9488" },
-    rulego_file: { colour: "#b45309" },
-    rulego_tracer: { colour: "#0891b2" },
-    rulego_rpa: { colour: "#6366f1" },
+    rulego_trigger: { colour: "#dc2626" },
+    rulego_action: { colour: "#2563eb" },
+    rulego_condition: { colour: "#0d9488" },
+    rulego_data: { colour: "#d97706" },
+    rulego_flow: { colour: "#7c3aed" },
+    rulego_db: { colour: "#0f766e" },
+    rulego_file: { colour: "#92400e" },
+    rulego_tracer: { colour: "#0e7490" },
+    rulego_rpa: { colour: "#4f46e5" },
   }
 );
 
@@ -392,6 +393,8 @@ type BlockConfigModalProps = {
   workspaceRef: React.RefObject<WorkspaceSvg | null>;
   onClose: () => void;
   onSaved?: () => void;
+  /** 内嵌模式：编辑器全局错误（展示在属性区顶栏下方） */
+  sideError?: string | null;
   /** 内嵌模式：在右侧属性面板中渲染，无遮罩无取消 */
   inline?: boolean;
   /** 子规则链列表（DSL 中 root 为 false 的规则链），用于 flow 块的 targetId 下拉 */
@@ -405,11 +408,14 @@ type BlockConfigModalProps = {
 
 type CaseItem = { case: string; then: string };
 
+const RULEGO_INLINE_BLOCK_FORM_ID = "rulego-inline-block-config-form";
+
 function BlockConfigModal({
   blockId,
   workspaceRef,
   onClose,
   onSaved,
+  sideError = null,
   inline,
   subRuleChains = [],
   refContextRules = [],
@@ -425,6 +431,11 @@ function BlockConfigModal({
   const initialFormRef = useRef<Record<string, string | boolean>>({});
   const initialSwitchCasesRef = useRef<CaseItem[]>([]);
   const initialDbClientParamsRef = useRef<Array<{ type: "string" | "number"; value: string }>>([]);
+  const initialJoinExtraRef = useRef<string[]>([]);
+  const [inlineSubmitFeedback, setInlineSubmitFeedback] = useState<null | { type: "success" | "error"; message: string }>(
+    null
+  );
+  const inlineFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [confirmUnsavedOpen, setConfirmUnsavedOpen] = useState(false);
   const [openSearchRecentEndpoints, setOpenSearchRecentEndpoints] = useState<string[]>([]);
   const [openSearchRecentIndexes, setOpenSearchRecentIndexes] = useState<string[]>([]);
@@ -808,11 +819,13 @@ function BlockConfigModal({
       const raw = get("JOIN_EXTRA_INCOMINGS") || "";
       const extra = raw ? raw.split(",").map((s) => s.trim()).filter(Boolean) : [];
       setJoinExtraIncomings(extra);
+      initialJoinExtraRef.current = [...extra];
       const mainPrev = block.previousConnection?.targetBlock?.();
       const total = (mainPrev ? 1 : 0) + extra.length;
       block.setFieldValue(total >= 2 ? ` (${total}路)` : "", "JOIN_ROUTES_LABEL");
     } else {
       setJoinExtraIncomings([]);
+      initialJoinExtraRef.current = [];
     }
     if (block.type === "rulego_switch") {
       try {
@@ -860,6 +873,20 @@ function BlockConfigModal({
       .catch(() => setModelConfigs([]));
   }, [block?.type, blockId]);
 
+  useEffect(() => {
+    setInlineSubmitFeedback(null);
+    if (inlineFeedbackTimerRef.current) {
+      clearTimeout(inlineFeedbackTimerRef.current);
+      inlineFeedbackTimerRef.current = null;
+    }
+  }, [blockId]);
+
+  useEffect(() => {
+    return () => {
+      if (inlineFeedbackTimerRef.current) clearTimeout(inlineFeedbackTimerRef.current);
+    };
+  }, []);
+
   const isDirty = useCallback(() => {
     const init = initialFormRef.current;
     const keys = new Set([...Object.keys(init), ...Object.keys(form)]);
@@ -878,12 +905,22 @@ function BlockConfigModal({
       const o = initialDbClientParamsRef.current[i];
       return !o || o.type !== p.type || o.value !== p.value;
     })) return true;
+    if (joinExtraIncomings.length !== initialJoinExtraRef.current.length) return true;
+    if (joinExtraIncomings.some((id, i) => id !== initialJoinExtraRef.current[i])) return true;
     return false;
-  }, [form, switchCases, dbClientParams]);
+  }, [form, switchCases, dbClientParams, joinExtraIncomings]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!block) return;
+    if (inline && !isDirty()) return;
+
+    if (inlineFeedbackTimerRef.current) {
+      clearTimeout(inlineFeedbackTimerRef.current);
+      inlineFeedbackTimerRef.current = null;
+    }
+
+    try {
     const set = (name: string, value: string | boolean) => {
       if (typeof value === "boolean") {
         block.setFieldValue(value ? "TRUE" : "FALSE", name);
@@ -1020,11 +1057,39 @@ function BlockConfigModal({
         setOpenSearchRecentIndexes(loadOpenSearchRecentIndexes());
       }
     }
-    onSaved?.();
-    initialFormRef.current = { ...form };
-    initialSwitchCasesRef.current = switchCases.map((c) => ({ ...c }));
-    initialDbClientParamsRef.current = dbClientParams.map((p) => ({ ...p }));
-    if (!inline) onClose();
+    if (block.type === "rulego_join") {
+      block.setFieldValue(joinExtraIncomings.join(", "), "JOIN_EXTRA_INCOMINGS");
+      const mainPrevJoin = block.previousConnection?.targetBlock?.();
+      const totalJoin = (mainPrevJoin ? 1 : 0) + joinExtraIncomings.length;
+      block.setFieldValue(totalJoin >= 2 ? ` (${totalJoin}路)` : "", "JOIN_ROUTES_LABEL");
+    }
+      onSaved?.();
+      initialFormRef.current = { ...form };
+      initialSwitchCasesRef.current = switchCases.map((c) => ({ ...c }));
+      initialDbClientParamsRef.current = dbClientParams.map((p) => ({ ...p }));
+      if (block.type === "rulego_join") {
+        initialJoinExtraRef.current = [...joinExtraIncomings];
+      }
+      if (inline) {
+        setInlineSubmitFeedback({ type: "success", message: "块配置已保存" });
+        inlineFeedbackTimerRef.current = setTimeout(() => {
+          setInlineSubmitFeedback(null);
+          inlineFeedbackTimerRef.current = null;
+        }, 2600);
+      }
+      if (!inline) onClose();
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (inline) {
+        setInlineSubmitFeedback({ type: "error", message: msg.trim() ? msg : "保存失败" });
+        inlineFeedbackTimerRef.current = setTimeout(() => {
+          setInlineSubmitFeedback(null);
+          inlineFeedbackTimerRef.current = null;
+        }, 5200);
+      } else {
+        throw err;
+      }
+    }
   };
 
   if (!blockId) return null;
@@ -1222,6 +1287,7 @@ function BlockConfigModal({
                         block.setFieldValue(next.join(", "), "JOIN_EXTRA_INCOMINGS");
                         const total = (mainNodeId ? 1 : 0) + next.length;
                         block.setFieldValue(total >= 2 ? ` (${total}路)` : "", "JOIN_ROUTES_LABEL");
+                        initialJoinExtraRef.current = [...next];
                         onSaved?.();
                       }}
                     >
@@ -1251,6 +1317,7 @@ function BlockConfigModal({
                         block.setFieldValue(next.join(", "), "JOIN_EXTRA_INCOMINGS");
                         const total = (mainNodeId ? 1 : 0) + next.length;
                         block.setFieldValue(total >= 2 ? ` (${total}路)` : "", "JOIN_ROUTES_LABEL");
+                        initialJoinExtraRef.current = [...next];
                         onSaved?.();
                       }}
                     >
@@ -1271,6 +1338,7 @@ function BlockConfigModal({
                       block.setFieldValue(next.join(", "), "JOIN_EXTRA_INCOMINGS");
                       const total = (mainNodeId ? 1 : 0) + next.length;
                       block.setFieldValue(total >= 2 ? ` (${total}路)` : "", "JOIN_ROUTES_LABEL");
+                      initialJoinExtraRef.current = [...next];
                       e.target.value = "";
                       onSaved?.();
                     }}
@@ -3848,13 +3916,13 @@ function BlockConfigModal({
   );
 
   const formContent = inline ? (
-    <form ref={formRef} className="block-config-inline-form" onSubmit={handleSubmit}>
+    <form
+      id={RULEGO_INLINE_BLOCK_FORM_ID}
+      ref={formRef}
+      className="block-config-inline-form"
+      onSubmit={handleSubmit}
+    >
       {formBody}
-      <div className="block-config-inline-actions">
-        <button type="submit" className="primary-button" disabled={!block}>
-          确定
-        </button>
-      </div>
     </form>
   ) : (
     <form ref={formRef} className="modal-body modal-body-form" onSubmit={handleSubmit}>
@@ -3879,12 +3947,36 @@ function BlockConfigModal({
   if (inline) {
     return (
       <>
+        <div className="rulego-props-sticky-top">
+          <h2 className="rulego-props-sticky-top-title">属性设置</h2>
+          <button
+            type="submit"
+            form={RULEGO_INLINE_BLOCK_FORM_ID}
+            className="primary-button rulego-props-submit-btn"
+            disabled={!block || !isDirty()}
+          >
+            确定
+          </button>
+        </div>
+        {inlineSubmitFeedback ? (
+          <div
+            role="status"
+            aria-live="polite"
+            className={`rulego-props-submit-feedback ${inlineSubmitFeedback.type === "error" ? "is-error" : "is-success"}`}
+          >
+            {inlineSubmitFeedback.message}
+          </div>
+        ) : null}
+        {sideError ? <div className="form-error rulego-props-side-error">{sideError}</div> : null}
         <div
           className="block-config-inline"
           onMouseLeave={handleMouseLeaveConfig}
         >
           <div className="block-config-inline-header">
-            <h3>块属性 · {block?.type ?? blockId}</h3>
+            <h3>块属性</h3>
+            <code className="rulego-block-config-type" title={block?.type ?? blockId}>
+              {block?.type ?? blockId}
+            </code>
           </div>
           {formContent}
         </div>
@@ -4155,9 +4247,9 @@ export default function RuleGoScratchEditorPage() {
       },
       trashcan: false,
       grid: {
-        spacing: 20,
-        length: 20,
-        colour: "rgba(148, 163, 184, 0.42)",
+        spacing: 24,
+        length: 18,
+        colour: "rgba(148, 163, 184, 0.28)",
         snap: true,
       },
     }) as WorkspaceSvg;
@@ -5279,7 +5371,22 @@ export default function RuleGoScratchEditorPage() {
   return (
     <div className="rulego-editor rulego-editor-visual">
       <header className="rulego-editor-header-bar">
-        <h1 className="rulego-editor-title">可视化规则编辑器</h1>
+        <div className="rulego-editor-title-cluster">
+          <div className="rulego-editor-title-row">
+            <h1 className="rulego-editor-title">规则编辑器</h1>
+            {isDirty ? (
+              <span className="rulego-editor-unsaved-badge" title="有未保存的更改">
+                未保存
+              </span>
+            ) : null}
+          </div>
+          <p
+            className={`rulego-editor-rule-name${name.trim() ? "" : " rulego-editor-rule-name--placeholder"}`}
+            title={name.trim() || undefined}
+          >
+            {name.trim() || "未命名规则"}
+          </p>
+        </div>
         <div className="rulego-editor-toolbar">
           <button
             className={`rulego-toolbar-btn ${isDirty ? "primary" : "save-unchanged"}`}
@@ -5311,6 +5418,7 @@ export default function RuleGoScratchEditorPage() {
             className="rulego-toolbar-btn icon"
             type="button"
             title="撤销"
+            aria-label="撤销"
             onClick={() => workspaceWs?.undo?.()}
           >
             ↶
@@ -5319,6 +5427,7 @@ export default function RuleGoScratchEditorPage() {
             className="rulego-toolbar-btn icon"
             type="button"
             title="重做"
+            aria-label="重做"
             onClick={() => workspaceWs?.redo?.()}
           >
             ↷
@@ -5327,6 +5436,7 @@ export default function RuleGoScratchEditorPage() {
             className="rulego-toolbar-btn icon"
             type="button"
             title="缩小画布"
+            aria-label="缩小画布"
             onClick={() => bumpWorkspaceZoom(-1)}
           >
             −
@@ -5338,6 +5448,7 @@ export default function RuleGoScratchEditorPage() {
             className="rulego-toolbar-btn icon"
             type="button"
             title="放大画布"
+            aria-label="放大画布"
             onClick={() => bumpWorkspaceZoom(1)}
           >
             +
@@ -5346,6 +5457,7 @@ export default function RuleGoScratchEditorPage() {
             className="rulego-toolbar-btn icon"
             type="button"
             title="适配画布"
+            aria-label="缩放以适配画布"
             onClick={() => {
               if (workspaceRef.current) {
                 const ws = workspaceRef.current as WorkspaceSvg & {
@@ -5475,8 +5587,6 @@ export default function RuleGoScratchEditorPage() {
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="rulego-panel-title">属性设置</div>
-            {error ? <div className="form-error">{error}</div> : null}
             <BlockConfigModal
               blockId={selectedBlockId}
               workspaceRef={workspaceRef}
@@ -5487,6 +5597,7 @@ export default function RuleGoScratchEditorPage() {
                   setJson(JSON.stringify(ScratchBlocks.serialization.workspaces.save(workspaceRef.current), null, 2));
                 }
               }}
+              sideError={error}
               inline
               subRuleChains={subRuleChains}
               refContextRules={rules}

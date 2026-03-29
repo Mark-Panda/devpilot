@@ -20,7 +20,7 @@ const CATEGORY_STYLES: Record<string, { bg: string; border: string }> = {
 };
 
 const BLOCK_LABELS: Record<string, string> = {
-  rulego_startTrigger: "开始",
+  rulego_startTrigger: "触发-手动开始",
   rulego_endpoint_http: "触发·HTTP",
   rulego_endpoint_ws: "触发·WebSocket",
   rulego_endpoint_mqtt: "触发·MQTT",
@@ -123,6 +123,11 @@ export function BlockLibraryPanel({ workspaceRef, searchKeyword = "" }: BlockLib
 
   return (
     <div className="rulego-block-library-panel">
+      {filteredCategories.length === 0 ? (
+        <p className="rulego-block-library-empty">
+          {searchKeyword.trim() ? "无匹配的积木或分类，请调整搜索词" : "暂无积木分类"}
+        </p>
+      ) : null}
       {filteredCategories.map((cat) => {
         const isExpanded = expanded[cat.id];
         const style = CATEGORY_STYLES[cat.categorystyle] || CATEGORY_STYLES.rulego_data;
