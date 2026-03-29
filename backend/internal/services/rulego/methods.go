@@ -268,6 +268,14 @@ func (s *Service) ListAvailableSkills() ([]AvailableSkillItem, error) {
 	return out, nil
 }
 
+// RuleGoPlanSubRuleCandidate 已启用子规则链摘要，供 Agent 规划时优先用 flow/targetId 复用。
+type RuleGoPlanSubRuleCandidate struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description,omitempty"`
+	NodeSummary string `json:"node_summary,omitempty"`
+}
+
 type GenerateRuleGoPlanInput struct {
 	Prompt              string   `json:"prompt"`
 	CurrentDSL          string   `json:"current_dsl"`
@@ -280,6 +288,7 @@ type GenerateRuleGoPlanInput struct {
 		Role    string `json:"role"`
 		Content string `json:"content"`
 	} `json:"conversation_history,omitempty"`
+	AvailableSubRuleChains []RuleGoPlanSubRuleCandidate `json:"available_sub_rule_chains,omitempty"`
 }
 
 type RuleGoPlanNode struct {
@@ -372,7 +381,8 @@ func (s *Service) GenerateRuleGoPlan(input GenerateRuleGoPlanInput) (GenerateRul
 		"3) node_type 必须优先使用可用节点类型列表中的类型；\n" +
 		"4) edges 的 from_id/to_id 必须引用你本次输出的 nodes 中 id，或引用输入里「当前画布」已有节点的 id（见 current_dsl 与 canvas_structure）；\n" +
 		"5) 输入中的 current_dsl 为当前画布完整 RuleGo 规则链 JSON（含 ruleChain、metadata.nodes 全量 configuration、metadata.connections、endpoints 等）；canvas_structure 为同一画布的拓扑摘要（节点 id/type/name、连线 fromId/toId/type、端点概要），用于快速把握结构；你必须结合二者理解整条链，在补充、修改、分支、错误处理等规划时优先复用已有节点 id 与连接关系，避免重复堆砌已有能力；\n" +
-		"6) 若 current_dsl 为空字符串，表示画布为空，可从触发器开始规划全新链。"
+		"6) 若 current_dsl 为空字符串，表示画布为空，可从触发器开始规划全新链。\n" +
+		"7) available_sub_rule_chains 为规则列表中「已启用」的子规则链（root=false 且未 disabled），每项含 id（目标子链规则 ID）、name、description、node_summary（节点类型/名称摘要）。当用户需求与某条子链的职责或摘要高度匹配时，必须优先使用 node_type \"flow\"、configuration 形如 {\"targetId\":\"<该条 id>\",\"extend\":false} 的节点引用该子链（需要继承子链输出关系时可将 extend 设为 true），用子规则链嵌套复用现成能力，避免再输出一串与子链内部等效的重复节点；仅当列表无合适项或需求明显是全新独立流程时，再从零组合其他节点。"
 	history := make([]map[string]string, 0, len(input.ConversationHistory))
 	for _, h := range input.ConversationHistory {
 		r := strings.TrimSpace(h.Role)
@@ -386,12 +396,13 @@ func (s *Service) GenerateRuleGoPlan(input GenerateRuleGoPlanInput) (GenerateRul
 	}
 	canvasStruct := compactCanvasStructureFromRuleGoDSL(input.CurrentDSL)
 	userPayload, _ := json.Marshal(map[string]interface{}{
-		"requirement":            prompt,
-		"conversation_history":   history,
-		"current_dsl":            strings.TrimSpace(input.CurrentDSL),
-		"canvas_structure":       canvasStruct,
-		"node_types":             input.NodeTypes,
-		"clarification_strategy": "ask_high_value_questions_first_if_needed",
+		"requirement":               prompt,
+		"conversation_history":      history,
+		"current_dsl":               strings.TrimSpace(input.CurrentDSL),
+		"canvas_structure":          canvasStruct,
+		"node_types":                input.NodeTypes,
+		"available_sub_rule_chains": input.AvailableSubRuleChains,
+		"clarification_strategy":    "ask_high_value_questions_first_if_needed",
 	})
 	raw, err := client.ChatWithSystem(context.Background(), systemPrompt, string(userPayload))
 	if err != nil {

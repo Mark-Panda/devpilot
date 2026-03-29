@@ -170,10 +170,18 @@ export async function deleteSkillForRuleChain(ruleId: string): Promise<void> {
   return DeleteSkillForRuleChain(ruleId);
 }
 
+export type AgentSubRuleChainRef = {
+  id: string;
+  name: string;
+  description?: string;
+  node_summary?: string;
+};
+
 export type GenerateRuleGoPlanInput = {
   prompt: string;
   current_dsl?: string;
   node_types?: string[];
+  available_sub_rule_chains?: AgentSubRuleChainRef[];
   conversation_history?: Array<{ role: string; content: string }>;
   base_url?: string;
   api_key?: string;
@@ -210,6 +218,7 @@ export async function generateRuleGoPlan(input: GenerateRuleGoPlanInput): Promis
     prompt: input.prompt,
     current_dsl: input.current_dsl ?? "",
     node_types: input.node_types ?? [],
+    available_sub_rule_chains: input.available_sub_rule_chains ?? [],
     conversation_history: input.conversation_history ?? [],
     base_url: input.base_url ?? "",
     api_key: input.api_key ?? "",

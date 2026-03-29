@@ -38,6 +38,28 @@ export function isSubRuleChain(definition: string): boolean {
 }
 
 /** 从规则链 definition JSON 中解析 metadata.nodes，供 ref 节点 targetId 下拉（跨链 `chainId:nodeId`）等使用 */
+/** 从子规则链 DSL 提取节点类型/名称短摘要，供 Agent 规划判断是否可复用 flow/targetId */
+export function summarizeRuleNodesForAgent(definition: string, maxNodes = 20): string {
+  if (!definition?.trim()) return "";
+  try {
+    const parsed = JSON.parse(definition);
+    const nodes = parsed?.metadata?.nodes;
+    if (!Array.isArray(nodes)) return "";
+    const parts: string[] = [];
+    for (let i = 0; i < nodes.length && i < maxNodes; i++) {
+      const n = nodes[i] as { type?: string; name?: string };
+      const t = String(n?.type ?? "").trim();
+      const nm = String(n?.name ?? "").trim();
+      if (!t && !nm) continue;
+      parts.push(nm ? `${t}(${nm})` : t);
+    }
+    const suffix = nodes.length > maxNodes ? ` …共${nodes.length}个节点` : "";
+    return parts.length ? `${parts.join("、")}${suffix}` : "";
+  } catch {
+    return "";
+  }
+}
+
 export function extractNodesFromRuleDefinition(definition: string): Array<{ id: string; name: string }> {
   if (!definition?.trim()) return [];
   try {
