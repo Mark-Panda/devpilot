@@ -275,7 +275,7 @@ export default function CurlComparePage() {
   };
 
   return (
-    <div className="page">
+    <div className="page animate-fade-in">
       <div className="page-header">
         <div>
           <h2>接口对比</h2>

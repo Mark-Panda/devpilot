@@ -156,7 +156,7 @@ export const MCPManagementPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-0 flex-1 overflow-auto bg-studio-code px-4 py-6 sm:px-8">
+    <div className="min-h-0 flex-1 animate-fade-in overflow-auto bg-studio-code px-4 py-6 sm:px-8">
       <div className="mx-auto max-w-5xl">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
           <div>
@@ -205,7 +205,17 @@ export const MCPManagementPage: React.FC = () => {
         )}
 
         {loading ? (
-          <p className="text-sm text-studio-muted">加载中…</p>
+          <div
+            className="flex items-center gap-3 rounded-xl border border-studio-border bg-studio-panel px-6 py-10 shadow-[0_8px_24px_rgba(0,0,0,0.25)]"
+            role="status"
+            aria-live="polite"
+          >
+            <span
+              className="inline-block h-6 w-6 shrink-0 animate-spin rounded-full border-2 border-studio-border border-t-studio-hot"
+              aria-hidden
+            />
+            <span className="text-sm text-studio-muted">加载 MCP 配置…</span>
+          </div>
         ) : servers.length === 0 ? (
           <div className="rounded-xl border border-studio-border bg-studio-panel p-8 text-center text-sm text-studio-muted">
             暂无 MCP 条目。点击「添加一行」后填写并保存。

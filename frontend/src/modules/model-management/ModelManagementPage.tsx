@@ -10,7 +10,7 @@ export default function ModelManagementPage() {
   const [confirmingConfig, setConfirmingConfig] = useState<ModelConfig | null>(null);
 
   return (
-    <div className="page">
+    <div className="page animate-fade-in">
       <div className="page-header">
         <div>
           <h2>模型管理</h2>
@@ -42,7 +42,10 @@ export default function ModelManagementPage() {
           <div className="table-cell">操作</div>
         </div>
         {loading ? (
-          <div className="table-empty">加载中...</div>
+          <div className="table-empty table-empty-loading" role="status" aria-live="polite">
+            <span className="table-inline-spinner" aria-hidden />
+            <span>加载中…</span>
+          </div>
         ) : configs.length === 0 ? (
           <div className="table-empty">暂无数据</div>
         ) : (

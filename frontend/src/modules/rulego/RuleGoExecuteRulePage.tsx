@@ -281,7 +281,7 @@ export default function RuleGoExecuteRulePage() {
   );
 
   return (
-    <div className="page rulego-exec-page">
+    <div className="page rulego-exec-page animate-fade-in">
       <div className="page-header">
         <div>
           <h2>执行规则</h2>

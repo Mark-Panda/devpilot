@@ -77,7 +77,7 @@ export default function RuleGoLogsPage() {
   };
 
   return (
-    <div className="page">
+    <div className="page animate-fade-in">
       <div className="page-header">
         <div>
           <h2>执行日志</h2>
@@ -99,7 +99,10 @@ export default function RuleGoLogsPage() {
           <div className="table-cell table-actions">操作</div>
         </div>
         {loading ? (
-          <div className="table-empty">加载中...</div>
+          <div className="table-empty table-empty-loading" role="status" aria-live="polite">
+            <span className="table-inline-spinner" aria-hidden />
+            <span>加载中…</span>
+          </div>
         ) : items.length === 0 ? (
           <div className="table-empty">暂无执行记录</div>
         ) : (

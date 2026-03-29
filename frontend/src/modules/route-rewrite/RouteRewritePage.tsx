@@ -11,7 +11,7 @@ export default function RouteRewritePage() {
   const [confirmingRule, setConfirmingRule] = useState<RouteRewriteRule | null>(null);
 
   return (
-    <div className="page">
+    <div className="page animate-fade-in">
       <div className="page-header">
         <div>
           <h2>重构路由管理</h2>
@@ -43,7 +43,10 @@ export default function RouteRewritePage() {
           <div className="table-cell">操作</div>
         </div>
         {loading ? (
-          <div className="table-empty">加载中...</div>
+          <div className="table-empty table-empty-loading" role="status" aria-live="polite">
+            <span className="table-inline-spinner" aria-hidden />
+            <span>加载中…</span>
+          </div>
         ) : rules.length === 0 ? (
           <div className="table-empty">暂无数据</div>
         ) : (

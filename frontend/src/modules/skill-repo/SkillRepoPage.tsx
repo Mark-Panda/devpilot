@@ -147,7 +147,7 @@ export default function SkillRepoPage() {
   );
 
   return (
-    <div className="page">
+    <div className="page animate-fade-in">
       <div className="page-header">
         <div>
           <h2>技能仓库</h2>
@@ -188,7 +188,10 @@ export default function SkillRepoPage() {
           <div className="table-cell">操作</div>
         </div>
         {loading ? (
-          <div className="table-empty">加载中...</div>
+          <div className="table-empty table-empty-loading" role="status" aria-live="polite">
+            <span className="table-inline-spinner" aria-hidden />
+            <span>加载中…</span>
+          </div>
         ) : packages.length === 0 ? (
           <div className="table-empty">暂无技能包，请上传 zip 或在此目录下放置含 SKILL.md 的子目录</div>
         ) : (

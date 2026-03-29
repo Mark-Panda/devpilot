@@ -16,6 +16,9 @@ import { StudioWorkspaceModalShell, StudioWorkspaceToolbar } from '../components
 import type { ChatMessage } from '../../agent/types'
 import type { StudioDetail, StudioProgressEvent, StudioTodoBoardRow } from '../types'
 
+const officeFocus =
+  'outline-none focus-visible:ring-2 focus-visible:ring-[var(--so-red)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--sp-bg)]'
+
 const kindLabels: Record<string, string> = {
   delegation_started: '主 Agent → 委派子 Agent',
   delegation_finished: '子 Agent → 返回结果',
@@ -307,39 +310,55 @@ export const StudioWorkspacePage: React.FC = () => {
 
   if (!studioId) {
     return (
-      <p className="studio-pixel p-6 text-sm text-[var(--sp-muted)]">无效的工作室</p>
+      <div className="studio-pixel flex flex-1 items-center justify-center p-8">
+        <p className="rounded-lg border-2 border-[var(--sp-border)] bg-[var(--sp-panel)] px-6 py-4 text-sm text-[var(--sp-muted)] shadow-[var(--sp-pixel-shadow-sm)]">
+          无效的工作室
+        </p>
+      </div>
     )
   }
 
   if (loading && !detail) {
     return (
-      <div className="studio-pixel flex flex-1 items-center justify-center p-8 text-sm text-[var(--sp-muted)]">
-        加载工作室…
+      <div className="studio-pixel flex flex-1 items-center justify-center p-8">
+        <div
+          className="flex max-w-md items-center gap-4 rounded-lg border-2 border-[var(--sp-border)] bg-[var(--sp-panel)] px-6 py-8 text-sm text-[var(--sp-muted)] shadow-[var(--sp-pixel-shadow-sm)]"
+          role="status"
+          aria-live="polite"
+        >
+          <span className="inline-block h-6 w-6 shrink-0 animate-spin border-2 border-[var(--sp-border)] border-t-[var(--sp-border-hot)]" />
+          <div>
+            <p className="m-0 font-semibold text-[var(--sp-text)]">加载工作室…</p>
+            <p className="mt-0.5 text-xs text-[var(--sp-muted)]">正在拉取成员与进度</p>
+          </div>
+        </div>
       </div>
     )
   }
 
   if (!detail) {
     return (
-      <div className="studio-pixel p-6">
-        <p className="text-sm text-[var(--sp-error-text)]">{error ?? '工作室不存在'}</p>
-        <Link
-          to="/studios"
-          className="mt-2 inline-block border-b-2 border-[var(--sp-border-hot)] text-sm text-[var(--sp-border-hot)]"
-        >
-          返回列表
-        </Link>
+      <div className="studio-pixel flex flex-1 flex-col items-center justify-center p-8">
+        <div className="w-full max-w-md rounded-lg border-2 border-[var(--sp-error-border)] bg-[var(--sp-error-bg)] px-6 py-5 shadow-[var(--sp-pixel-shadow-sm)]">
+          <p className="m-0 text-sm text-[var(--sp-error-text)]">{error ?? '工作室不存在'}</p>
+          <Link
+            to="/studios"
+            className={`mt-4 inline-block rounded border-2 border-[var(--sp-border-hot)] bg-[var(--sp-panel)] px-3 py-1.5 text-sm font-medium text-[var(--sp-border-hot)] transition-colors hover:bg-[var(--sp-code)] ${officeFocus}`}
+          >
+            返回列表
+          </Link>
+        </div>
       </div>
     )
   }
 
   return (
     <div className="studio-pixel studio-office-layout studio-workspace-root flex min-h-0 w-full flex-1 flex-col bg-[var(--sp-bg)]">
-      <header className="flex flex-shrink-0 flex-col gap-1.5 border-b-2 border-[var(--so-red)] bg-[var(--so-dashboard)] px-4 py-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-1 sm:px-6">
+      <header className="flex flex-shrink-0 flex-col gap-1.5 border-b-2 border-[var(--so-red)] bg-[var(--so-dashboard)] px-4 py-2.5 shadow-[inset_0_-1px_0_rgba(0,0,0,0.35)] sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-1 sm:px-6">
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <Link
             to="/studios"
-            className="shrink-0 border border-transparent px-2 py-1 text-sm text-[var(--sp-muted)] transition-colors hover:border-[var(--so-red)] hover:bg-[#252525] hover:text-[var(--sp-text)]"
+            className={`shrink-0 rounded border border-transparent px-2 py-1 text-sm text-[var(--sp-muted)] transition-colors hover:border-[var(--so-red)] hover:bg-[#252525] hover:text-[var(--sp-text)] ${officeFocus}`}
           >
             ← 工作室列表
           </Link>
@@ -375,7 +394,7 @@ export const StudioWorkspacePage: React.FC = () => {
           <button
             type="button"
             onClick={() => setSceneCollapsed(false)}
-            className="shrink-0 border border-[var(--so-red)] bg-[var(--so-red)]/20 px-2.5 py-1 text-sm text-[var(--sp-error-text)] hover:bg-[var(--so-red)]/30"
+            className={`shrink-0 border border-[var(--so-red)] bg-[var(--so-red)]/20 px-2.5 py-1 text-sm text-[var(--sp-error-text)] transition-colors hover:bg-[var(--so-red)]/30 ${officeFocus}`}
           >
             展开场景
           </button>
@@ -411,7 +430,10 @@ export const StudioWorkspacePage: React.FC = () => {
       )}
 
       {error && (
-        <div className="mx-4 mt-2 border-2 border-[var(--sp-error-border)] bg-[var(--sp-error-bg)] px-3 py-2 text-sm text-[var(--sp-error-text)] sm:mx-6">
+        <div
+          className="mx-4 mt-2 rounded-lg border-2 border-[var(--sp-error-border)] bg-[var(--sp-error-bg)] px-3 py-2.5 text-sm text-[var(--sp-error-text)] shadow-[var(--sp-pixel-shadow-sm)] sm:mx-6"
+          role="alert"
+        >
           {error}
         </div>
       )}

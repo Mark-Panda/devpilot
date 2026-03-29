@@ -10,10 +10,11 @@ export default function PlaceholderPage({
   description = "建设中",
 }: PlaceholderPageProps) {
   return (
-    <div className="page">
-      <div className="page-header">
-        <h2>{title}</h2>
-        <p className="page-subtitle">{description}</p>
+    <div className="page placeholder-page">
+      <div className="placeholder-page-card animate-slide-up">
+        <p className="placeholder-page-eyebrow">DevPilot</p>
+        <h2 className="placeholder-page-title">{title}</h2>
+        <p className="placeholder-page-desc">{description}</p>
       </div>
     </div>
   );

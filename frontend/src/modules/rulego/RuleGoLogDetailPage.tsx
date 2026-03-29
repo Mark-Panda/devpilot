@@ -129,7 +129,7 @@ export default function RuleGoLogDetailPage() {
 
   if (!id) {
     return (
-      <div className="page">
+      <div className="page animate-fade-in">
         <p className="table-error">缺少执行 ID</p>
         <button className="text-button" type="button" onClick={() => navigate("/rulego/logs")}>
           返回列表
@@ -140,15 +140,18 @@ export default function RuleGoLogDetailPage() {
 
   if (loading) {
     return (
-      <div className="page">
-        <div className="table-empty">加载中...</div>
+      <div className="page animate-fade-in">
+        <div className="table-empty table-empty-loading" role="status" aria-live="polite">
+          <span className="table-inline-spinner" aria-hidden />
+          <span>加载中…</span>
+        </div>
       </div>
     );
   }
 
   if (error || !log) {
     return (
-      <div className="page">
+      <div className="page animate-fade-in">
         <p className="table-error">{error || "未找到该执行记录"}</p>
         <button className="text-button" type="button" onClick={() => navigate("/rulego/logs")}>
           返回列表
@@ -158,7 +161,7 @@ export default function RuleGoLogDetailPage() {
   }
 
   return (
-    <div className="page rulego-log-detail-page">
+    <div className="page rulego-log-detail-page animate-fade-in">
       <div className="page-header">
         <div>
           <h2>执行明细</h2>

@@ -5,6 +5,9 @@ import { agentApi } from '../../agent/api'
 import type { Studio } from '../types'
 import type { AgentInfo } from '../../agent/types'
 
+const pixelFocus =
+  'outline-none focus-visible:ring-2 focus-visible:ring-[var(--sp-border-hot)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--sp-bg)]'
+
 export const StudioListPage: React.FC = () => {
   const navigate = useNavigate()
   const [studios, setStudios] = useState<Studio[]>([])
@@ -93,25 +96,35 @@ export const StudioListPage: React.FC = () => {
           <button
             type="button"
             onClick={() => setModalOpen(true)}
-            className="border-2 border-black bg-[var(--sp-accent)] px-4 py-2 text-sm font-medium text-white shadow-[var(--sp-pixel-shadow)] hover:bg-[var(--sp-border-hot)]"
+            className={`border-2 border-black bg-[var(--sp-accent)] px-4 py-2 text-sm font-medium text-white shadow-[var(--sp-pixel-shadow)] transition-colors hover:bg-[var(--sp-border-hot)] ${pixelFocus}`}
           >
             新建工作室
           </button>
         </div>
 
         {error && (
-          <div className="mb-4 border-2 border-[var(--sp-error-border)] bg-[var(--sp-error-bg)] px-4 py-3 text-sm text-[var(--sp-error-text)]">
+          <div
+            className="mb-4 rounded-lg border-2 border-[var(--sp-error-border)] bg-[var(--sp-error-bg)] px-4 py-3 text-sm text-[var(--sp-error-text)] shadow-[var(--sp-pixel-shadow-sm)]"
+            role="alert"
+          >
             {error}
           </div>
         )}
 
         {loading ? (
-          <div className="flex items-center gap-3 py-12 text-sm text-[var(--sp-muted)]">
-            <span className="inline-block h-5 w-5 animate-spin border-2 border-[var(--sp-border)] border-t-[var(--sp-border-hot)]" />
-            加载中…
+          <div
+            className="flex items-center gap-4 rounded-lg border-2 border-[var(--sp-border)] bg-[var(--sp-panel)] px-6 py-10 text-sm text-[var(--sp-muted)] shadow-[var(--sp-pixel-shadow-sm)]"
+            role="status"
+            aria-live="polite"
+          >
+            <span className="inline-block h-6 w-6 shrink-0 animate-spin border-2 border-[var(--sp-border)] border-t-[var(--sp-border-hot)]" />
+            <div>
+              <p className="m-0 font-semibold text-[var(--sp-text)]">加载中…</p>
+              <p className="mt-0.5 text-xs text-[var(--sp-muted)]">正在获取工作室与 Agent 列表</p>
+            </div>
           </div>
         ) : studios.length === 0 ? (
-          <div className="border-2 border-dashed border-[var(--sp-border)] bg-[var(--sp-panel)] px-8 py-14 text-center shadow-[var(--sp-pixel-shadow)]">
+          <div className="rounded-lg border-2 border-dashed border-[var(--sp-border)] bg-[var(--sp-panel)] px-8 py-14 text-center shadow-[var(--sp-pixel-shadow)]">
             <p className="text-base font-bold text-[var(--sp-text)]">还没有工作室</p>
             <p className="mx-auto mt-2 max-w-md text-sm text-[var(--sp-muted)]">
               创建一个工作室，把主 Agent 及其子 Agent 拉进同一协作空间，在左侧看任务进度与 TODO，在右侧与主 Agent 对话。
@@ -119,7 +132,7 @@ export const StudioListPage: React.FC = () => {
             <button
               type="button"
               onClick={() => setModalOpen(true)}
-              className="mt-6 border-2 border-black bg-[var(--sp-accent)] px-5 py-2.5 text-sm font-medium text-white shadow-[var(--sp-pixel-shadow)] hover:bg-[var(--sp-border-hot)]"
+              className={`mt-6 border-2 border-black bg-[var(--sp-accent)] px-5 py-2.5 text-sm font-medium text-white shadow-[var(--sp-pixel-shadow)] transition-colors hover:bg-[var(--sp-border-hot)] ${pixelFocus}`}
             >
               新建工作室
             </button>
@@ -129,12 +142,12 @@ export const StudioListPage: React.FC = () => {
             {studios.map((s) => (
               <li
                 key={s.id}
-                className="flex flex-wrap items-center justify-between gap-3 border-2 border-[var(--sp-border)] bg-[var(--sp-panel)] px-4 py-3.5 shadow-[var(--sp-pixel-shadow-sm)] transition-colors hover:border-[var(--sp-border-hot)]"
+                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border-2 border-[var(--sp-border)] bg-[var(--sp-panel)] px-4 py-3.5 shadow-[var(--sp-pixel-shadow-sm)] transition-colors hover:border-[var(--sp-border-hot)]"
               >
                 <div className="min-w-0 flex-1">
                   <Link
                     to={`/studios/${s.id}`}
-                    className="font-medium text-[var(--sp-text)] hover:text-[var(--sp-border-hot)]"
+                    className={`rounded font-medium text-[var(--sp-text)] transition-colors hover:text-[var(--sp-border-hot)] ${pixelFocus}`}
                   >
                     {s.name}
                   </Link>
@@ -145,7 +158,7 @@ export const StudioListPage: React.FC = () => {
                 <div className="flex shrink-0 gap-2">
                   <Link
                     to={`/studios/${s.id}`}
-                    className="border-2 border-[var(--sp-border)] bg-[var(--sp-panel-2)] px-3 py-1.5 text-sm font-medium text-[var(--sp-border-hot)] hover:border-[var(--sp-border-hot)]"
+                    className={`border-2 border-[var(--sp-border)] bg-[var(--sp-panel-2)] px-3 py-1.5 text-sm font-medium text-[var(--sp-border-hot)] transition-colors hover:border-[var(--sp-border-hot)] ${pixelFocus}`}
                   >
                     进入
                   </Link>
@@ -153,7 +166,7 @@ export const StudioListPage: React.FC = () => {
                     type="button"
                     onClick={() => setConfirmDelete(s)}
                     disabled={deletingId !== null}
-                    className="border-2 border-[var(--sp-border)] px-3 py-1.5 text-sm text-[var(--sp-muted)] hover:border-[var(--sp-error-border)] hover:text-[var(--sp-error-text)] disabled:opacity-50"
+                    className={`border-2 border-[var(--sp-border)] px-3 py-1.5 text-sm text-[var(--sp-muted)] transition-colors hover:border-[var(--sp-error-border)] hover:text-[var(--sp-error-text)] disabled:opacity-50 ${pixelFocus}`}
                   >
                     删除
                   </button>
@@ -171,7 +184,7 @@ export const StudioListPage: React.FC = () => {
           aria-modal="true"
           aria-labelledby="studio-delete-title"
         >
-          <div className="w-full max-w-md border-4 border-[var(--sp-border)] bg-[var(--sp-panel-2)] p-6 shadow-[var(--sp-pixel-shadow)]">
+          <div className="w-full max-w-md rounded-sm border-4 border-[var(--sp-border)] bg-[var(--sp-panel-2)] p-6 shadow-[var(--sp-pixel-shadow)]">
             <h2 id="studio-delete-title" className="text-lg font-bold text-[var(--sp-text)]">
               删除工作室
             </h2>
@@ -183,7 +196,7 @@ export const StudioListPage: React.FC = () => {
                 type="button"
                 disabled={deletingId !== null}
                 onClick={() => setConfirmDelete(null)}
-                className="border-2 border-[var(--sp-border)] px-4 py-2 text-sm text-[var(--sp-text)] disabled:opacity-50"
+                className={`border-2 border-[var(--sp-border)] px-4 py-2 text-sm text-[var(--sp-text)] transition-colors hover:bg-[var(--sp-code)] disabled:opacity-50 ${pixelFocus}`}
               >
                 取消
               </button>
@@ -191,7 +204,7 @@ export const StudioListPage: React.FC = () => {
                 type="button"
                 disabled={deletingId !== null}
                 onClick={() => void runDelete(confirmDelete)}
-                className="border-2 border-black bg-[var(--sp-accent)] px-4 py-2 text-sm font-medium text-white shadow-[var(--sp-pixel-shadow-sm)] disabled:opacity-50"
+                className={`border-2 border-black bg-[var(--sp-accent)] px-4 py-2 text-sm font-medium text-white shadow-[var(--sp-pixel-shadow-sm)] transition-colors hover:brightness-110 disabled:opacity-50 ${pixelFocus}`}
               >
                 {deletingId ? '删除中…' : '确定删除'}
               </button>
@@ -208,7 +221,7 @@ export const StudioListPage: React.FC = () => {
         >
           <form
             onSubmit={(e) => void handleCreate(e)}
-            className="w-full max-w-md border-4 border-[var(--sp-border)] bg-[var(--sp-panel-2)] p-6 shadow-[var(--sp-pixel-shadow)]"
+            className="w-full max-w-md rounded-sm border-4 border-[var(--sp-border)] bg-[var(--sp-panel-2)] p-6 shadow-[var(--sp-pixel-shadow)]"
           >
             <h2 className="text-lg font-bold text-[var(--sp-text)]">新建工作室</h2>
             <p className="mt-1 text-xs text-[var(--sp-muted)]">将同步纳入当前主 Agent 下的全部子 Agent（以运行时树为准）。</p>
@@ -219,7 +232,7 @@ export const StudioListPage: React.FC = () => {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="留空则使用主 Agent 名称"
-                  className="w-full border-2 border-[var(--sp-border)] bg-[var(--sp-code)] px-3 py-2 text-sm text-[var(--sp-text)] placeholder:text-[var(--sp-muted)]"
+                  className={`w-full rounded-sm border-2 border-[var(--sp-border)] bg-[var(--sp-code)] px-3 py-2 text-sm text-[var(--sp-text)] placeholder:text-[var(--sp-muted)] ${pixelFocus}`}
                 />
               </div>
               <div>
@@ -228,7 +241,7 @@ export const StudioListPage: React.FC = () => {
                   required
                   value={mainId}
                   onChange={(e) => setMainId(e.target.value)}
-                  className="w-full border-2 border-[var(--sp-border)] bg-[var(--sp-code)] px-3 py-2 text-sm text-[var(--sp-text)]"
+                  className={`w-full rounded-sm border-2 border-[var(--sp-border)] bg-[var(--sp-code)] px-3 py-2 text-sm text-[var(--sp-text)] ${pixelFocus}`}
                 >
                   <option value="">请选择 main 类型 Agent</option>
                   {mains.map((a) => (
@@ -243,14 +256,14 @@ export const StudioListPage: React.FC = () => {
               <button
                 type="button"
                 onClick={() => setModalOpen(false)}
-                className="border-2 border-[var(--sp-border)] px-4 py-2 text-sm text-[var(--sp-text)]"
+                className={`border-2 border-[var(--sp-border)] px-4 py-2 text-sm text-[var(--sp-text)] transition-colors hover:bg-[var(--sp-code)] ${pixelFocus}`}
               >
                 取消
               </button>
               <button
                 type="submit"
                 disabled={saving || !mainId}
-                className="border-2 border-black bg-[var(--sp-accent)] px-4 py-2 text-sm font-medium text-white shadow-[var(--sp-pixel-shadow-sm)] disabled:opacity-50"
+                className={`border-2 border-black bg-[var(--sp-accent)] px-4 py-2 text-sm font-medium text-white shadow-[var(--sp-pixel-shadow-sm)] transition-colors hover:brightness-110 disabled:opacity-50 ${pixelFocus}`}
               >
                 {saving ? '创建中…' : '创建'}
               </button>

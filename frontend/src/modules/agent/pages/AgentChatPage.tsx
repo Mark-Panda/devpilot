@@ -10,6 +10,10 @@ import type { AgentConfig, AgentInfo, ModelConfig } from '../types'
 /** 避免 React Strict Mode 双次挂载时重复自动建主 Agent（仅取最后一次 init） */
 let agentChatInitGeneration = 0
 
+/** 键盘焦点环，与侧栏 OpenClaw 主题一致 */
+const focusRing =
+  'outline-none focus-visible:ring-2 focus-visible:ring-studio-hot/50 focus-visible:ring-offset-2 focus-visible:ring-offset-studio-bg'
+
 function orderedAgentsWithDepth(agents: AgentInfo[]): { agent: AgentInfo; depth: number }[] {
   const map = new Map(agents.map((a) => [a.config.id, a]))
   const roots = agents.filter((a) => !a.config.parent_id || !map.has(a.config.parent_id))
@@ -64,9 +68,12 @@ function proxyHostFromBaseUrl(baseUrl: string | undefined): string {
 /** 顶栏：面包屑 + 快捷入口（去掉无行为的占位按钮，减少干扰） */
 function OcTopBar() {
   return (
-    <header className="flex flex-shrink-0 items-center gap-3 border-b border-studio-border bg-studio-panel px-4 py-2.5 sm:px-6">
+    <header className="flex flex-shrink-0 items-center gap-3 border-b border-studio-border bg-studio-panel/95 px-4 py-2.5 shadow-[0_1px_0_rgba(0,0,0,0.35)] backdrop-blur-sm sm:px-6">
       <nav className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-studio-muted">
-        <Link to="/agent" className="shrink-0 font-bold text-studio-text hover:text-studio-hot">
+        <Link
+          to="/agent"
+          className={`shrink-0 rounded-md font-bold text-studio-text transition-colors hover:text-studio-hot ${focusRing}`}
+        >
           聊天
         </Link>
         <span className="shrink-0 text-studio-muted" aria-hidden>
@@ -76,7 +83,7 @@ function OcTopBar() {
       </nav>
       <Link
         to="/studios"
-        className="shrink-0 rounded-lg border border-studio-hot/40 bg-studio-hot/10 px-3 py-1.5 text-xs font-bold text-studio-hot transition-colors hover:border-studio-hot hover:bg-studio-hot/20"
+        className={`shrink-0 rounded-lg border border-studio-hot/40 bg-studio-hot/10 px-3 py-1.5 text-xs font-bold text-studio-hot transition-colors hover:border-studio-hot hover:bg-studio-hot/20 ${focusRing}`}
       >
         工作室
       </Link>
@@ -217,10 +224,15 @@ export const AgentChatPage: React.FC = () => {
 
   if (isInitializing) {
     return (
-      <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center bg-studio-bg py-16">
-        <div className="text-center">
-          <div className="mb-3 inline-block h-10 w-10 animate-spin rounded-full border-2 border-studio-border border-t-studio-hot" />
-          <p className="text-sm text-studio-muted">初始化中...</p>
+      <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center bg-studio-bg px-4 py-16">
+        <div
+          className="animate-slide-up rounded-2xl border border-studio-border bg-studio-panel px-10 py-9 text-center shadow-[0_16px_48px_rgba(0,0,0,0.4)]"
+          role="status"
+          aria-live="polite"
+        >
+          <div className="mx-auto mb-4 h-10 w-10 animate-spin rounded-full border-2 border-studio-border border-t-studio-hot" />
+          <p className="text-sm font-medium text-studio-text">初始化中…</p>
+          <p className="mt-1 text-xs text-studio-muted">正在加载 Agent 与模型配置</p>
         </div>
       </div>
     )
@@ -242,7 +254,7 @@ export const AgentChatPage: React.FC = () => {
     <div className="agent-chat-shell">
       <OcTopBar />
 
-      <div className="flex flex-shrink-0 flex-col gap-2 border-b border-studio-border bg-studio-panel px-4 py-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:px-6">
+      <div className="flex flex-shrink-0 flex-col gap-2 border-b border-studio-border bg-studio-panel/90 px-4 py-2.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3 sm:px-6">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2 text-xs text-studio-muted">
           <span className="shrink-0 text-xs font-bold text-studio-text">
             {currentAgent?.config.workspace_root?.trim()
@@ -264,7 +276,7 @@ export const AgentChatPage: React.FC = () => {
           <button
             type="button"
             onClick={() => void pickAgentWorkspaceFolder()}
-            className="shrink-0 rounded-md border border-studio-border bg-studio-panel px-2 py-0.5 text-studio-text hover:bg-studio-panel-2"
+            className={`shrink-0 rounded-md border border-studio-border bg-studio-panel px-2 py-0.5 text-xs font-medium text-studio-text transition-colors hover:bg-studio-panel-2 ${focusRing}`}
             title="仅影响未配置「专属工作区」的 Agent"
           >
             更改默认
@@ -275,7 +287,7 @@ export const AgentChatPage: React.FC = () => {
         </p>
       </div>
 
-      <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-studio-border bg-studio-code/90 px-4 py-2 sm:gap-3 sm:px-6">
+      <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b border-studio-border bg-gradient-to-b from-studio-code to-studio-code/95 px-4 py-2.5 sm:gap-3 sm:px-6">
         <div className="relative flex-shrink-0" ref={agentMenuRef}>
           <button
             type="button"
@@ -283,7 +295,7 @@ export const AgentChatPage: React.FC = () => {
               setModelMenuOpen(false)
               setAgentMenuOpen((o) => !o)
             }}
-            className="flex items-center gap-1 rounded-lg border border-studio-border bg-studio-code px-3 py-1.5 text-sm font-bold text-studio-text transition-colors hover:bg-studio-panel-2"
+            className={`flex items-center gap-1 rounded-lg border border-studio-border bg-studio-code px-3 py-1.5 text-sm font-bold text-studio-text transition-colors hover:bg-studio-panel-2 ${focusRing}`}
             aria-expanded={agentMenuOpen}
             aria-haspopup="listbox"
           >
@@ -294,14 +306,14 @@ export const AgentChatPage: React.FC = () => {
           </button>
           {agentMenuOpen && (
             <ul
-              className="absolute left-0 top-full z-50 mt-1 min-w-[220px] rounded-lg border border-studio-border bg-studio-panel py-1 shadow-lg"
+              className="absolute left-0 top-full z-50 mt-1 min-w-[220px] rounded-xl border border-studio-border bg-studio-panel py-1 shadow-[0_16px_48px_rgba(0,0,0,0.45)] ring-1 ring-white/[0.06]"
               role="listbox"
             >
               {agentsOrdered.map(({ agent: a, depth }) => (
                 <li key={a.config.id} role="option" aria-selected={a.config.id === currentAgentId}>
                   <button
                     type="button"
-                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-studio-code ${a.config.id === currentAgentId ? 'bg-studio-hot/15 font-medium text-studio-hot' : 'text-studio-text'}`}
+                    className={`flex w-full items-center gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-studio-code ${focusRing} ${a.config.id === currentAgentId ? 'bg-studio-hot/15 font-medium text-studio-hot' : 'text-studio-text'}`}
                     style={{ paddingLeft: `${12 + depth * 14}px` }}
                     onClick={() => {
                       void selectAgent(a.config.id)
@@ -326,7 +338,7 @@ export const AgentChatPage: React.FC = () => {
               <li>
                 <button
                   type="button"
-                  className="w-full px-3 py-2 text-left text-sm text-studio-hot hover:bg-studio-hot/15"
+                  className={`w-full px-3 py-2 text-left text-sm text-studio-hot transition-colors hover:bg-studio-hot/15 ${focusRing}`}
                   onClick={() => {
                     setAgentMenuOpen(false)
                     setShowSubAgentModal(true)
@@ -338,7 +350,7 @@ export const AgentChatPage: React.FC = () => {
               <li>
                 <Link
                   to="/settings/agents"
-                  className="block w-full px-3 py-2 text-left text-sm text-studio-text hover:bg-studio-code"
+                  className={`block w-full px-3 py-2 text-left text-sm text-studio-text transition-colors hover:bg-studio-code ${focusRing}`}
                   onClick={() => setAgentMenuOpen(false)}
                 >
                   Agent 管理…
@@ -348,7 +360,7 @@ export const AgentChatPage: React.FC = () => {
                 <button
                   type="button"
                   disabled={!currentAgentId}
-                  className="w-full px-3 py-2 text-left text-sm text-studio-muted hover:bg-studio-code disabled:cursor-not-allowed disabled:opacity-50"
+                  className={`w-full px-3 py-2 text-left text-sm text-studio-muted transition-colors hover:bg-studio-code disabled:cursor-not-allowed disabled:opacity-50 ${focusRing}`}
                   onClick={() => openClearMemoryConfirm()}
                 >
                   清空对话记忆
@@ -376,7 +388,7 @@ export const AgentChatPage: React.FC = () => {
                 return next
               })
             }}
-            className="flex w-full items-center gap-2 rounded-lg border border-studio-border bg-studio-code px-3 py-2 text-left text-sm text-studio-text transition-colors hover:border-studio-hot hover:bg-studio-panel-2 disabled:cursor-not-allowed disabled:opacity-60"
+            className={`flex w-full items-center gap-2 rounded-lg border border-studio-border bg-studio-code px-3 py-2 text-left text-sm text-studio-text transition-colors hover:border-studio-hot hover:bg-studio-panel-2 disabled:cursor-not-allowed disabled:opacity-60 ${focusRing}`}
             aria-expanded={modelMenuOpen}
             aria-haspopup="listbox"
           >
@@ -394,7 +406,7 @@ export const AgentChatPage: React.FC = () => {
           </button>
           {modelMenuOpen && (
             <ul
-              className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-y-auto rounded-lg border border-studio-border bg-studio-panel py-1 shadow-lg"
+              className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-y-auto rounded-xl border border-studio-border bg-studio-panel py-1 shadow-[0_16px_48px_rgba(0,0,0,0.45)] ring-1 ring-white/[0.06]"
               role="listbox"
             >
               {modelOptions.length === 0 ? (
@@ -407,7 +419,7 @@ export const AgentChatPage: React.FC = () => {
                       <button
                         type="button"
                         disabled={isLoading}
-                        className={`w-full px-3 py-2 text-left text-sm hover:bg-studio-code disabled:opacity-50 ${active ? 'bg-studio-hot/15 font-medium text-studio-hot' : 'text-studio-text'}`}
+                        className={`w-full px-3 py-2 text-left text-sm transition-colors hover:bg-studio-code disabled:opacity-50 ${focusRing} ${active ? 'bg-studio-hot/15 font-medium text-studio-hot' : 'text-studio-text'}`}
                         onClick={async () => {
                           if (!currentAgentId || !currentAgent) return
                           try {
@@ -432,7 +444,7 @@ export const AgentChatPage: React.FC = () => {
               <li>
                 <Link
                   to="/settings/models"
-                  className="block px-3 py-2 text-sm text-studio-hot hover:bg-studio-hot/15"
+                  className={`block px-3 py-2 text-sm text-studio-hot transition-colors hover:bg-studio-hot/15 ${focusRing}`}
                   onClick={() => setModelMenuOpen(false)}
                 >
                   打开模型管理…
@@ -445,7 +457,7 @@ export const AgentChatPage: React.FC = () => {
         <div className="flex w-full flex-shrink-0 flex-wrap items-center justify-end gap-0.5 sm:ml-auto sm:w-auto">
           <button
             type="button"
-            className="rounded-lg p-2 text-studio-muted hover:bg-studio-panel-2 disabled:cursor-not-allowed disabled:opacity-40"
+            className={`rounded-lg p-2 text-studio-muted transition-colors hover:bg-studio-panel-2 disabled:cursor-not-allowed disabled:opacity-40 ${focusRing}`}
             title="从后端重新加载当前会话记忆"
             disabled={!currentAgentId}
             onClick={() => currentAgentId && void selectAgent(currentAgentId)}
@@ -454,7 +466,7 @@ export const AgentChatPage: React.FC = () => {
           </button>
           <button
             type="button"
-            className={`rounded-lg p-2 text-studio-muted ${isLoading ? 'cursor-pointer hover:bg-studio-panel-2' : 'cursor-not-allowed opacity-40'}`}
+            className={`rounded-lg p-2 text-studio-muted transition-colors ${isLoading ? `cursor-pointer hover:bg-studio-panel-2 ${focusRing}` : 'cursor-not-allowed opacity-40'}`}
             title={isLoading ? '停止（暂不支持）' : '停止'}
             disabled={!isLoading}
           >
@@ -463,7 +475,7 @@ export const AgentChatPage: React.FC = () => {
           <div className="mx-0.5 hidden h-5 w-px bg-studio-border sm:block" aria-hidden />
           <button
             type="button"
-            className="rounded-lg p-2 text-studio-hot hover:bg-studio-hot/15 disabled:cursor-not-allowed disabled:opacity-40"
+            className={`rounded-lg p-2 text-studio-hot transition-colors hover:bg-studio-hot/15 disabled:cursor-not-allowed disabled:opacity-40 ${focusRing}`}
             title="创建子 Agent"
             aria-label="创建子 Agent"
             disabled={!currentAgent}
@@ -473,14 +485,19 @@ export const AgentChatPage: React.FC = () => {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
             </svg>
           </button>
-          <button type="button" className="rounded-lg p-2 text-studio-muted hover:bg-studio-panel-2" title="展开" aria-label="展开">
+          <button
+            type="button"
+            className={`rounded-lg p-2 text-studio-muted transition-colors hover:bg-studio-panel-2 ${focusRing}`}
+            title="展开"
+            aria-label="展开"
+          >
             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
             </svg>
           </button>
           <button
             type="button"
-            className="rounded-lg p-2 text-studio-hot hover:bg-studio-hot/15 disabled:cursor-not-allowed disabled:opacity-40"
+            className={`rounded-lg p-2 text-studio-hot transition-colors hover:bg-studio-hot/15 disabled:cursor-not-allowed disabled:opacity-40 ${focusRing}`}
             title="清空持久化记忆"
             aria-label="清空持久化记忆"
             disabled={!currentAgent}
@@ -490,7 +507,7 @@ export const AgentChatPage: React.FC = () => {
           </button>
           <Link
             to="/settings/models"
-            className="rounded-lg p-2 text-studio-muted hover:bg-studio-panel-2"
+            className={`rounded-lg p-2 text-studio-muted transition-colors hover:bg-studio-panel-2 ${focusRing}`}
             title="模型管理"
             aria-label="模型管理"
           >
@@ -509,28 +526,33 @@ export const AgentChatPage: React.FC = () => {
             modelName={currentAgent.config.model_config?.model ?? ''}
           />
         ) : (
-          <div className="flex min-h-[40vh] flex-col items-center justify-center gap-3 px-6 text-center text-sm text-studio-muted">
-            {modelOptions.length === 0 ? (
-              <>
-                <p>尚未配置可用模型，无法开始对话。</p>
-                <Link to="/settings/models" className="font-medium text-studio-hot hover:underline">
-                  前往模型管理
-                </Link>
-              </>
-            ) : error ? (
-              <>
-                <p>无法创建会话：{error}</p>
-                <button
-                  type="button"
-                  className="font-medium text-studio-hot hover:underline"
-                  onClick={() => window.location.reload()}
-                >
-                  刷新页面重试
-                </button>
-              </>
-            ) : (
-              <p>正在准备对话…</p>
-            )}
+          <div className="flex min-h-[40vh] flex-col items-center justify-center px-4 py-8">
+            <div className="w-full max-w-md rounded-2xl border border-studio-border bg-studio-panel/90 px-8 py-10 text-center shadow-[0_12px_40px_rgba(0,0,0,0.35)] ring-1 ring-white/[0.04]">
+              {modelOptions.length === 0 ? (
+                <div className="flex flex-col gap-3 text-sm text-studio-muted">
+                  <p className="m-0 text-studio-text">尚未配置可用模型，无法开始对话。</p>
+                  <Link
+                    to="/settings/models"
+                    className={`font-semibold text-studio-hot hover:underline ${focusRing} mx-auto rounded-md`}
+                  >
+                    前往模型管理
+                  </Link>
+                </div>
+              ) : error ? (
+                <div className="flex flex-col gap-3 text-sm text-studio-muted">
+                  <p className="m-0 text-studio-text">无法创建会话：{error}</p>
+                  <button
+                    type="button"
+                    className={`font-semibold text-studio-hot hover:underline ${focusRing} mx-auto rounded-md`}
+                    onClick={() => window.location.reload()}
+                  >
+                    刷新页面重试
+                  </button>
+                </div>
+              ) : (
+                <p className="m-0 text-sm text-studio-muted">正在准备对话…</p>
+              )}
+            </div>
           </div>
         )}
       </div>
@@ -551,9 +573,14 @@ export const AgentChatPage: React.FC = () => {
       </footer>
 
       {error && (
-        <div className="fixed bottom-4 right-4 flex items-center gap-2 rounded-xl bg-rose-600 px-4 py-3 text-sm text-white shadow-lg">
-          <span>⚠️</span>
-          <span>{error}</span>
+        <div
+          className="fixed bottom-4 right-4 z-[100] flex max-w-sm items-start gap-3 rounded-xl border border-studio-hot/35 bg-studio-panel px-4 py-3 text-sm text-studio-text shadow-[0_12px_40px_rgba(0,0,0,0.45)] ring-1 ring-black/20"
+          role="alert"
+        >
+          <span className="shrink-0 text-lg leading-none text-studio-hot" aria-hidden>
+            ⚠
+          </span>
+          <span className="min-w-0 leading-snug">{error}</span>
         </div>
       )}
 
@@ -564,7 +591,7 @@ export const AgentChatPage: React.FC = () => {
           aria-modal="true"
           aria-labelledby="clear-memory-title"
         >
-          <div className="w-full max-w-md rounded-2xl border border-studio-border bg-studio-panel p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-2xl border border-studio-border bg-studio-panel p-6 shadow-[0_24px_60px_rgba(0,0,0,0.55)] ring-1 ring-white/[0.06]">
             <h2 id="clear-memory-title" className="text-lg font-bold text-studio-text">
               清空对话记忆
             </h2>
@@ -582,7 +609,7 @@ export const AgentChatPage: React.FC = () => {
                 type="button"
                 disabled={clearingMemory}
                 onClick={() => setClearMemoryModalOpen(false)}
-                className="rounded-lg border border-studio-border px-4 py-2 text-sm text-studio-text disabled:opacity-50"
+                className={`rounded-lg border border-studio-border px-4 py-2 text-sm font-medium text-studio-text transition-colors hover:bg-studio-code disabled:opacity-50 ${focusRing}`}
               >
                 取消
               </button>
@@ -590,7 +617,7 @@ export const AgentChatPage: React.FC = () => {
                 type="button"
                 disabled={clearingMemory || !currentAgentId}
                 onClick={() => void runClearAgentMemory()}
-                className="rounded-lg bg-rose-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                className={`rounded-lg bg-studio-hot px-4 py-2 text-sm font-semibold text-white shadow-[0_4px_14px_rgba(233,69,96,0.35)] transition-[filter,opacity] hover:brightness-110 disabled:opacity-50 ${focusRing}`}
               >
                 {clearingMemory ? '清空中…' : '确定清空'}
               </button>

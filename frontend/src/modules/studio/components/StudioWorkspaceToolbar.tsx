@@ -1,5 +1,8 @@
 import React from 'react'
 
+const officeFocus =
+  'outline-none focus-visible:ring-2 focus-visible:ring-[var(--so-red)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#111]'
+
 interface StudioWorkspaceToolbarProps {
   sceneCollapsed: boolean
   onToggleScene: () => void
@@ -25,11 +28,11 @@ export function StudioWorkspaceToolbar({
   refreshing,
 }: StudioWorkspaceToolbarProps) {
   return (
-    <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b-2 border-[#333] bg-[#111] px-3 py-2 sm:gap-3 sm:px-4">
+    <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b-2 border-[#333] bg-[#111] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:gap-3 sm:px-4">
       <button
         type="button"
         onClick={onToggleScene}
-        className={`border px-2.5 py-1.5 text-sm font-medium transition-colors ${
+        className={`border px-2.5 py-1.5 text-sm font-medium transition-colors ${officeFocus} ${
           sceneCollapsed
             ? 'border-[var(--so-red)] bg-[var(--so-red)]/15 text-[#fca5a5]'
             : 'border-[#444] bg-[#1f1f1f] text-[#d4d4d4] hover:border-[var(--so-red)] hover:text-white'
@@ -41,35 +44,35 @@ export function StudioWorkspaceToolbar({
       <button
         type="button"
         onClick={onOpenHelp}
-        className="border border-[#444] bg-[#1f1f1f] px-2.5 py-1.5 text-sm text-[#d4d4d4] hover:border-[#666] hover:text-white"
+        className={`border border-[#444] bg-[#1f1f1f] px-2.5 py-1.5 text-sm text-[#d4d4d4] transition-colors hover:border-[#666] hover:text-white ${officeFocus}`}
       >
         使用说明
       </button>
       <button
         type="button"
         onClick={onOpenMemo}
-        className="border border-[#444] bg-[#1f1f1f] px-2.5 py-1.5 text-sm text-[#d4d4d4] hover:border-[#666] hover:text-white"
+        className={`border border-[#444] bg-[#1f1f1f] px-2.5 py-1.5 text-sm text-[#d4d4d4] transition-colors hover:border-[#666] hover:text-white ${officeFocus}`}
       >
         工作室小记
       </button>
       <button
         type="button"
         onClick={onOpenTodo}
-        className="border border-[#444] bg-[#1f1f1f] px-2.5 py-1.5 text-sm text-[#d4d4d4] hover:border-[#666] hover:text-white"
+        className={`border border-[#444] bg-[#1f1f1f] px-2.5 py-1.5 text-sm text-[#d4d4d4] transition-colors hover:border-[#666] hover:text-white ${officeFocus}`}
       >
         TODO 看板
       </button>
       <button
         type="button"
         onClick={onOpenMembers}
-        className="border border-[#444] bg-[#1f1f1f] px-2.5 py-1.5 text-sm text-[#d4d4d4] hover:border-[#666] hover:text-white"
+        className={`border border-[#444] bg-[#1f1f1f] px-2.5 py-1.5 text-sm text-[#d4d4d4] transition-colors hover:border-[#666] hover:text-white ${officeFocus}`}
       >
         成员与 @
       </button>
       <button
         type="button"
         onClick={onOpenWorkspaces}
-        className="border border-[#444] bg-[#1f1f1f] px-2.5 py-1.5 text-sm text-[#d4d4d4] hover:border-[#666] hover:text-white"
+        className={`border border-[#444] bg-[#1f1f1f] px-2.5 py-1.5 text-sm text-[#d4d4d4] transition-colors hover:border-[#666] hover:text-white ${officeFocus}`}
       >
         工作区目录
       </button>
@@ -77,7 +80,7 @@ export function StudioWorkspaceToolbar({
         type="button"
         disabled={refreshing}
         onClick={onRefresh}
-        className="ml-auto border border-[#444] bg-[#1f1f1f] px-2.5 py-1.5 text-sm text-[#d4d4d4] hover:border-[var(--so-red)] hover:text-white disabled:opacity-50"
+        className={`ml-auto border border-[#444] bg-[#1f1f1f] px-2.5 py-1.5 text-sm text-[#d4d4d4] transition-colors hover:border-[var(--so-red)] hover:text-white disabled:opacity-50 ${officeFocus}`}
       >
         {refreshing ? '刷新中…' : '刷新数据'}
       </button>

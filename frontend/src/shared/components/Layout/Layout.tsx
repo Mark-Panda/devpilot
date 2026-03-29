@@ -56,7 +56,7 @@ export default function Layout({ children }: LayoutProps) {
           <div className="app-brand">
             <img src="/devpilot-logo.png" alt="DevPilot" className="app-brand-logo" />
           </div>
-          <nav className="app-nav">
+          <nav className="app-nav" aria-label="主导航">
             {menuGroups.map((group, gi) => (
               <div key={gi} className="app-nav-group">
                 {group.group && (
