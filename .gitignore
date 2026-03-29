@@ -47,3 +47,4 @@ frontend/wailsjs/
 .env
 .env.local
 .env.*
+api-route-tracer-frontend/

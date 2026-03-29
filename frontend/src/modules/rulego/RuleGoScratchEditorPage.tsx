@@ -46,6 +46,11 @@ import {
   VOLC_TLS_KNOWN_REGIONS,
 } from "./rulego-blocks/blocks/volcTlsSearchLogs";
 import { datetimeLocalToMs, msToDatetimeLocal } from "./datetimeLocalMs";
+import {
+  buildTracerSourcegraphQueryWithScope,
+  DEFAULT_SOURCEGRAPH_REPO_BACKEND,
+  DEFAULT_SOURCEGRAPH_REPO_FRONTEND,
+} from "./sourcegraph/buildTracerSourcegraphQuery";
 
 const volcTlsKnownRegionSet = new Set(VOLC_TLS_KNOWN_REGIONS.map((r) => r.value));
 const OPENSEARCH_DEFAULT_BODY = '{"size":100,"sort":[{"@timestamp":{"order":"desc"}}],"query":{"match_all":{}}}';
@@ -563,6 +568,18 @@ function BlockConfigModal({
       next.SG_TOKEN = get("SG_TOKEN");
       next.SG_TIMEOUT_SEC = get("SG_TIMEOUT_SEC") || "30";
       next.SG_DEFAULT_QUERY = get("SG_DEFAULT_QUERY");
+    }
+    if (block.type === "rulego_sourcegraphQueryBuild") {
+      const dpt = get("SGQB_DEFAULT_PATTERN_TYPE").toLowerCase();
+      next.SGQB_DEFAULT_PATTERN_TYPE = dpt === "regexp" ? "regexp" : "literal";
+      next.SGQB_DEFAULT_PATTERNS = get("SGQB_DEFAULT_PATTERNS");
+      next.SGQB_REPO_SCOPE = get("SGQB_REPO_SCOPE");
+      next.SGQB_REPO_FRONTEND = get("SGQB_REPO_FRONTEND") || DEFAULT_SOURCEGRAPH_REPO_FRONTEND;
+      next.SGQB_REPO_BACKEND = get("SGQB_REPO_BACKEND") || DEFAULT_SOURCEGRAPH_REPO_BACKEND;
+      next.SGQB_CONTEXT_GLOBAL = getBool("SGQB_CONTEXT_GLOBAL");
+      next.SGQB_TYPE_FILTER = get("SGQB_TYPE_FILTER");
+      next.SGQB_INCLUDE_FORKED = getBool("SGQB_INCLUDE_FORKED");
+      next.SGQB_DISPLAY_LIMIT = get("SGQB_DISPLAY_LIMIT") || "1500";
     }
     if (block.type === "rulego_volcTlsSearchLogs") {
       next.TLS_ENDPOINT = get("TLS_ENDPOINT");
@@ -2213,6 +2230,10 @@ function BlockConfigModal({
               autoCorrect="off"
               autoComplete="off"
             />
+            <small className="form-hint" style={{ display: "block", marginTop: 6 }}>
+              支持 <code>{"${...}"}</code> 模板（RuleGo 环境 / 消息 <code>metadata</code>），例如{" "}
+              <code>https://sourcegraph.${"{metadata.sg_host}"}.com</code>
+            </small>
           </label>
           <label className="form-field" style={{ gridColumn: "1 / -1" }}>
             <span>访问令牌 (accessToken，可选)</span>
@@ -2225,6 +2246,9 @@ function BlockConfigModal({
               autoCorrect="off"
               autoComplete="off"
             />
+            <small className="form-hint" style={{ display: "block", marginTop: 6 }}>
+              支持 <code>{"${...}"}</code> 模板；勿把真实密钥写进可分享 DSL，可改为 <code>{"${metadata.sourcegraph_token}"}</code> 等
+            </small>
           </label>
           <label className="form-field">
             <span>超时 (秒)</span>
@@ -2233,6 +2257,7 @@ function BlockConfigModal({
               value={String(form.SG_TIMEOUT_SEC ?? "30")}
               onChange={(e) => setForm((f) => ({ ...f, SG_TIMEOUT_SEC: e.target.value }))}
             />
+            <small className="form-hint" style={{ display: "block", marginTop: 6 }}>固定数字，不支持 {"${...}"} 模板</small>
           </label>
           <label className="form-field" style={{ gridColumn: "1 / -1" }}>
             <span>默认搜索词 (defaultSearchQuery，可选)</span>
@@ -2244,12 +2269,183 @@ function BlockConfigModal({
               autoCorrect="off"
               autoComplete="off"
             />
+            <small className="form-hint" style={{ display: "block", marginTop: 6 }}>
+              支持 <code>{"${...}"}</code> 模板；接上游「查询构建」时可填{" "}
+              <code>{"${metadata.sourcegraph_built_query}"}</code>
+            </small>
           </label>
           <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
-            实例地址、访问令牌、默认搜索词均支持 <code>{"${...}"}</code> 模板，运行时由 RuleGo 环境与消息{" "}
-            <code>metadata</code> 渲染（与 OpenSearch、飞书等节点一致）。调用 <code>/.api/graphql</code>；消息 data 可为纯文本或 JSON{" "}
-            <code>{"{\"query\":\"repo:foo/bar func\"}"}</code>。鉴权头为 <code>Authorization: token …</code>。
+            调用 <code>/.api/graphql</code>；消息 <code>data</code> 可为纯文本或 JSON{" "}
+            <code>{"{\"query\":\"repo:foo/bar func\"}"}</code>（有 data 时优先于默认搜索词）。鉴权头为 <code>Authorization: token …</code>。
           </p>
+        </>
+      )}
+      {block.type === "rulego_sourcegraphQueryBuild" && (
+        <>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>默认 pattern 类型 (defaultPatternType，无上游 data 时使用)</span>
+            <select
+              value={String(form.SGQB_DEFAULT_PATTERN_TYPE ?? "literal") === "regexp" ? "regexp" : "literal"}
+              onChange={(e) => setForm((f) => ({ ...f, SGQB_DEFAULT_PATTERN_TYPE: e.target.value }))}
+              className="rulego-sourcegraph-scope-select"
+              style={{ padding: "6px 10px", borderRadius: 8, maxWidth: "100%" }}
+            >
+              <option value="literal">literal（普通字符串，适合 URL 路径等）</option>
+              <option value="regexp">regexp（正则）</option>
+            </select>
+            <small className="form-hint" style={{ display: "block", marginTop: 6 }}>
+              支持在 DSL 中写 <code>{"${...}"}</code> 模板；侧栏仅 literal / regexp 两档
+            </small>
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>默认搜索路径 / pattern (defaultPatterns，每行一条)</span>
+            <textarea
+              value={String(form.SGQB_DEFAULT_PATTERNS ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, SGQB_DEFAULT_PATTERNS: e.target.value }))}
+              placeholder={"/api/v1/users\n/invoice/list"}
+              rows={5}
+              style={{ fontFamily: "ui-monospace, monospace", fontSize: 12, width: "100%", resize: "vertical" }}
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+            <small className="form-hint" style={{ display: "block", marginTop: 6 }}>
+              当消息 <code>data</code> 为空、或 JSON 中 <code>patterns</code> 为空时，使用此处内容（渲染 <code>{"${...}"}</code> 后按行拆分，空行忽略）。有有效上游{" "}
+              <code>data</code> 时仍以 <code>data</code> 为准。
+            </small>
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>仓库范围 (repoScope)</span>
+            <select
+              value={["", "frontend", "backend"].includes(String(form.SGQB_REPO_SCOPE ?? "").trim()) ? String(form.SGQB_REPO_SCOPE ?? "").trim() : ""}
+              onChange={(e) => setForm((f) => ({ ...f, SGQB_REPO_SCOPE: e.target.value }))}
+              className="rulego-sourcegraph-scope-select"
+              style={{ padding: "6px 10px", borderRadius: 8, maxWidth: "100%" }}
+            >
+              <option value="">不限仓库</option>
+              <option value="frontend">前端仓库（repo 正则见下）</option>
+              <option value="backend">后端仓库（repo 正则见下）</option>
+            </select>
+            <small className="form-hint" style={{ display: "block", marginTop: 6 }}>
+              侧栏仅保存固定值（空 / frontend / backend）。若要在运行时按 metadata 切换范围，请在规则 DSL 里把{" "}
+              <code>configuration.repoScope</code> 写成含 <code>{"${...}"}</code> 的字符串。
+            </small>
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>前端 repo 正则 (repoFrontend，scope=frontend 时拼成 repo:(…))</span>
+            <input
+              value={String(form.SGQB_REPO_FRONTEND ?? DEFAULT_SOURCEGRAPH_REPO_FRONTEND)}
+              onChange={(e) => setForm((f) => ({ ...f, SGQB_REPO_FRONTEND: e.target.value }))}
+              placeholder={DEFAULT_SOURCEGRAPH_REPO_FRONTEND}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+              style={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }}
+            />
+            <small className="form-hint" style={{ display: "block", marginTop: 6 }}>
+              支持 <code>{"${...}"}</code> 模板（与下方后端正则、typeFilter、displayLimit 相同，运行时由后端渲染后再拼进查询串）
+            </small>
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>后端 repo 正则 (repoBackend，scope=backend 时拼成 repo:(…))</span>
+            <input
+              value={String(form.SGQB_REPO_BACKEND ?? DEFAULT_SOURCEGRAPH_REPO_BACKEND)}
+              onChange={(e) => setForm((f) => ({ ...f, SGQB_REPO_BACKEND: e.target.value }))}
+              placeholder={DEFAULT_SOURCEGRAPH_REPO_BACKEND}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+              style={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }}
+            />
+            <small className="form-hint" style={{ display: "block", marginTop: 6 }}>
+              支持 <code>{"${...}"}</code> 模板
+            </small>
+          </label>
+          <label className="form-field" style={{ alignItems: "center" }}>
+            <span>context:global</span>
+            <input
+              type="checkbox"
+              checked={Boolean(form.SGQB_CONTEXT_GLOBAL)}
+              onChange={(e) => setForm((f) => ({ ...f, SGQB_CONTEXT_GLOBAL: e.target.checked }))}
+            />
+          </label>
+          <div className="form-field" style={{ gridColumn: "1 / -1", marginTop: -4 }}>
+            <small className="form-hint" style={{ display: "block", margin: 0 }}>
+              侧栏为固定开关（写入 <code>true</code>/<code>false</code>）。若需按 metadata 动态决定，请在 DSL 的{" "}
+              <code>configuration.contextGlobal</code> 中写 <code>{"${...}"}</code>，渲染为 true/1/yes/on 视为开启。
+            </small>
+          </div>
+          <label className="form-field" style={{ alignItems: "center" }}>
+            <span>fork:yes（含 fork）</span>
+            <input
+              type="checkbox"
+              checked={Boolean(form.SGQB_INCLUDE_FORKED)}
+              onChange={(e) => setForm((f) => ({ ...f, SGQB_INCLUDE_FORKED: e.target.checked }))}
+            />
+          </label>
+          <div className="form-field" style={{ gridColumn: "1 / -1", marginTop: -4 }}>
+            <small className="form-hint" style={{ display: "block", margin: 0 }}>
+              同上：侧栏固定；动态请改 DSL <code>configuration.includeForked</code> 为模板字符串。
+            </small>
+          </div>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>类型等过滤 (typeFilter，如 lang:typescript，可选)</span>
+            <input
+              value={String(form.SGQB_TYPE_FILTER ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, SGQB_TYPE_FILTER: e.target.value }))}
+              placeholder="留空则不加"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+            <small className="form-hint" style={{ display: "block", marginTop: 6 }}>
+              支持 <code>{"${...}"}</code> 模板，例如 <code>lang:${"{metadata.lang}"}</code>
+            </small>
+          </label>
+          <label className="form-field">
+            <span>count 上限 (displayLimit)</span>
+            <input
+              type="number"
+              value={String(form.SGQB_DISPLAY_LIMIT ?? "1500")}
+              onChange={(e) => setForm((f) => ({ ...f, SGQB_DISPLAY_LIMIT: e.target.value }))}
+              min={1}
+            />
+            <small className="form-hint" style={{ display: "block", marginTop: 6 }}>
+              侧栏为数字；DSL 中也可写字符串模板（如 <code>{"${metadata.sg_count}"}</code>），渲染后须为正整数
+            </small>
+          </label>
+          <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
+            消息 <code>data</code> 为 LLM 预处理 JSON{" "}
+            <code>{"{\"patternType\":\"literal|regexp\",\"patterns\":[\"...\"]}"}</code>，或纯文本（视为单条 literal）；无 data 时用上方「默认路径」。输出：{" "}
+            <code>metadata.sourcegraph_built_query</code>（首条）、<code>metadata.sourcegraph_built_queries</code>（JSON 数组）、{" "}
+            <code>data</code> 含 <code>query</code> 与 <code>queries</code>。
+          </p>
+          <div className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>示例查询（取默认路径首行，若无则用 /api/example）</span>
+            <pre className="rulego-sourcegraph-query-preview">
+              {(() => {
+                const scopeRaw = String(form.SGQB_REPO_SCOPE ?? "").trim();
+                const scope = scopeRaw === "frontend" || scopeRaw === "backend" ? scopeRaw : "";
+                const lim = parseInt(String(form.SGQB_DISPLAY_LIMIT ?? "1500"), 10);
+                const pt = String(form.SGQB_DEFAULT_PATTERN_TYPE ?? "literal") === "regexp" ? "regexp" : "literal";
+                const lines = String(form.SGQB_DEFAULT_PATTERNS ?? "")
+                  .split("\n")
+                  .map((s) => s.trim())
+                  .filter(Boolean);
+                const samplePath = lines[0] ?? "/api/example";
+                return buildTracerSourcegraphQueryWithScope(pt, samplePath, {
+                  repoScope: scope,
+                  repoFrontend: String(form.SGQB_REPO_FRONTEND ?? ""),
+                  repoBackend: String(form.SGQB_REPO_BACKEND ?? ""),
+                  contextGlobal: Boolean(form.SGQB_CONTEXT_GLOBAL),
+                  typeFilter: String(form.SGQB_TYPE_FILTER ?? ""),
+                  includeForked: Boolean(form.SGQB_INCLUDE_FORKED),
+                  displayLimit: Number.isFinite(lim) && lim > 0 ? lim : 1500,
+                });
+              })()}
+            </pre>
+          </div>
         </>
       )}
       {block.type === "rulego_volcTlsSearchLogs" && (

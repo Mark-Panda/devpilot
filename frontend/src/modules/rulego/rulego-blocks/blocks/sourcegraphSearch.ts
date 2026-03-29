@@ -9,7 +9,8 @@ import { UI_RELATION_FAILURE } from "../../relationLabels";
 
 const blockType = "rulego_sourcegraphSearch";
 const nodeType = "sourcegraph/search";
-const category = "rulego_sourcegraph" as const;
+/** 与「Sourcegraph·查询构建」及 scratchTheme 中 rulego_tracer 配色一致，避免未定义 category 时块体呈黑色 */
+const category = "rulego_tracer" as const;
 
 const def: BlockTypeDef = {
   blockType,

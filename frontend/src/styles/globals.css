@@ -3033,6 +3033,34 @@ body {
   color: #c7d2fe;
 }
 
+/* Sourcegraph 查询构建：示例查询预览（深色侧栏与浅色弹窗均需高对比） */
+.rulego-sourcegraph-query-preview {
+  margin: 6px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid #334155;
+}
+
+/* 深色侧栏：仓库范围下拉与画布区一致 */
+.rulego-editor-visual .rulego-editor-side .rulego-sourcegraph-scope-select {
+  border: 1px solid #475569;
+  background: rgba(15, 23, 42, 0.55);
+  color: #e2e8f0;
+}
+
+.rulego-editor-visual .rulego-editor-side .rulego-sourcegraph-scope-select option {
+  background: #0f172a;
+  color: #e2e8f0;
+}
+
 .rulego-editor-visual .rulego-editor-side .form-error {
   background: rgba(239, 68, 68, 0.15);
   color: #fca5a5;

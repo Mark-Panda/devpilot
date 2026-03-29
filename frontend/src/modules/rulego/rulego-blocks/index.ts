@@ -24,6 +24,8 @@ import "./blocks/switch";
 import "./blocks/startTrigger";
 import "./blocks/endpointTriggers";
 import "./blocks/dbClient";
+import "./blocks/sourcegraphSearch";
+import "./blocks/sourcegraphQueryBuild";
 import "./blocks/apiRouteTracer";
 import "./blocks/cursorAcp";
 
@@ -129,6 +131,7 @@ export const toolbox = {
       name: "API 路由追踪",
       categorystyle: "rulego_tracer",
       contents: [
+        { kind: "block" as const, type: "rulego_sourcegraphQueryBuild" },
         { kind: "block" as const, type: "rulego_sourcegraphSearch" },
         { kind: "block" as const, type: "rulego_apiRouteTracer_gitPrepare" },
         { kind: "block" as const, type: "rulego_cursorAcp" },

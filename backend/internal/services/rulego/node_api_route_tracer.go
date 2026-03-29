@@ -77,7 +77,7 @@ func (n *SourcegraphSearchNode) Init(_ types.Config, configuration types.Configu
 }
 
 const sourcegraphSearchGQL = `query RuleGoSourcegraphSearch($query: String!) {
-  search(query: $query, version: V3, patternType: literal) {
+  search(query: $query, version: V3) {
     results {
       matchCount
       limitHit
@@ -98,7 +98,6 @@ const sourcegraphSearchGQL = `query RuleGoSourcegraphSearch($query: String!) {
         }
         ... on CommitSearchResult {
           url
-          subject
         }
       }
     }
@@ -145,6 +144,7 @@ func (n *SourcegraphSearchNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) 
 		return
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
 	if accessToken != "" {
 		req.Header.Set("Authorization", "token "+accessToken)
 	}
@@ -162,20 +162,22 @@ func (n *SourcegraphSearchNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) 
 		return
 	}
 
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		ctx.TellFailure(msg, fmt.Errorf("sourcegraph/search: HTTP %d（请先检查 endpoint 是否为实例根 URL、令牌是否有效）: %s", resp.StatusCode, truncateForLog(strings.TrimSpace(string(respBody)), 512)))
+		return
+	}
+
 	var gqlResp struct {
 		Data   json.RawMessage   `json:"data"`
 		Errors []json.RawMessage `json:"errors"`
 	}
 	if err := json.Unmarshal(respBody, &gqlResp); err != nil {
-		ctx.TellFailure(msg, fmt.Errorf("sourcegraph/search: 解析响应 JSON 失败: %w", err))
+		preview := truncateForLog(strings.TrimSpace(string(respBody)), 320)
+		ctx.TellFailure(msg, fmt.Errorf("sourcegraph/search: 响应非 JSON（常为登录页/网关错误/HTML）。请确认 POST %s 且返回 application/json。正文片段: %q — %w", gqlURL, preview, err))
 		return
 	}
 	if len(gqlResp.Errors) > 0 {
 		ctx.TellFailure(msg, fmt.Errorf("sourcegraph/search: GraphQL 错误: %s", string(gqlResp.Errors[0])))
-		return
-	}
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		ctx.TellFailure(msg, fmt.Errorf("sourcegraph/search: HTTP %d: %s", resp.StatusCode, truncateForLog(string(respBody), 512)))
 		return
 	}
 
