@@ -703,6 +703,11 @@ function BlockConfigModal({
       next.DELAY_MS = get("DELAY_MS") || "60000";
       next.DELAY_OVERWRITE = getBool("DELAY_OVERWRITE");
     }
+    if (block.type === "rulego_execCommand") {
+      next.EXEC_SHELL_SCRIPT = String(block.getFieldValue("EXEC_SHELL_SCRIPT") ?? "").trim() || "cd /path/to/project && cursor a.v";
+      next.EXEC_LOG = getBool("EXEC_LOG");
+      next.EXEC_REPLACE_DATA = getBool("EXEC_REPLACE_DATA");
+    }
     if (block.type === "rulego_endpoint_http") {
       next.EP_SERVER = get("EP_SERVER") || ":9090";
       next.EP_ALLOW_CORS = getBool("EP_ALLOW_CORS");
@@ -1656,6 +1661,43 @@ function BlockConfigModal({
               onChange={(e) => setForm((f) => ({ ...f, DELAY_OVERWRITE: e.target.checked }))}
             />
             <span>周期内覆盖 (overwrite)</span>
+          </label>
+        </>
+      )}
+      {block.type === "rulego_execCommand" && (
+        <>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>Shell 脚本（经 sh -c 执行）</span>
+            <textarea
+              rows={5}
+              value={String(form.EXEC_SHELL_SCRIPT ?? "cd /path/to/project && cursor a.v")}
+              onChange={(e) => setForm((f) => ({ ...f, EXEC_SHELL_SCRIPT: e.target.value }))}
+              placeholder={"cd /aaaa/sss && cursor a.v"}
+              style={{ width: "100%", fontFamily: "monospace", fontSize: 13 }}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+            <small className="form-hint" style={{ display: "block", marginTop: 6 }}>
+              支持 <code>{"${metadata.key}"}</code>、<code>{"${msg.key}"}</code> 模板。工作目录可放在脚本内 <code>cd</code>，或通过执行请求 metadata 传入{" "}
+              <code>workDir</code>。
+            </small>
+          </label>
+          <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={Boolean(form.EXEC_LOG)}
+              onChange={(e) => setForm((f) => ({ ...f, EXEC_LOG: e.target.checked }))}
+            />
+            <span>输出打到调试日志 (log)</span>
+          </label>
+          <label className="form-field" style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <input
+              type="checkbox"
+              checked={Boolean(form.EXEC_REPLACE_DATA)}
+              onChange={(e) => setForm((f) => ({ ...f, EXEC_REPLACE_DATA: e.target.checked }))}
+            />
+            <span>用标准输出替换消息体 (replaceData)</span>
           </label>
         </>
       )}

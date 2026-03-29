@@ -20,6 +20,7 @@ import "./blocks/fileNodes";
 import "./blocks/rpaNodes";
 import "./blocks/llm";
 import "./blocks/delay";
+import "./blocks/execCommand";
 import "./blocks/switch";
 import "./blocks/startTrigger";
 import "./blocks/endpointTriggers";
@@ -75,6 +76,7 @@ export const toolbox = {
         { kind: "block" as const, type: "rulego_opensearchSearch" },
         { kind: "block" as const, type: "rulego_llm" },
         { kind: "block" as const, type: "rulego_delay" },
+        { kind: "block" as const, type: "rulego_execCommand" },
         { kind: "block" as const, type: "rulego_jsTransform" },
         { kind: "block" as const, type: "rulego_jsFilter" },
       ],

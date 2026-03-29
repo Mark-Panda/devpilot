@@ -7,7 +7,6 @@ import (
 	"sort"
 
 	"github.com/rulego/rulego"
-	"github.com/rulego/rulego/api/types"
 	"github.com/rulego/rulego/engine"
 
 	"devpilot/backend/internal/store/pebble"
@@ -65,13 +64,13 @@ func (s *Service) LoadRuleChain(ruleID string) error {
 	defStr = AlignDefinitionRuleChainID(defStr, ruleID)
 	def := []byte(defStr)
 	if eng, ok := rulego.Get(ruleID); ok && eng.Initialized() {
-		if err := eng.ReloadSelf(def, types.WithAspects(&LogAspect{})); err != nil {
+		if err := eng.ReloadSelf(def, ruleEngineOpts(&LogAspect{})...); err != nil {
 			return err
 		}
 		log.Printf("[rulego] 规则链已重载: id=%s name=%s", ruleID, rule.Name)
 		return nil
 	}
-	engine, err := rulego.New(ruleID, def, types.WithAspects(&LogAspect{}))
+	engine, err := rulego.New(ruleID, def, ruleEngineOpts(&LogAspect{})...)
 	if err != nil {
 		return err
 	}
@@ -113,7 +112,7 @@ func (s *Service) LoadAllEnabledRuleChains() (loaded int, err error) {
 			}
 		}
 		defStr = AlignDefinitionRuleChainID(defStr, rule.ID)
-		engine, createErr := rulego.New(rule.ID, []byte(defStr), types.WithAspects(&LogAspect{}))
+		engine, createErr := rulego.New(rule.ID, []byte(defStr), ruleEngineOpts(&LogAspect{})...)
 		if createErr != nil {
 			log.Printf("[rulego] 启动加载规则链失败 id=%s name=%s: %v", rule.ID, rule.Name, createErr)
 			if err == nil {

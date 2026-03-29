@@ -32,6 +32,7 @@ const BLOCK_LABELS: Record<string, string> = {
   rulego_opensearchSearch: "OpenSearch 查日志",
   rulego_llm: "大模型 LLM",
   rulego_delay: "延迟",
+  rulego_execCommand: "执行命令",
   rulego_jsTransform: "脚本转换器",
   rulego_jsFilter: "Filter",
   rulego_switch: "多条件分支",

@@ -118,11 +118,11 @@ func (s *Service) StartExecuteRule(ruleID string, input ExecuteRuleInput) (Start
 	}
 
 	if existing, ok := rulego.Get(ruleID); ok && existing.Initialized() {
-		_ = existing.ReloadSelf(defBytes, types.WithAspects(&LogAspect{}))
+		_ = existing.ReloadSelf(defBytes, ruleEngineOpts(&LogAspect{})...)
 		go s.runExecuteRuleInBackground(existing, ruleID, input, execLog.ID, true)
 		return StartExecuteRuleResult{ExecutionID: execLog.ID}, nil
 	}
-	engine, createErr := rulego.New(ruleID, defBytes, types.WithAspects(&LogAspect{}))
+	engine, createErr := rulego.New(ruleID, defBytes, ruleEngineOpts(&LogAspect{})...)
 	if createErr != nil {
 		return zero, createErr
 	}
@@ -186,11 +186,11 @@ func (s *Service) ExecuteRule(ruleID string, input ExecuteRuleInput) (ExecuteRul
 	var engine types.RuleEngine
 	if existing, ok := rulego.Get(ruleID); ok && existing.Initialized() {
 		// 已加载的引擎用当前（可能已 patch key）的 definition 重载，保证使用最新模型配置
-		_ = existing.ReloadSelf(defBytes, types.WithAspects(&LogAspect{}))
+		_ = existing.ReloadSelf(defBytes, ruleEngineOpts(&LogAspect{})...)
 		engine = existing
 	} else {
 		var createErr error
-		engine, createErr = rulego.New(ruleID, defBytes, types.WithAspects(&LogAspect{}))
+		engine, createErr = rulego.New(ruleID, defBytes, ruleEngineOpts(&LogAspect{})...)
 		if createErr != nil {
 			return ExecuteRuleOutput{Success: false, Error: createErr.Error()}, createErr
 		}
@@ -258,7 +258,7 @@ func (s *Service) ExecuteRuleDefinition(definition string, input ExecuteRuleInpu
 	}
 	const testRuleID = "_test_"
 	def = AlignDefinitionRuleChainID(def, testRuleID)
-	engine, createErr := rulego.New(testRuleID, []byte(def), types.WithAspects(&LogAspect{}))
+	engine, createErr := rulego.New(testRuleID, []byte(def), ruleEngineOpts(&LogAspect{})...)
 	if createErr != nil {
 		return ExecuteRuleOutput{Success: false, Error: createErr.Error()}, createErr
 	}
@@ -318,7 +318,7 @@ func (s *Service) ValidateRuleDefinition(definition string) error {
 		return err
 	}
 	definition = AlignDefinitionRuleChainID(definition, "_validate_")
-	eng, err := rulego.New("_validate_", []byte(definition))
+	eng, err := rulego.New("_validate_", []byte(definition), ruleEngineOpts()...)
 	if err != nil {
 		return err
 	}
