@@ -550,6 +550,7 @@ function BlockConfigModal({
       next.FS_TIMEOUT_SEC = get("FS_TIMEOUT_SEC") || "30";
     }
     if (block.type === "rulego_apiRouteTracer_gitPrepare") {
+      next.GITLAB_URL = get("GITLAB_URL");
       next.WORK_DIR = get("WORK_DIR");
     }
     if (block.type === "rulego_cursorAcp") {
@@ -2048,19 +2049,30 @@ function BlockConfigModal({
       {block.type === "rulego_apiRouteTracer_gitPrepare" && (
         <>
           <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>Git 仓库地址 (gitlabUrl)</span>
+            <input
+              value={String(form.GITLAB_URL ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, GITLAB_URL: e.target.value }))}
+              placeholder="https://gitlab.com/group/repo.git 或 git@host:group/repo.git"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
             <span>工作目录 (workDir)</span>
             <input
               value={String(form.WORK_DIR ?? "")}
               onChange={(e) => setForm((f) => ({ ...f, WORK_DIR: e.target.value }))}
-              placeholder="克隆/更新服务的父目录"
+              placeholder="父目录；仓库克隆为 workDir 下与 URL 末段同名的子目录"
               autoCapitalize="off"
               autoCorrect="off"
               autoComplete="off"
             />
           </label>
           <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
-            工作目录支持 <code>{"${...}"}</code> 模板（RuleGo 环境与消息 <code>metadata</code>）。支持完整 Router JSON（按 data 下标取项，下标来自 metadata 的{" "}
-            <code>api_route_tracer_service_index</code> 或 for 注入的 <code>_loopIndex</code>）；也支持 for 遍历 msg.data 时传入的单条 service 对象。
+            二者均支持 <code>{"${...}"}</code> 模板。若 <code>workDir/&lt;仓库名&gt;</code> 已存在且含 <code>.git</code>，则在该目录执行 <code>git pull</code>；否则在{" "}
+            <code>workDir</code> 下执行 <code>git clone</code>。成功后在 metadata 写入 <code>api_route_tracer_service_path</code> 等，供下游节点使用。
           </p>
         </>
       )}

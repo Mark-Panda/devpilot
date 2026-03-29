@@ -13,7 +13,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 	"unicode"
@@ -218,16 +217,18 @@ func truncateForLog(s string, max int) string {
 	return s[:max] + "…"
 }
 
-// --- apiRouteTracer/gitPrepare：按 Router 响应克隆/更新服务仓库 ---
+// --- apiRouteTracer/gitPrepare：按配置的 Git 地址与父目录克隆或拉取仓库 ---
 
 type apiRouteTracerGitPrepareConfig struct {
-	WorkDir string `json:"workDir"`
+	GitlabURL string `json:"gitlabUrl"`
+	WorkDir   string `json:"workDir"`
 }
 
 type apiRouteTracerGitPrepareNode struct {
 	cfg apiRouteTracerGitPrepareConfig
 
-	workDirTmpl el.Template
+	gitlabURLTmpl el.Template
+	workDirTmpl   el.Template
 }
 
 func (n *apiRouteTracerGitPrepareNode) Type() string { return "apiRouteTracer/gitPrepare" }
@@ -238,11 +239,19 @@ func (n *apiRouteTracerGitPrepareNode) Init(_ types.Config, configuration types.
 	if err := mapConfigurationToStruct(configuration, &n.cfg); err != nil {
 		return err
 	}
+	n.cfg.GitlabURL = strings.TrimSpace(n.cfg.GitlabURL)
 	n.cfg.WorkDir = strings.TrimSpace(n.cfg.WorkDir)
+	if n.cfg.GitlabURL == "" {
+		return errors.New("gitPrepare: gitlabUrl 不能为空（可为含 ${...} 的模板）")
+	}
 	if n.cfg.WorkDir == "" {
 		return errors.New("gitPrepare: workDir 不能为空（可为含 ${...} 的模板）")
 	}
 	var err error
+	n.gitlabURLTmpl, err = el.NewTemplate(n.cfg.GitlabURL)
+	if err != nil {
+		return fmt.Errorf("gitPrepare: gitlabUrl 模板: %w", err)
+	}
 	n.workDirTmpl, err = el.NewTemplate(n.cfg.WorkDir)
 	if err != nil {
 		return fmt.Errorf("gitPrepare: workDir 模板: %w", err)
@@ -251,30 +260,25 @@ func (n *apiRouteTracerGitPrepareNode) Init(_ types.Config, configuration types.
 }
 
 func (n *apiRouteTracerGitPrepareNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) {
-	raw := strings.TrimSpace(msg.GetData())
-	if raw == "" {
-		ctx.TellFailure(msg, errors.New("gitPrepare: 上游消息 data 为空（需为 Router API 返回的 JSON，或 for 遍历中的单条 service 对象）"))
-		return
-	}
-	svc, err := parseGitPrepareService(raw, msg)
-	if err != nil {
-		ctx.TellFailure(msg, err)
-		return
-	}
-	name, ok := sanitizeServiceDirName(svc.ServiceName)
-	if !ok {
-		ctx.TellFailure(msg, fmt.Errorf("gitPrepare: 非法 serviceName %q", svc.ServiceName))
-		return
-	}
-	gitURL := strings.TrimSpace(svc.GitlabURL)
-	if gitURL == "" {
-		ctx.TellFailure(msg, errors.New("gitPrepare: gitlabUrl 为空"))
-		return
-	}
 	env := base.NodeUtils.GetEvnAndMetadata(ctx, msg)
+	gitURL := strings.TrimSpace(n.gitlabURLTmpl.ExecuteAsString(env))
+	if gitURL == "" {
+		ctx.TellFailure(msg, errors.New("gitPrepare: 渲染后 gitlabUrl 为空"))
+		return
+	}
 	workDir := filepath.Clean(strings.TrimSpace(n.workDirTmpl.ExecuteAsString(env)))
 	if workDir == "" || workDir == "." {
 		ctx.TellFailure(msg, errors.New("gitPrepare: 渲染后 workDir 为空"))
+		return
+	}
+	repoBase, err := gitRepoDirNameFromURL(gitURL)
+	if err != nil {
+		ctx.TellFailure(msg, fmt.Errorf("gitPrepare: 从 URL 解析仓库目录名: %w", err))
+		return
+	}
+	name, ok := sanitizeServiceDirName(repoBase)
+	if !ok {
+		ctx.TellFailure(msg, fmt.Errorf("gitPrepare: 仓库目录名非法 %q（仅允许字母、数字、.-_，长度 1–128）", repoBase))
 		return
 	}
 	servicePath := filepath.Join(workDir, name)
@@ -292,27 +296,37 @@ func (n *apiRouteTracerGitPrepareNode) OnMsg(ctx types.RuleContext, msg types.Ru
 
 	gitEnv := append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
 
-	if _, err := os.Stat(filepath.Join(servicePath, ".git")); err == nil {
-		if err := runGit(gitEnv, servicePath, "checkout", "master"); err != nil {
-			_ = runGit(gitEnv, servicePath, "checkout", "main")
+	st, err := os.Stat(servicePath)
+	if err == nil {
+		if !st.IsDir() {
+			ctx.TellFailure(msg, fmt.Errorf("gitPrepare: %q 已存在且不是目录", servicePath))
+			return
 		}
-		if err := runGit(gitEnv, servicePath, "pull", "origin", "master"); err != nil {
-			_ = runGit(gitEnv, servicePath, "pull", "origin", "main")
+		if _, err := os.Stat(filepath.Join(servicePath, ".git")); err != nil {
+			ctx.TellFailure(msg, fmt.Errorf("gitPrepare: 目录 %q 已存在但不是 git 仓库（无 .git），请删除后重试", servicePath))
+			return
 		}
-	} else {
+		if err := runGit(gitEnv, servicePath, "pull"); err != nil {
+			ctx.TellFailure(msg, fmt.Errorf("gitPrepare: git pull: %w", err))
+			return
+		}
+	} else if os.IsNotExist(err) {
 		if err := runGit(gitEnv, workDir, "clone", gitURL, name); err != nil {
 			ctx.TellFailure(msg, fmt.Errorf("gitPrepare: git clone: %w", err))
 			return
 		}
+	} else {
+		ctx.TellFailure(msg, fmt.Errorf("gitPrepare: 检查路径: %w", err))
+		return
 	}
 
 	out.Metadata.PutValue("api_route_tracer_service_path", servicePath)
-	out.Metadata.PutValue("api_route_tracer_project_type", strings.TrimSpace(svc.Type))
+	out.Metadata.PutValue("api_route_tracer_project_type", "")
 	out.Metadata.PutValue("api_route_tracer_service_name", name)
 	summary, _ := json.Marshal(map[string]string{
 		"servicePath": servicePath,
 		"serviceName": name,
-		"projectType": strings.TrimSpace(svc.Type),
+		"gitlabUrl":   gitURL,
 	})
 	out.SetData(string(summary))
 	ctx.TellSuccess(out)
@@ -320,61 +334,58 @@ func (n *apiRouteTracerGitPrepareNode) OnMsg(ctx types.RuleContext, msg types.Ru
 
 func (n *apiRouteTracerGitPrepareNode) Destroy() {
 	n.cfg = apiRouteTracerGitPrepareConfig{}
+	n.gitlabURLTmpl = nil
 	n.workDirTmpl = nil
 }
 
-type apiRouteTracerService struct {
-	ServiceName string `json:"serviceName"`
-	GitlabURL   string `json:"gitlabUrl"`
-	Type        string `json:"type"`
-}
-
-// parseGitPrepareService 支持两种上游：① Router 完整 JSON（含 data 数组）；② for 节点遍历时的单条元素 JSON。
-func parseGitPrepareService(raw string, msg types.RuleMsg) (apiRouteTracerService, error) {
-	var root map[string]interface{}
-	if err := json.Unmarshal([]byte(raw), &root); err != nil {
-		return apiRouteTracerService{}, fmt.Errorf("gitPrepare: 解析 JSON 失败: %w", err)
+// gitRepoDirNameFromURL 返回与 git clone 默认一致的本地目录名（路径最后一段，去掉 .git 后缀）。
+func gitRepoDirNameFromURL(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", errors.New("url 为空")
 	}
-	if arr, ok := root["data"].([]interface{}); ok && len(arr) > 0 {
-		idx := serviceIndexForTracer(msg, len(arr))
-		b, err := json.Marshal(arr[idx])
+	switch {
+	case strings.HasPrefix(raw, "ssh://"):
+		u, err := url.Parse(raw)
 		if err != nil {
-			return apiRouteTracerService{}, fmt.Errorf("gitPrepare: 序列化 data[%d] 失败: %w", idx, err)
+			return "", err
 		}
-		var one apiRouteTracerService
-		if err := json.Unmarshal(b, &one); err != nil {
-			return apiRouteTracerService{}, fmt.Errorf("gitPrepare: 解析 data[%d] 失败: %w", idx, err)
+		path := strings.TrimSuffix(strings.Trim(u.Path, "/"), ".git")
+		if path == "" {
+			return "", errors.New("ssh:// URL 路径为空")
 		}
-		return one, nil
-	}
-	var one apiRouteTracerService
-	if err := json.Unmarshal([]byte(raw), &one); err != nil {
-		return apiRouteTracerService{}, fmt.Errorf("gitPrepare: 解析单条 service 失败: %w", err)
-	}
-	if strings.TrimSpace(one.ServiceName) == "" || strings.TrimSpace(one.GitlabURL) == "" {
-		return apiRouteTracerService{}, errors.New("gitPrepare: 非 Router 包格式时，JSON 根级需含 serviceName、gitlabUrl（适用于 for 遍历 msg.data）")
-	}
-	return one, nil
-}
-
-// serviceIndexForTracer 优先 api_route_tracer_service_index，否则使用 RuleGo for 注入的 _loopIndex。
-func serviceIndexForTracer(msg types.RuleMsg, n int) int {
-	if n <= 0 {
-		return 0
-	}
-	if msg.Metadata != nil {
-		if s := strings.TrimSpace(msg.Metadata.GetValue("api_route_tracer_service_index")); s != "" {
-			if v, err := strconv.Atoi(s); err == nil && v >= 0 && v < n {
-				return v
-			}
+		parts := strings.Split(path, "/")
+		return parts[len(parts)-1], nil
+	case strings.Contains(raw, "://"):
+		u, err := url.Parse(raw)
+		if err != nil {
+			return "", err
 		}
-		if s := strings.TrimSpace(msg.Metadata.GetValue("_loopIndex")); s != "" {
-			if v, err := strconv.Atoi(s); err == nil && v >= 0 && v < n {
-				return v
-			}
+		path := strings.TrimSuffix(strings.Trim(u.Path, "/"), ".git")
+		parts := strings.Split(path, "/")
+		if len(parts) == 0 || parts[len(parts)-1] == "" {
+			return "", errors.New("无法从 URL 路径得到仓库名")
 		}
+		return parts[len(parts)-1], nil
+	case strings.HasPrefix(raw, "git@"):
+		colon := strings.Index(raw, ":")
+		if colon < 0 {
+			return "", errors.New("SCP 形式 git URL 中缺少 ':'")
+		}
+		path := strings.TrimSuffix(strings.Trim(raw[colon+1:], "/"), ".git")
+		parts := strings.Split(path, "/")
+		if len(parts) == 0 || parts[len(parts)-1] == "" {
+			return "", errors.New("无法从 SCP 形式 URL 得到仓库名")
+		}
+		return parts[len(parts)-1], nil
+	default:
+		path := strings.TrimSuffix(strings.Trim(raw, "/"), ".git")
+		parts := strings.Split(path, "/")
+		if len(parts) == 0 || parts[len(parts)-1] == "" {
+			return "", errors.New("无法解析为非空仓库名")
+		}
+		return parts[len(parts)-1], nil
 	}
-	return 0
 }
 
 // --- helpers ---

@@ -313,12 +313,12 @@ export default function RuleChainRequestParamsEditor({
             </div>
             <div className="modal-body">
               <label className="form-field">
-                <span>粘贴对象 JSON（将覆盖当前表格）</span>
+                <span>粘贴对象 JSON（将覆盖当前表格）。支持 // 与 /* */ 注释；对象数组会解析为 array 并保留元素对象内的字段（例如每项含 repo）。</span>
                 <textarea
                   value={importText}
                   onChange={(e) => setImportText(e.target.value)}
                   rows={8}
-                  placeholder={'{\n  "key": "value"\n}'}
+                  placeholder={'{\n  "repos": [\n    { "repo": "https://gitlab.com/group/repo.git" }\n  ]\n}'}
                   spellCheck={false}
                   className="rulego-request-params-import-textarea"
                 />

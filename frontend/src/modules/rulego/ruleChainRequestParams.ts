@@ -133,28 +133,148 @@ export function parseRuleChainParamsJsonStrict(raw: string): RuleChainParamNode[
   return parseRuleChainParamsJson(trimmed);
 }
 
-function objectToNodes(obj: Record<string, unknown>): RuleChainParamNode[] {
-  return Object.entries(obj).map(([k, val]) => {
-    const typ = inferType(val);
-    if (typ === "object" && val && typeof val === "object" && !Array.isArray(val)) {
-      return {
-        id: newParamNodeId(),
-        key: k,
-        type: "object",
-        required: false,
-        description: "",
-        children: objectToNodes(val as Record<string, unknown>),
-      };
+/** 去掉 JSON 字符串外的 // 行注释与 /* *\/ 块注释，便于粘贴带说明的 JSON。 */
+function stripJsonLikeComments(input: string): string {
+  let out = "";
+  let i = 0;
+  let inString = false;
+  let escape = false;
+  while (i < input.length) {
+    const c = input[i]!;
+    if (inString) {
+      out += c;
+      if (escape) {
+        escape = false;
+      } else if (c === "\\") {
+        escape = true;
+      } else if (c === '"') {
+        inString = false;
+      }
+      i++;
+      continue;
     }
+    if (c === '"') {
+      inString = true;
+      out += c;
+      i++;
+      continue;
+    }
+    if (c === "/" && input[i + 1] === "/") {
+      i += 2;
+      while (i < input.length && input[i] !== "\n" && input[i] !== "\r") {
+        i++;
+      }
+      continue;
+    }
+    if (c === "/" && input[i + 1] === "*") {
+      i += 2;
+      while (i < input.length - 1) {
+        if (input[i] === "*" && input[i + 1] === "/") {
+          i += 2;
+          break;
+        }
+        i++;
+      }
+      continue;
+    }
+    out += c;
+    i++;
+  }
+  return out;
+}
+
+function isPlainObject(v: unknown): v is Record<string, unknown> {
+  return Boolean(v && typeof v === "object" && !Array.isArray(v));
+}
+
+/** 将数组中的多个对象合并为一份键 → 示例值，用于推导数组元素的对象结构。 */
+function mergeObjectArrayItemsForSchema(items: unknown[]): Record<string, unknown> {
+  const merged: Record<string, unknown> = {};
+  for (const el of items) {
+    if (!isPlainObject(el)) continue;
+    for (const [k, v] of Object.entries(el)) {
+      if (!(k in merged)) merged[k] = v;
+    }
+  }
+  return merged;
+}
+
+function valueToParamNode(key: string, val: unknown): RuleChainParamNode {
+  const typ = inferType(val);
+  if (typ === "object" && isPlainObject(val)) {
     return {
       id: newParamNodeId(),
-      key: k,
-      type: typ,
+      key,
+      type: "object",
       required: false,
       description: "",
-      children: [],
+      children: objectToNodes(val),
     };
-  });
+  }
+  if (typ === "array" && Array.isArray(val)) {
+    const arr = val as unknown[];
+    if (arr.length === 0) {
+      return {
+        id: newParamNodeId(),
+        key,
+        type: "array",
+        required: false,
+        description: "",
+        children: [],
+      };
+    }
+    const first = arr[0];
+    if (isPlainObject(first)) {
+      const itemFields = mergeObjectArrayItemsForSchema(arr);
+      return {
+        id: newParamNodeId(),
+        key,
+        type: "array",
+        required: false,
+        description: "",
+        children: [
+          {
+            id: newParamNodeId(),
+            key: "",
+            type: "object",
+            required: false,
+            description: "",
+            children: objectToNodes(itemFields),
+          },
+        ],
+      };
+    }
+    const itemTyp = inferType(first);
+    return {
+      id: newParamNodeId(),
+      key,
+      type: "array",
+      required: false,
+      description: "",
+      children: [
+        {
+          id: newParamNodeId(),
+          key: "",
+          type: itemTyp,
+          required: false,
+          description: "",
+          children: [],
+        },
+      ],
+    };
+  }
+  return {
+    id: newParamNodeId(),
+    key,
+    type: typ,
+    required: false,
+    description: "",
+    children: [],
+  };
+}
+
+function objectToNodes(obj: Record<string, unknown>): RuleChainParamNode[] {
+  return Object.entries(obj).map(([k, val]) => valueToParamNode(k, val));
 }
 
 export function importRuleChainParamsFromObjectJson(text: string): RuleChainParamNode[] {
@@ -162,9 +282,10 @@ export function importRuleChainParamsFromObjectJson(text: string): RuleChainPara
   if (!trimmed) {
     throw new Error("JSON 内容为空");
   }
+  const withoutComments = stripJsonLikeComments(trimmed);
   let parsed: unknown;
   try {
-    parsed = JSON.parse(trimmed);
+    parsed = JSON.parse(withoutComments);
   } catch (e) {
     throw new Error(`JSON 解析失败：${e instanceof Error ? e.message : String(e)}`);
   }

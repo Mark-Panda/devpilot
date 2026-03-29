@@ -32,6 +32,30 @@ describe("ruleChainRequestParams", () => {
     expect(cfg?.children?.[0]?.key).toBe("a");
   });
 
+  it("imports repos array of { repo } as array of object schema", () => {
+    const nodes = importRuleChainParamsFromObjectJson(
+      JSON.stringify({
+        repos: [{ repo: "https://gitlab.com/g/r.git" }, { repo: "" }],
+      })
+    );
+    const repos = nodes.find((r) => r.key === "repos");
+    expect(repos?.type).toBe("array");
+    expect(repos?.children).toHaveLength(1);
+    expect(repos?.children[0]?.type).toBe("object");
+    const repoField = repos?.children[0]?.children.find((c) => c.key === "repo");
+    expect(repoField?.type).toBe("string");
+  });
+
+  it("imports JSON with line comments outside strings", () => {
+    const raw = `{
+  "repos": [ // list
+    { "repo": "https://x" }
+  ]
+}`;
+    const nodes = importRuleChainParamsFromObjectJson(raw);
+    expect(nodes.find((r) => r.key === "repos")?.children[0]?.children[0]?.key).toBe("repo");
+  });
+
   it("builds preview object from nodes", () => {
     const json = JSON.stringify([
       { key: "cfg", type: "object", required: false, description: "nested", children: [{ key: "a", type: "number", required: false, description: "", children: [] }] },
