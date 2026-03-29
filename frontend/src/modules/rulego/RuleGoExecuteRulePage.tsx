@@ -514,7 +514,21 @@ export default function RuleGoExecuteRulePage() {
                         height={140}
                         minHeight={80}
                         showExpandButton
+                        showCopyButton
                         expandTitle="节点入参 data"
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>入参 metadata</span>
+                      <JsonEditor
+                        value={prettyJsonForDisplay(selectedNode.input_metadata ?? "", "(空)")}
+                        onChange={() => {}}
+                        readOnly
+                        height={120}
+                        minHeight={72}
+                        showExpandButton
+                        showCopyButton
+                        expandTitle="节点入参 metadata"
                       />
                     </label>
                     <label className="form-field">
@@ -526,7 +540,21 @@ export default function RuleGoExecuteRulePage() {
                         height={140}
                         minHeight={80}
                         showExpandButton
+                        showCopyButton
                         expandTitle="节点出参 data"
+                      />
+                    </label>
+                    <label className="form-field">
+                      <span>出参 metadata</span>
+                      <JsonEditor
+                        value={prettyJsonForDisplay(selectedNode.output_metadata ?? "", "(空)")}
+                        onChange={() => {}}
+                        readOnly
+                        height={120}
+                        minHeight={72}
+                        showExpandButton
+                        showCopyButton
+                        expandTitle="节点出参 metadata"
                       />
                     </label>
                     {(selectedNode.error_message ?? "").trim() ? (

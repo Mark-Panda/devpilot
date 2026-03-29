@@ -13,6 +13,8 @@ type JsonEditorProps = {
   showFormatButton?: boolean;
   /** 展示「放大编辑」：在弹窗中以更大区域编辑（只读时用于查看与复制） */
   showExpandButton?: boolean;
+  /** 展示「复制」：将当前编辑器内容写入剪贴板 */
+  showCopyButton?: boolean;
   /** 放大弹窗标题 */
   expandTitle?: string;
   onFormatError?: (message: string) => void;
@@ -51,14 +53,17 @@ export function JsonEditor({
   readOnly = false,
   showFormatButton = false,
   showExpandButton = false,
+  showCopyButton = false,
   expandTitle = "JSON",
   onFormatError,
   className,
 }: JsonEditorProps) {
   const rootRef = useRef<HTMLDivElement | null>(null);
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+  const expandEditorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
   const resizeObsRef = useRef<ResizeObserver | null>(null);
   const [expandOpen, setExpandOpen] = useState(false);
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
 
   useEffect(() => {
     return () => {
@@ -66,6 +71,10 @@ export function JsonEditor({
       resizeObsRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!expandOpen) expandEditorRef.current = null;
+  }, [expandOpen]);
 
   const handleEditorMount: OnMount = useCallback((editorInstance) => {
     editorRef.current = editorInstance;
@@ -111,7 +120,36 @@ export function JsonEditor({
     formatFromString(String(value ?? ""));
   }, [value, formatFromString]);
 
-  const showToolbar = showFormatButton || showExpandButton;
+  const getMainEditorText = useCallback(() => {
+    const m = editorRef.current?.getModel();
+    if (m) return m.getValue();
+    return String(value ?? "");
+  }, [value]);
+
+  const handleCopy = useCallback(async () => {
+    const text = getMainEditorText();
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyFeedback("已复制");
+    } catch {
+      setCopyFeedback("复制失败");
+    }
+    window.setTimeout(() => setCopyFeedback(null), 2000);
+  }, [getMainEditorText]);
+
+  const handleCopyExpanded = useCallback(async () => {
+    const m = expandEditorRef.current?.getModel();
+    const text = m ? m.getValue() : String(value ?? "");
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopyFeedback("已复制");
+    } catch {
+      setCopyFeedback("复制失败");
+    }
+    window.setTimeout(() => setCopyFeedback(null), 2000);
+  }, [value]);
+
+  const showToolbar = showFormatButton || showExpandButton || showCopyButton;
 
   const expandModal =
     expandOpen &&
@@ -128,11 +166,23 @@ export function JsonEditor({
           style={{ width: "min(920px, 96vw)", maxHeight: "92vh", display: "flex", flexDirection: "column" }}
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="modal-header" style={{ paddingBottom: 8 }}>
-            <h3>{expandTitle}</h3>
-            <button type="button" className="text-button" onClick={() => setExpandOpen(false)} aria-label="关闭">
-              ×
-            </button>
+          <div className="modal-header" style={{ paddingBottom: 8, display: "flex", alignItems: "center", gap: 12 }}>
+            <h3 style={{ flex: 1, margin: 0 }}>{expandTitle}</h3>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+              {showCopyButton ? (
+                <button type="button" className="text-button" style={{ padding: "4px 10px", fontSize: 12 }} onClick={() => void handleCopyExpanded()}>
+                  复制
+                </button>
+              ) : null}
+              {copyFeedback ? (
+                <span className="form-hint" style={{ fontSize: 12 }} role="status">
+                  {copyFeedback}
+                </span>
+              ) : null}
+              <button type="button" className="text-button" onClick={() => setExpandOpen(false)} aria-label="关闭">
+                ×
+              </button>
+            </div>
           </div>
           <div className="modal-body" style={{ flex: 1, minHeight: 0, paddingTop: 0 }}>
             {showFormatButton && !readOnly ? (
@@ -150,7 +200,10 @@ export function JsonEditor({
               loading={null}
               readOnly={readOnly}
               options={MONACO_JSON_OPTIONS}
-              onMount={(ed) => requestAnimationFrame(() => ed.layout())}
+              onMount={(ed) => {
+                expandEditorRef.current = ed;
+                requestAnimationFrame(() => ed.layout());
+              }}
               style={{
                 border: "1px solid var(--color-border, #e2e8f0)",
                 borderRadius: 8,
@@ -165,8 +218,8 @@ export function JsonEditor({
   return (
     <div ref={rootRef} className={[`json-editor-root`, className].filter(Boolean).join(" ")}>
       {showToolbar ? (
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 4 }}>
-          <div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 4, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
             {showExpandButton ? (
               <button
                 type="button"
@@ -176,6 +229,21 @@ export function JsonEditor({
               >
                 放大编辑
               </button>
+            ) : null}
+            {showCopyButton ? (
+              <button
+                type="button"
+                className="text-button"
+                style={{ padding: "4px 10px", fontSize: 12 }}
+                onClick={() => void handleCopy()}
+              >
+                复制
+              </button>
+            ) : null}
+            {copyFeedback && !expandOpen ? (
+              <span className="form-hint" style={{ fontSize: 12 }} role="status">
+                {copyFeedback}
+              </span>
             ) : null}
           </div>
           <div>

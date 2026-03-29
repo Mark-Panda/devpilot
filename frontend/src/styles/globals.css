@@ -3941,6 +3941,37 @@ body {
   background: #ffffff;
 }
 
+.rulego-log-json-header {
+  display: flex;
+  align-items: stretch;
+  gap: 0;
+  background: #f1f5f9;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.rulego-log-json-header .rulego-log-json-title {
+  flex: 1;
+  min-width: 0;
+}
+
+.rulego-log-json-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+  padding: 0 10px 0 4px;
+}
+
+.rulego-log-json-copy {
+  padding: 4px 8px !important;
+  font-size: 12px !important;
+}
+
+.rulego-log-json-copy-tip {
+  font-size: 11px !important;
+  white-space: nowrap;
+}
+
 .rulego-log-json-title {
   width: 100%;
   display: flex;
@@ -3948,7 +3979,7 @@ body {
   gap: 8px;
   padding: 8px 12px;
   border: none;
-  background: #f1f5f9;
+  background: transparent;
   font-size: 12px;
   font-weight: 600;
   color: #475569;

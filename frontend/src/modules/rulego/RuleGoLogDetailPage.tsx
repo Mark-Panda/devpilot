@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type MouseEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getExecutionLog } from "./useRuleGoApi";
 import type { RuleGoExecutionLog, RuleGoExecutionNodeLog } from "./useRuleGoApi";
@@ -33,21 +33,48 @@ function tryFormatJson(s: string): string {
 
 function JsonBlock({ title, raw, emptyLabel = "无" }: { title: string; raw: string; emptyLabel?: string }) {
   const [open, setOpen] = useState(true);
+  const [copyTip, setCopyTip] = useState<string | null>(null);
   const text = raw?.trim() ? tryFormatJson(raw) : "";
+  const bodyText = text || emptyLabel;
+
+  const handleCopy = async (e: MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(bodyText);
+      setCopyTip("已复制");
+    } catch {
+      setCopyTip("复制失败");
+    }
+    window.setTimeout(() => setCopyTip(null), 2000);
+  };
+
   return (
     <div className="rulego-log-json-block">
-      <button
-        type="button"
-        className="rulego-log-json-title"
-        onClick={() => setOpen(!open)}
-        aria-expanded={open}
-      >
-        <span className="rulego-log-json-chevron">{open ? "▼" : "▶"}</span>
-        {title}
-      </button>
+      <div className="rulego-log-json-header">
+        <button
+          type="button"
+          className="rulego-log-json-title"
+          onClick={() => setOpen(!open)}
+          aria-expanded={open}
+        >
+          <span className="rulego-log-json-chevron">{open ? "▼" : "▶"}</span>
+          {title}
+        </button>
+        <div className="rulego-log-json-header-actions">
+          <button type="button" className="text-button rulego-log-json-copy" onClick={(ev) => void handleCopy(ev)}>
+            复制
+          </button>
+          {copyTip ? (
+            <span className="form-hint rulego-log-json-copy-tip" role="status">
+              {copyTip}
+            </span>
+          ) : null}
+        </div>
+      </div>
       {open && (
         <pre className="rulego-log-json-body">
-          {text || emptyLabel}
+          {bodyText}
         </pre>
       )}
     </div>
