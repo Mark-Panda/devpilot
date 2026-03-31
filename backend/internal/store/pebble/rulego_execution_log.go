@@ -183,12 +183,68 @@ func InsertRuleGoExecutionNodeLog(ctx context.Context, db *DB, input models.Rule
 	return input, nil
 }
 
+// findLatestUnfinishedNodeLog 查找指定执行中、该 nodeId 下尚未标记结束（FinishedAt 为空）的最新一条节点日志。
+func findLatestUnfinishedNodeLog(db *DB, executionID, nodeID string) (key []byte, node models.RuleGoExecutionNodeLog, ok bool, iterErr error) {
+	prefix := enPrefix + executionID + ":"
+	iter, err := db.NewIter(&pebble.IterOptions{
+		LowerBound: []byte(prefix),
+		UpperBound: prefixEnd(prefix),
+	})
+	if err != nil {
+		return nil, models.RuleGoExecutionNodeLog{}, false, err
+	}
+	defer iter.Close()
+
+	for iter.First(); iter.Valid(); iter.Next() {
+		v, err := iter.ValueAndErr()
+		if err != nil {
+			return nil, models.RuleGoExecutionNodeLog{}, false, err
+		}
+		var n models.RuleGoExecutionNodeLog
+		if err := json.Unmarshal(v, &n); err != nil {
+			continue
+		}
+		if n.NodeID != nodeID {
+			continue
+		}
+		if strings.TrimSpace(n.FinishedAt) != "" {
+			continue
+		}
+		if !ok || n.OrderIndex > node.OrderIndex {
+			ok = true
+			key = append([]byte(nil), iter.Key()...)
+			node = n
+		}
+	}
+	if err := iter.Error(); err != nil {
+		return nil, models.RuleGoExecutionNodeLog{}, false, err
+	}
+	return key, node, ok, nil
+}
+
 func UpdateRuleGoExecutionNodeLogByExecutionAndNode(ctx context.Context, db *DB, executionID, nodeID, outputData, outputMetadata, errorMessage, finishedAt string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
 	if finishedAt == "" {
 		finishedAt = now
 	}
 
+	key, node, found, err := findLatestUnfinishedNodeLog(db, executionID, nodeID)
+	if err != nil {
+		return err
+	}
+	if found {
+		node.OutputData = outputData
+		node.OutputMetadata = outputMetadata
+		node.ErrorMessage = errorMessage
+		node.FinishedAt = finishedAt
+		data, err := json.Marshal(node)
+		if err != nil {
+			return err
+		}
+		return db.Set(key, data, pebble.Sync)
+	}
+
+	// 兼容旧数据：无「未完成」行时退回「出参仍为空」的第一条匹配
 	prefix := enPrefix + executionID + ":"
 	iter, err := db.NewIter(&pebble.IterOptions{
 		LowerBound: []byte(prefix),
@@ -204,27 +260,46 @@ func UpdateRuleGoExecutionNodeLogByExecutionAndNode(ctx context.Context, db *DB,
 		if err != nil {
 			return err
 		}
-		var node models.RuleGoExecutionNodeLog
-		if err := json.Unmarshal(v, &node); err != nil {
+		var n models.RuleGoExecutionNodeLog
+		if err := json.Unmarshal(v, &n); err != nil {
 			continue
 		}
-		if node.NodeID != nodeID {
+		if n.NodeID != nodeID {
 			continue
 		}
-		if node.OutputData != "" {
+		if n.OutputData != "" {
 			continue
 		}
-		node.OutputData = outputData
-		node.OutputMetadata = outputMetadata
-		node.ErrorMessage = errorMessage
-		node.FinishedAt = finishedAt
-		data, err := json.Marshal(node)
+		n.OutputData = outputData
+		n.OutputMetadata = outputMetadata
+		n.ErrorMessage = errorMessage
+		n.FinishedAt = finishedAt
+		data, err := json.Marshal(n)
 		if err != nil {
 			return err
 		}
 		return db.Set(iter.Key(), data, pebble.Sync)
 	}
 	return iter.Error()
+}
+
+// PatchRuleGoExecutionNodeLogProgress 更新进行中节点的出参预览（FinishedAt 保持为空），供前端轮询。
+func PatchRuleGoExecutionNodeLogProgress(ctx context.Context, db *DB, executionID, nodeID, outputData, outputMetadata string) error {
+	_ = ctx
+	key, node, found, err := findLatestUnfinishedNodeLog(db, executionID, nodeID)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return nil
+	}
+	node.OutputData = outputData
+	node.OutputMetadata = outputMetadata
+	data, err := json.Marshal(node)
+	if err != nil {
+		return err
+	}
+	return db.Set(key, data, pebble.Sync)
 }
 
 func GetRuleGoExecutionNodeLogsByExecutionID(ctx context.Context, db *DB, executionID string) ([]models.RuleGoExecutionNodeLog, error) {

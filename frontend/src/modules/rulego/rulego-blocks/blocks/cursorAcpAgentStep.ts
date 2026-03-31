@@ -1,5 +1,5 @@
 /**
- * Cursor ACP Agent：同一会话内多轮 session/prompt，并对规划 / 问答 / elicitation 等自动批复。
+ * Cursor ACP Agent Step：单次 session/prompt，供规则链多节点串联（与 cursor/acp_agent_step 对应）。
  */
 import type { Block } from "blockly/core";
 import type { BlockTypeDef } from "../types";
@@ -12,6 +12,7 @@ import {
   cursorAcpSessionModeOptions,
   cursorAcpTimeoutPresetOptions,
 } from "./cursorAcp";
+import { cursorAcpElicitationUrlOptions } from "./cursorAcpAgent";
 
 const category = "rulego_tracer" as const;
 
@@ -43,24 +44,18 @@ function inferArgsPreset(args: unknown): string {
   return "custom";
 }
 
-export const cursorAcpElicitationUrlOptions = [
-  { value: "decline", label: "拒绝外链（decline，默认）" },
-  { value: "accept", label: "接受（accept，自动化慎用）" },
-  { value: "cancel", label: "取消（cancel）" },
-] as const;
-
-const cursorAcpAgentDef: BlockTypeDef = {
-  blockType: "rulego_cursorAcpAgent",
-  nodeType: "cursor/acp_agent",
+const cursorAcpAgentStepDef: BlockTypeDef = {
+  blockType: "rulego_cursorAcpAgentStep",
+  nodeType: "cursor/acp_agent_step",
   category,
   register(ScratchBlocks, BlocklyF) {
     const blocks = (ScratchBlocks as { Blocks: Record<string, object> }).Blocks;
     const B = BlocklyF as any;
-    blocks[cursorAcpAgentDef.blockType] = {
+    blocks[cursorAcpAgentStepDef.blockType] = {
       init: function (this: Block) {
-        (this as Block).appendDummyInput("HEAD").appendField(new B.FieldTextInput("追踪·Cursor ACP Agent"), "NODE_NAME");
+        (this as Block).appendDummyInput("HEAD").appendField(new B.FieldTextInput("追踪·ACP Agent 单步"), "NODE_NAME");
         const config = (this as Block).appendDummyInput("CONFIG");
-        config.appendField(new B.FieldTextInput("cursor_acp_agent1"), "NODE_ID");
+        config.appendField(new B.FieldTextInput("cursor_acp_agent_step1"), "NODE_ID");
         config.appendField(
           new B.FieldDropdown(cursorAcpAgentPresetOptions.map((o) => [o.label, o.value] as [string, string])),
           "ACP_AGENT_PRESET",
@@ -86,9 +81,6 @@ const cursorAcpAgentDef: BlockTypeDef = {
         );
         config.appendField(new B.FieldTextInput("[]"), "ACP_ARGS_JSON");
         config.appendField(new B.FieldCheckbox(true), "ACP_VERBOSE_LOG");
-        config.appendField(new B.FieldTextInput("20"), "MAX_PROMPT_ROUNDS");
-        config.appendField(new B.FieldTextInput(""), "CONTINUATION_PROMPT");
-        config.appendField(new B.FieldCheckbox(false), "USE_REGISTERED_AFTER_ROUND_HOOK");
         config.appendField(new B.FieldCheckbox(false), "USE_ASK_QUESTION_DIALOG");
         config.appendField(new B.FieldTextInput("approve"), "AUTO_PLAN_OPTION_ID");
         config.appendField(new B.FieldTextInput("0"), "AUTO_ASK_OPTION_INDEX");
@@ -139,7 +131,6 @@ const cursorAcpAgentDef: BlockTypeDef = {
 
     const sessionMode = String(helpers.getFieldValue(block, "ACP_SESSION_MODE") ?? "agent").trim() || "agent";
 
-    const maxRounds = Math.max(1, parseInt(String(helpers.getFieldValue(block, "MAX_PROMPT_ROUNDS") ?? "20"), 10) || 20);
     const askIdx = parseInt(String(helpers.getFieldValue(block, "AUTO_ASK_OPTION_INDEX") ?? "0"), 10);
     const elicitUrl = String(helpers.getFieldValue(block, "ELICIT_URL_ACTION") ?? "decline").trim() || "decline";
 
@@ -150,9 +141,6 @@ const cursorAcpAgentDef: BlockTypeDef = {
       workDir: helpers.getFieldValue(block, "WORK_DIR"),
       sessionMode,
       permissionOptionId: helpers.getFieldValue(block, "PERM_OPTION") || "allow-once",
-      maxPromptRounds: maxRounds,
-      continuationPrompt: helpers.getFieldValue(block, "CONTINUATION_PROMPT"),
-      useRegisteredAfterRoundHook: helpers.getBooleanField(block, "USE_REGISTERED_AFTER_ROUND_HOOK"),
       useAskQuestionDialog: helpers.getBooleanField(block, "USE_ASK_QUESTION_DIALOG"),
       autoPlanOptionId: helpers.getFieldValue(block, "AUTO_PLAN_OPTION_ID") || "approve",
       autoAskQuestionOptionIndex: Number.isFinite(askIdx) ? askIdx : 0,
@@ -179,17 +167,13 @@ const cursorAcpAgentDef: BlockTypeDef = {
 
     const perm = String(c.permissionOptionId ?? "allow-once");
     block.setFieldValue(["allow-once", "allow-always", "reject-once"].includes(perm) ? perm : "allow-once", "PERM_OPTION");
+    block.setFieldValue(c.useAskQuestionDialog === true ? "TRUE" : "FALSE", "USE_ASK_QUESTION_DIALOG");
 
     const args = Array.isArray(c.args) ? c.args.map((x: unknown) => String(x)) : [];
     const ap = inferArgsPreset(args);
     block.setFieldValue(ap, "ACP_ARGS_PRESET");
     block.setFieldValue(JSON.stringify(args.length > 0 ? args : []), "ACP_ARGS_JSON");
 
-    const mr = Number(c.maxPromptRounds ?? 20) || 20;
-    block.setFieldValue(String(Math.max(1, mr)), "MAX_PROMPT_ROUNDS");
-    block.setFieldValue(String(c.continuationPrompt ?? ""), "CONTINUATION_PROMPT");
-    block.setFieldValue(c.useRegisteredAfterRoundHook === true ? "TRUE" : "FALSE", "USE_REGISTERED_AFTER_ROUND_HOOK");
-    block.setFieldValue(c.useAskQuestionDialog === true ? "TRUE" : "FALSE", "USE_ASK_QUESTION_DIALOG");
     block.setFieldValue(String(c.autoPlanOptionId ?? "approve"), "AUTO_PLAN_OPTION_ID");
     const aidx = Number(c.autoAskQuestionOptionIndex ?? 0);
     block.setFieldValue(String(Number.isFinite(aidx) ? aidx : 0), "AUTO_ASK_OPTION_INDEX");
@@ -212,6 +196,6 @@ const cursorAcpAgentDef: BlockTypeDef = {
   defaultConnectionType: "Success",
 };
 
-registerBlockType(cursorAcpAgentDef);
+registerBlockType(cursorAcpAgentStepDef);
 
-export default cursorAcpAgentDef;
+export default cursorAcpAgentStepDef;

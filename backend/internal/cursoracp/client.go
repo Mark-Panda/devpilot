@@ -38,6 +38,12 @@ type Config struct {
 	PermissionOptionID string
 	// AutoReply 对 session/elicitation、cursor/create_plan、cursor/ask_question 等客户端请求的自动批复。
 	AutoReply AutoReplyConfig
+	// RPCInteractionCtx 随外层 context 取消（如规则链超时）；人机弹窗等待时若取消则回退自动选项。
+	RPCInteractionCtx context.Context
+	// DialogTask 当前会话所属规则执行，传入问答弹窗。
+	DialogTask DialogTask
+	// AskQuestionPicker 非空时对 cursor/ask_question 在独立协程中等待用户选择后再 replyRPC（避免阻塞 stdout 读循环）。
+	AskQuestionPicker func(ctx context.Context, params json.RawMessage, task DialogTask) (optionID string, err error)
 	// VerboseLog 为 true 时打印工作区绝对路径（由调用方在 session/new 前记录）以及每条 agent_message_chunk 流式文本。
 	VerboseLog bool
 }
@@ -114,6 +120,39 @@ type Client struct {
 	readOnce sync.Once
 	readErr  error
 	wg       sync.WaitGroup
+
+	stderrCap *stderrTailCapture
+}
+
+const stderrTailMax = 64 * 1024
+
+// stderrTailCapture 保留子进程 stderr 尾部，便于写入规则执行日志（仍同时输出到 os.Stderr）。
+type stderrTailCapture struct {
+	mu  sync.Mutex
+	buf []byte
+	max int
+}
+
+func (t *stderrTailCapture) Write(p []byte) (int, error) {
+	if t == nil {
+		return len(p), nil
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.buf = append(t.buf, p...)
+	if len(t.buf) > t.max {
+		t.buf = t.buf[len(t.buf)-t.max:]
+	}
+	return len(p), nil
+}
+
+func (t *stderrTailCapture) String() string {
+	if t == nil {
+		return ""
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return string(t.buf)
 }
 
 // NewClient 构造客户端（尚未启动子进程）。
@@ -157,7 +196,8 @@ func (c *Client) Start(ctx context.Context) error {
 		cancel()
 		return fmt.Errorf("cursoracp stdout: %w", err)
 	}
-	c.cmd.Stderr = os.Stderr
+	c.stderrCap = &stderrTailCapture{max: stderrTailMax}
+	c.cmd.Stderr = io.MultiWriter(os.Stderr, c.stderrCap)
 
 	if err := c.cmd.Start(); err != nil {
 		cancel()
@@ -283,6 +323,12 @@ func (c *Client) handleIncomingLine(line []byte) {
 				c.replyPermission(id)
 			case "session/elicitation":
 				c.replyRPCResult(id, autoReplyElicitation(m["params"], c.cfg.AutoReply))
+			case "cursor/ask_question":
+				if c.cfg.AskQuestionPicker != nil {
+					go c.asyncReplyAskQuestion(id, m["params"])
+				} else {
+					c.replyRPCResult(id, autoReplyAskQuestion(m["params"], c.cfg.AutoReply.askIndex()))
+				}
 			default:
 				if strings.HasPrefix(method, "cursor/") {
 					if res := autoReplyCursorExtension(method, m["params"], c.cfg.AutoReply); res != nil {
@@ -304,6 +350,26 @@ func (c *Client) replyRPCResult(id int64, result interface{}) {
 		"id":      id,
 		"result":  result,
 	})
+}
+
+func (c *Client) asyncReplyAskQuestion(rpcID int64, params json.RawMessage) {
+	pick := c.cfg.AskQuestionPicker
+	if pick == nil {
+		c.replyRPCResult(rpcID, autoReplyAskQuestion(params, c.cfg.AutoReply.askIndex()))
+		return
+	}
+	ctx := c.cfg.RPCInteractionCtx
+	if ctx == nil {
+		ctx = context.Background()
+	}
+	optID, err := pick(ctx, params, c.cfg.DialogTask)
+	var res interface{}
+	if err != nil || strings.TrimSpace(optID) == "" {
+		res = autoReplyAskQuestion(params, c.cfg.AutoReply.askIndex())
+	} else {
+		res = autoPlanApproveResult(strings.TrimSpace(optID))
+	}
+	c.replyRPCResult(rpcID, res)
 }
 
 func (c *Client) replyPermission(id int64) {
@@ -498,19 +564,36 @@ func (c *Client) StreamText() string {
 	return c.stream.String()
 }
 
+// StderrTail 返回自 Start 以来子进程 stderr 的保留尾部（用于执行日志）；未启动则为空。
+func (c *Client) StderrTail() string {
+	if c == nil || c.stderrCap == nil {
+		return ""
+	}
+	return strings.TrimSpace(c.stderrCap.String())
+}
+
+// RunOnceOutcome 单次 session/prompt 的结果汇总。
+type RunOnceOutcome struct {
+	Prompt     *PromptResult
+	Stream     string
+	StderrTail string
+}
+
 // RunOnce 启动客户端、完成握手、创建会话并执行一次 Prompt，最后关闭子进程。
-func RunOnce(ctx context.Context, cfg Config, cwd, prompt string) (*PromptResult, string, error) {
-	cl := NewClient(cfg)
+func RunOnce(ctx context.Context, cfg Config, cwd, prompt string) (*RunOnceOutcome, error) {
+	clientCfg := cfg
+	clientCfg.RPCInteractionCtx = ctx
+	cl := NewClient(clientCfg)
 	if err := cl.Start(ctx); err != nil {
-		return nil, "", err
+		return nil, err
 	}
 	defer func() { _ = cl.Close() }()
 
 	if err := cl.Initialize(ctx); err != nil {
-		return nil, "", fmt.Errorf("initialize: %w", err)
+		return nil, fmt.Errorf("initialize: %w", err)
 	}
 	if err := cl.Authenticate(ctx); err != nil {
-		return nil, "", fmt.Errorf("authenticate: %w", err)
+		return nil, fmt.Errorf("authenticate: %w", err)
 	}
 	if cfg.VerboseLog {
 		logWorkspaceCwd("cursor/acp", cwd)
@@ -520,17 +603,21 @@ func RunOnce(ctx context.Context, cfg Config, cwd, prompt string) (*PromptResult
 		Mode: strings.TrimSpace(cfg.SessionMode),
 	})
 	if err != nil {
-		return nil, "", fmt.Errorf("session/new: %w", err)
+		return nil, fmt.Errorf("session/new: %w", err)
 	}
 	pr, err := cl.Prompt(ctx, sid, prompt)
 	if err != nil {
-		return nil, "", fmt.Errorf("session/prompt: %w", err)
+		return nil, fmt.Errorf("session/prompt: %w", err)
 	}
 	stream := cl.StreamText()
 	if cfg.VerboseLog && pr != nil {
 		log.Printf("[cursoracp] cursor/acp prompt done stopReason=%q streamChars=%d", pr.StopReason, len(stream))
 	}
-	return pr, stream, nil
+	return &RunOnceOutcome{
+		Prompt:     pr,
+		Stream:     stream,
+		StderrTail: cl.StderrTail(),
+	}, nil
 }
 
 func logWorkspaceCwd(scope, cwd string) {

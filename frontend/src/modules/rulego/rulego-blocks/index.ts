@@ -30,6 +30,7 @@ import "./blocks/sourcegraphQueryBuild";
 import "./blocks/apiRouteTracer";
 import "./blocks/cursorAcp";
 import "./blocks/cursorAcpAgent";
+import "./blocks/cursorAcpAgentStep";
 
 import {
   getBlockDef,
@@ -139,6 +140,7 @@ export const toolbox = {
         { kind: "block" as const, type: "rulego_apiRouteTracer_gitPrepare" },
         { kind: "block" as const, type: "rulego_cursorAcp" },
         { kind: "block" as const, type: "rulego_cursorAcpAgent" },
+        { kind: "block" as const, type: "rulego_cursorAcpAgentStep" },
       ],
     },
     {

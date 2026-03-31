@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Cursor ACP 待处理堆叠 — UI 演示</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --studio-deep: #08080e;
+        --studio-bg: #0f0f18;
+        --studio-panel: #18182a;
+        --studio-panel-2: #222236;
+        --studio-border: #4a4d6a;
+        --studio-hot: #e94560;
+        --studio-text: #e8e8f0;
+        --studio-muted: #8b8ba4;
+        --text-muted: #64748b;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family:
+          "Inter",
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          "PingFang SC",
+          "Hiragino Sans GB",
+          "Microsoft YaHei",
+          sans-serif;
+        background: var(--studio-deep);
+        color: var(--studio-text);
+      }
+
+      /* 模拟主窗口内容（弹窗背后） */
+      .fake-app {
+        padding: 24px;
+        min-height: 100vh;
+        background: linear-gradient(180deg, var(--studio-bg) 0%, var(--studio-deep) 100%);
+      }
+
+      .fake-app h1 {
+        margin: 0 0 8px;
+        font-size: 20px;
+      }
+
+      .fake-app p {
+        margin: 0;
+        font-size: 13px;
+        color: var(--studio-muted);
+        max-width: 520px;
+        line-height: 1.55;
+      }
+
+      .hint {
+        margin-top: 16px;
+        padding: 12px 14px;
+        border-radius: 10px;
+        border: 1px solid var(--studio-border);
+        background: var(--studio-panel);
+        font-size: 13px;
+        color: var(--studio-muted);
+        max-width: 560px;
+      }
+
+      .hint kbd {
+        font-family: ui-monospace, monospace;
+        font-size: 11px;
+        padding: 2px 6px;
+        border-radius: 4px;
+        background: var(--studio-panel-2);
+        border: 1px solid var(--studio-border);
+      }
+
+      /* 与 globals.css 中 modal / 按钮 对齐 */
+      .modal-overlay {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.65);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        z-index: 200000;
+      }
+
+      .modal {
+        width: min(720px, 94vw);
+        max-height: 92vh;
+        background: var(--studio-panel);
+        border: 2px solid var(--studio-border);
+        border-radius: 16px;
+        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+        color: var(--studio-text);
+        display: flex;
+        flex-direction: column;
+        gap: 0;
+        padding: 0;
+        overflow: hidden;
+      }
+
+      .modal-header {
+        flex-shrink: 0;
+        padding: 20px 20px 8px;
+      }
+
+      .modal-title {
+        margin: 0;
+        font-size: 18px;
+        font-weight: 700;
+      }
+
+      .modal-sub {
+        margin: 8px 16px 12px;
+        font-size: 12px;
+        color: var(--text-muted);
+        line-height: 1.5;
+      }
+
+      .modal-body {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        overflow-y: auto;
+        padding: 0 16px 20px;
+        min-height: 0;
+        flex: 1;
+      }
+
+      .card {
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        border-radius: 10px;
+        padding: 14px;
+        background: rgba(0, 0, 0, 0.2);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .card-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+
+      .card-head strong {
+        font-size: 14px;
+      }
+
+      .card-head code {
+        font-size: 11px;
+        opacity: 0.9;
+        color: var(--studio-muted);
+      }
+
+      .task-banner {
+        font-size: 12px;
+        line-height: 1.5;
+        padding: 8px 10px;
+        border-radius: 8px;
+        background: rgba(59, 130, 246, 0.12);
+        border: 1px solid rgba(59, 130, 246, 0.28);
+      }
+
+      .task-banner .tb-title {
+        font-weight: 600;
+        margin-bottom: 4px;
+        font-size: 13px;
+      }
+
+      .muted {
+        margin: 0;
+        font-size: 12px;
+        color: var(--text-muted);
+      }
+
+      pre.stream {
+        margin: 6px 0 0;
+        padding: 10px;
+        border-radius: 8px;
+        background: var(--studio-panel-2);
+        font-size: 11px;
+        line-height: 1.45;
+        max-height: 120px;
+        overflow: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+      }
+
+      .form-field span {
+        display: block;
+        font-size: 12px;
+        margin-bottom: 6px;
+        color: var(--studio-muted);
+      }
+
+      textarea {
+        width: 100%;
+        border-radius: 8px;
+        border: 1px solid var(--studio-border);
+        background: var(--studio-deep);
+        color: var(--studio-text);
+        padding: 10px;
+        font-size: 13px;
+        font-family: inherit;
+        resize: vertical;
+        min-height: 72px;
+      }
+
+      .ask-options label {
+        display: flex;
+        align-items: flex-start;
+        gap: 10px;
+        cursor: pointer;
+        font-size: 13px;
+        margin-bottom: 6px;
+      }
+
+      .modal-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 4px;
+      }
+
+      .text-button {
+        border: none;
+        background: transparent;
+        color: #ff8fab;
+        cursor: pointer;
+        font-size: 13px;
+        padding: 8px 4px;
+      }
+
+      .primary-button {
+        background: var(--studio-hot);
+        color: #fff;
+        border: none;
+        padding: 10px 16px;
+        border-radius: 10px;
+        font-size: 14px;
+        font-weight: 600;
+        cursor: pointer;
+        box-shadow: 0 4px 14px rgba(233, 69, 96, 0.35);
+      }
+
+      .primary-button:hover {
+        filter: brightness(1.06);
+      }
+
+      .toast {
+        position: fixed;
+        bottom: 24px;
+        left: 50%;
+        transform: translateX(-50%);
+        background: var(--studio-panel-2);
+        border: 1px solid var(--studio-border);
+        padding: 10px 16px;
+        border-radius: 10px;
+        font-size: 13px;
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.2s;
+        z-index: 300000;
+      }
+
+      .toast.show {
+        opacity: 1;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="fake-app">
+      <h1>DevPilot 主界面（示意）</h1>
+      <p>
+        下方为「Cursor ACP 待处理」弹窗的静态演示：多条续聊 / 问答在单窗内纵向堆叠；真实应用中由 Wails 事件追加，提交后对应条目从 React 状态移除。
+      </p>
+      <div class="hint">
+        <strong>交互：</strong>点击任意卡片上的主操作（如「发送并继续下一轮」「确认所选选项」）会模拟<strong>提交并移除此条</strong>，标题中的条数会更新。刷新页面可重置。
+      </div>
+    </div>
+
+    <div class="modal-overlay" id="overlay" aria-modal="true" role="dialog" aria-labelledby="dlg-title">
+      <div class="modal" onclick="event.stopPropagation()">
+        <div class="modal-header">
+          <h2 class="modal-title" id="dlg-title">Cursor ACP 待处理 · <span id="count">3</span> 条</h2>
+        </div>
+        <p class="modal-sub">
+          每条可单独操作；提交后该条会从列表消失，其它任务保留。请按执行 ID 区分并发规则链。
+        </p>
+        <div class="modal-body" id="stack">
+          <!-- 卡片 1：续聊 -->
+          <section class="card" data-id="acp-1">
+            <div class="card-head">
+              <strong>续聊 · 第 2/5 轮</strong>
+              <code>acp-1</code>
+            </div>
+            <div class="task-banner">
+              <div class="tb-title">所属任务</div>
+              <div>规则名称：<span>示例规则 A</span></div>
+              <div>规则 ID：<code style="font-size: 11px">rule-uuid-a</code></div>
+              <div>执行 ID：<code style="font-size: 11px">exec-1001</code>（可与「执行日志」页对照）</div>
+            </div>
+            <p class="muted">
+              session <code>sess-abc</code><br />
+              工作目录：/Users/demo/project-a
+            </p>
+            <div>
+              <span style="font-size: 12px; font-weight: 600">本轮输出预览</span>
+              <pre class="stream">已根据你的要求修改了 utils.go 中的错误处理…</pre>
+            </div>
+            <label class="form-field">
+              <span>下一轮发给 Agent（空则用 continuationPrompt）</span>
+              <textarea placeholder="可输入补充说明…">请继续检查 test 目录</textarea>
+            </label>
+            <p class="muted" style="font-size: 11px; line-height: 1.5">
+              两种都会停止多轮；未配分支选「主动结束」；规则要区分人为停与约定完成选「完成标记结束」。
+            </p>
+            <div class="modal-actions">
+              <button type="button" class="text-button" data-remove="acp-1">主动结束</button>
+              <button type="button" class="text-button" data-remove="acp-1">完成标记结束</button>
+              <button type="button" class="primary-button" data-remove="acp-1">发送并继续下一轮</button>
+            </div>
+          </section>
+
+          <!-- 卡片 2：问答 -->
+          <section class="card" data-id="acp-ask-2">
+            <div class="card-head">
+              <strong>Agent 提问</strong>
+              <code>acp-ask-2</code>
+            </div>
+            <div class="task-banner">
+              <div class="tb-title">所属任务</div>
+              <div>规则名称：<span>示例规则 B</span></div>
+              <div>执行 ID：<code style="font-size: 11px">exec-1002</code></div>
+            </div>
+            <p style="margin: 0; font-size: 14px; line-height: 1.5">请选择下一步操作方式：</p>
+            <div class="ask-options">
+              <label>
+                <input type="radio" name="q-acp-ask-2" checked />
+                <span><code style="font-size: 11px">0</code> — 自动合并</span>
+              </label>
+              <label>
+                <input type="radio" name="q-acp-ask-2" />
+                <span><code style="font-size: 11px">1</code> — 仅生成补丁</span>
+              </label>
+            </div>
+            <div class="modal-actions">
+              <button type="button" class="text-button" data-remove="acp-ask-2">使用节点自动下标</button>
+              <button type="button" class="primary-button" data-remove="acp-ask-2">确认所选选项</button>
+            </div>
+          </section>
+
+          <!-- 卡片 3：另一条续聊（并发链） -->
+          <section class="card" data-id="acp-3">
+            <div class="card-head">
+              <strong>续聊 · 第 1/3 轮</strong>
+              <code>acp-3</code>
+            </div>
+            <div class="task-banner">
+              <div class="tb-title">所属任务</div>
+              <div>规则名称：<span>示例规则 C</span></div>
+              <div>执行 ID：<code style="font-size: 11px">exec-1003</code></div>
+            </div>
+            <p class="muted">session <code>sess-xyz</code></p>
+            <div>
+              <span style="font-size: 12px; font-weight: 600">本轮输出预览</span>
+              <pre class="stream">（无文本）</pre>
+            </div>
+            <label class="form-field">
+              <span>下一轮发给 Agent（空则用 continuationPrompt）</span>
+              <textarea></textarea>
+            </label>
+            <p class="muted" style="font-size: 11px; line-height: 1.5">
+              两种都会停止多轮；未配分支选「主动结束」；规则要区分人为停与约定完成选「完成标记结束」。
+            </p>
+            <div class="modal-actions">
+              <button type="button" class="text-button" data-remove="acp-3">主动结束</button>
+              <button type="button" class="text-button" data-remove="acp-3">完成标记结束</button>
+              <button type="button" class="primary-button" data-remove="acp-3">发送并继续下一轮</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" id="toast">已模拟提交并移除该条</div>
+
+    <script>
+      (function () {
+        var stack = document.getElementById("stack");
+        var countEl = document.getElementById("count");
+        var overlay = document.getElementById("overlay");
+        var toast = document.getElementById("toast");
+        var toastTimer;
+
+        function updateCount() {
+          var n = stack.querySelectorAll(".card").length;
+          countEl.textContent = String(n);
+          if (n === 0) {
+            overlay.style.display = "none";
+            document.querySelector(".fake-app .hint").insertAdjacentHTML(
+              "beforeend",
+              "<p style=\"margin-top:12px;color:#94a3b8\">列表已空，弹窗已关闭（演示）。</p>",
+            );
+          }
+        }
+
+        function flash(msg) {
+          toast.textContent = msg;
+          toast.classList.add("show");
+          clearTimeout(toastTimer);
+          toastTimer = setTimeout(function () {
+            toast.classList.remove("show");
+          }, 1600);
+        }
+
+        stack.addEventListener("click", function (e) {
+          var t = e.target;
+          if (!(t instanceof HTMLElement)) return;
+          var id = t.getAttribute("data-remove");
+          if (!id) return;
+          var card = stack.querySelector('.card[data-id="' + id + '"]');
+          if (!card) return;
+          card.remove();
+          flash("已移除 request_id: " + id);
+          updateCount();
+        });
+      })();
+    </script>
+  </body>
+</html>

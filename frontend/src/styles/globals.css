@@ -3259,9 +3259,108 @@ body {
 }
 
 /* 规则链执行日志列表 */
+.rulego-logs-header-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.rulego-logs-auto-refresh {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #475569;
+  cursor: pointer;
+  user-select: none;
+}
+
+.rulego-logs-auto-refresh input {
+  width: 15px;
+  height: 15px;
+  accent-color: #6366f1;
+}
+
 .rulego-logs-table .table-head.rulego-logs-head,
 .rulego-logs-table .table-row.rulego-logs-row {
-  grid-template-columns: 1.4fr 0.7fr 0.6fr 1.4fr minmax(100px, auto);
+  grid-template-columns: minmax(140px, 1.5fr) 0.72fr 0.72fr 0.62fr 1.15fr minmax(108px, auto);
+  align-items: center;
+}
+
+.rulego-logs-cell-rule {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  min-width: 0;
+}
+
+.rulego-logs-rule-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #0f172a;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.rulego-logs-rule-id {
+  font-size: 11px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rulego-logs-row {
+  transition: background 0.12s ease;
+}
+
+.rulego-logs-row:hover {
+  background: #f8fafc;
+}
+
+.rulego-logs-duration {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  color: #475569;
+}
+
+.rulego-logs-duration-live {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #0369a1;
+  font-weight: 600;
+}
+
+.rulego-logs-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 36px 20px !important;
+}
+
+.rulego-logs-empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: #334155;
+}
+
+.rulego-logs-empty-hint {
+  font-size: 13px;
+  color: #64748b;
+  line-height: 1.5;
+  max-width: 420px;
+  text-align: center;
 }
 
 .rulego-log-trigger {
@@ -3407,6 +3506,79 @@ body {
   padding: 2px 6px;
   border-radius: 4px;
   color: #0f172a;
+}
+
+.rulego-exec-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0369a1;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  border: 1px solid #bae6fd;
+}
+
+.rulego-exec-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #0ea5e9;
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.35);
+  animation: rulego-exec-dot-pulse 1.2s ease-in-out infinite;
+}
+
+.rulego-exec-live-hint {
+  margin: 0 0 14px;
+  padding: 10px 12px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: #475569;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 8px;
+}
+
+.rulego-exec-param-array-wrap {
+  margin-bottom: 12px;
+}
+
+.rulego-exec-param-array-label {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #334155;
+}
+
+.rulego-exec-payload-empty {
+  margin: 0;
+}
+
+.rulego-exec-payload-text-wrap {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #fafbfc;
+  overflow: hidden;
+}
+
+.rulego-exec-payload-pre {
+  margin: 0;
+  padding: 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #334155;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.rulego-exec-payload-markdown {
+  max-height: 220px;
+  background: #fafbfc !important;
 }
 
 /* 规则链 DSL：横向流程 */
@@ -3584,8 +3756,9 @@ body {
   list-style: none;
   margin: 0 0 16px;
   padding: 0;
-  max-height: 280px;
+  max-height: min(360px, 42vh);
   overflow-y: auto;
+  scroll-behavior: smooth;
   border: 1px solid #e2e8f0;
   border-radius: 10px;
   background: #fafbfc;
@@ -3761,6 +3934,31 @@ body {
 /* 规则链执行明细 */
 .rulego-log-detail-page {
   max-width: 960px;
+}
+
+.rulego-log-detail-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #0369a1;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #e0f2fe;
+  border: 1px solid #bae6fd;
+}
+
+.rulego-log-detail-live-hint {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #475569;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 10px;
 }
 
 .rulego-log-detail-summary {
@@ -4007,6 +4205,244 @@ body {
   overflow-y: auto;
 }
 
+/* 规则链日志：Markdown 预览（Agent/节点文本等为 Markdown 时渲染） */
+.rulego-log-markdown-body {
+  margin: 0;
+  padding: 12px;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #334155;
+  background: #ffffff;
+  max-height: 240px;
+  overflow: auto;
+  word-break: break-word;
+}
+
+.rulego-log-markdown-body h1,
+.rulego-log-markdown-body h2,
+.rulego-log-markdown-body h3,
+.rulego-log-markdown-body h4 {
+  margin: 0.65em 0 0.3em;
+  font-weight: 700;
+  line-height: 1.3;
+  color: #0f172a;
+}
+
+.rulego-log-markdown-body h1 {
+  font-size: 1.3em;
+}
+.rulego-log-markdown-body h2 {
+  font-size: 1.15em;
+}
+.rulego-log-markdown-body h3 {
+  font-size: 1.05em;
+}
+
+.rulego-log-markdown-body p {
+  margin: 0.4em 0;
+}
+
+.rulego-log-markdown-body ul,
+.rulego-log-markdown-body ol {
+  margin: 0.35em 0 0.35em 1.2em;
+  padding: 0;
+}
+
+.rulego-log-markdown-body li {
+  margin: 0.2em 0;
+}
+
+.rulego-log-markdown-body pre {
+  margin: 0.5em 0;
+  padding: 10px 12px;
+  font-family: ui-monospace, "SF Mono", Monaco, monospace;
+  font-size: 12px;
+  line-height: 1.45;
+  background: #f1f5f9;
+  border-radius: 6px;
+  overflow-x: auto;
+}
+
+.rulego-log-markdown-body code {
+  font-family: ui-monospace, "SF Mono", Monaco, monospace;
+  font-size: 0.9em;
+  background: #f1f5f9;
+  padding: 0.15em 0.4em;
+  border-radius: 4px;
+}
+
+.rulego-log-markdown-body pre code {
+  padding: 0;
+  background: transparent;
+  font-size: inherit;
+}
+
+.rulego-log-markdown-body blockquote {
+  margin: 0.5em 0;
+  padding: 0.25em 0 0.25em 12px;
+  border-left: 3px solid #cbd5e1;
+  color: #64748b;
+}
+
+.rulego-log-markdown-body table {
+  border-collapse: collapse;
+  margin: 0.5em 0;
+  font-size: 12px;
+}
+
+.rulego-log-markdown-body th,
+.rulego-log-markdown-body td {
+  border: 1px solid #e2e8f0;
+  padding: 6px 10px;
+  text-align: left;
+}
+
+.rulego-log-markdown-body th {
+  background: #f8fafc;
+}
+
+.rulego-log-markdown-body a {
+  color: #2563eb;
+  word-break: break-all;
+}
+
+.rulego-log-markdown-body hr {
+  border: none;
+  border-top: 1px solid #e2e8f0;
+  margin: 12px 0;
+}
+
+.rulego-log-detail-error .rulego-log-markdown-body,
+.rulego-log-node-error .rulego-log-markdown-body {
+  color: inherit;
+  background: transparent;
+  padding: 0;
+  max-height: min(360px, 55vh);
+}
+
+.rulego-log-detail-error .rulego-log-markdown-body {
+  margin: 8px 0 0;
+}
+
+.rulego-log-node-error .rulego-log-markdown-body {
+  margin: 6px 0 0;
+}
+
+.rulego-log-detail-error .rulego-log-markdown-body pre,
+.rulego-log-node-error .rulego-log-markdown-body pre {
+  background: rgba(0, 0, 0, 0.06);
+  color: inherit;
+}
+
+.rulego-log-markdown-body--dark {
+  color: var(--studio-text, #e8e8f0);
+  background: var(--studio-code, #12121c);
+  border: 1px solid var(--studio-border, rgba(255, 255, 255, 0.12));
+  margin-top: 6px;
+  max-height: 200px;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.rulego-log-markdown-body--dark h1,
+.rulego-log-markdown-body--dark h2,
+.rulego-log-markdown-body--dark h3,
+.rulego-log-markdown-body--dark h4 {
+  color: var(--studio-text, #e8e8f0);
+}
+
+.rulego-log-markdown-body--dark pre {
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--studio-text, #e8e8f0);
+}
+
+.rulego-log-markdown-body--dark code {
+  background: rgba(0, 0, 0, 0.35);
+  color: #e8e8f0;
+}
+
+.rulego-log-markdown-body--dark a {
+  color: #93c5fd;
+}
+
+.rulego-log-markdown-body--dark th {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.rulego-log-markdown-body--dark th,
+.rulego-log-markdown-body--dark td {
+  border-color: var(--studio-border, rgba(255, 255, 255, 0.15));
+  color: var(--studio-text, #e8e8f0);
+}
+
+.rulego-log-markdown-body--dark tbody tr:nth-child(even) td {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.rulego-log-markdown-body--dark blockquote {
+  color: #cbd5e1;
+  border-left-color: rgba(255, 255, 255, 0.25);
+}
+
+.rulego-log-markdown-body--dark li,
+.rulego-log-markdown-body--dark p {
+  color: inherit;
+}
+
+.rulego-log-markdown-body--dark strong {
+  color: #f8fafc;
+  font-weight: 700;
+}
+
+/* 嵌入在浅色日志页内的 ACP 深色块：由行内 style 控制高度，避免与弹窗用的 --dark 默认 max-height 冲突 */
+.rulego-log-markdown-body--acp-embed {
+  margin-top: 0 !important;
+}
+
+/* ACP 嵌入：表格表头强制深色条（避免与浅色 .rulego-log-markdown-body th 叠层顺序导致白底黑字） */
+.rulego-log-markdown-body.rulego-log-markdown-body--dark.rulego-log-markdown-body--acp-embed table {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.rulego-log-markdown-body.rulego-log-markdown-body--dark.rulego-log-markdown-body--acp-embed thead th {
+  background: rgba(255, 255, 255, 0.12);
+  color: #f8fafc;
+  font-weight: 700;
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.rulego-log-markdown-body.rulego-log-markdown-body--dark.rulego-log-markdown-body--acp-embed tbody td,
+.rulego-log-markdown-body.rulego-log-markdown-body--dark.rulego-log-markdown-body--acp-embed tbody th {
+  background: transparent;
+  color: var(--studio-text, #e8e8f0);
+  border-color: rgba(255, 255, 255, 0.12);
+}
+
+.rulego-log-markdown-body.rulego-log-markdown-body--dark.rulego-log-markdown-body--acp-embed tbody tr:nth-child(even) td,
+.rulego-log-markdown-body.rulego-log-markdown-body--dark.rulego-log-markdown-body--acp-embed tbody tr:nth-child(even) th {
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.rulego-log-markdown--danger {
+  color: #dc2626;
+  max-height: 280px;
+  overflow: auto;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+}
+
+.rulego-log-markdown--danger pre {
+  background: #fee2e2;
+  color: #450a0a;
+}
+
+.rulego-log-markdown--danger code {
+  background: #fecaca;
+  color: #450a0a;
+}
+
 .rulego-log-node-error {
   padding: 10px 12px;
   background: #fef2f2;
@@ -4024,6 +4460,271 @@ body {
 .rulego-log-node-meta {
   font-size: 12px;
   color: #94a3b8;
+}
+
+/* Cursor ACP 全局弹窗（续聊 / 提问） */
+.cursor-acp-overlay {
+  z-index: 200000 !important;
+  align-items: flex-start;
+  padding-top: 5vh;
+  backdrop-filter: blur(6px);
+  background: rgba(6, 8, 18, 0.78) !important;
+}
+
+.cursor-acp-modal {
+  max-width: 760px;
+  width: 94vw;
+  max-height: 92vh;
+  display: flex;
+  flex-direction: column;
+  padding: 0 !important;
+  overflow: hidden;
+  background: var(--studio-panel, #1a1a26) !important;
+  border: 1px solid var(--studio-border, #3f4258) !important;
+  box-shadow: 0 28px 64px rgba(0, 0, 0, 0.55);
+}
+
+.cursor-acp-modal-header {
+  flex-shrink: 0;
+  padding: 18px 22px 10px !important;
+  border-bottom: 1px solid var(--studio-border, rgba(255, 255, 255, 0.08));
+  background: linear-gradient(180deg, rgba(99, 102, 241, 0.12) 0%, transparent 100%);
+}
+
+.cursor-acp-modal-title {
+  margin: 0 !important;
+  font-size: 18px !important;
+  font-weight: 700;
+  color: var(--studio-text, #e8e8f0) !important;
+  letter-spacing: 0.02em;
+}
+
+.cursor-acp-lead {
+  margin: 0 20px 10px;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--studio-muted, #a8a8c0);
+}
+
+.cursor-acp-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  overflow-y: auto;
+  padding: 0 20px 20px !important;
+  min-height: 0;
+  flex: 1;
+}
+
+.cursor-acp-card {
+  border: 1px solid var(--studio-border, #4a4d6a);
+  border-radius: 12px;
+  padding: 16px;
+  background: var(--studio-panel-2, #222236);
+  color: var(--studio-text, #e8e8f0);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cursor-acp-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.cursor-acp-card-title {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--studio-text, #e8e8f0);
+}
+
+.cursor-acp-req-id {
+  font-size: 11px;
+  color: var(--studio-muted, #a8a8c0);
+  font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+}
+
+.cursor-acp-meta-line {
+  margin: 0;
+  font-size: 12px;
+  color: var(--studio-muted, #a8a8c0);
+  line-height: 1.55;
+}
+
+.cursor-acp-code {
+  font-size: 11px;
+  color: #c4d4ff;
+  font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+}
+
+.cursor-acp-code-sm {
+  font-size: 10px;
+  color: #c4d4ff;
+  font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
+}
+
+.cursor-acp-block-label {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--studio-text, #e8e8f0);
+  margin-bottom: 4px;
+}
+
+.cursor-acp-block-hint {
+  margin: 0 0 6px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: var(--studio-muted, #a8a8c0);
+}
+
+.cursor-acp-stream-scroll {
+  max-height: min(280px, 38vh);
+  overflow-y: auto;
+  overflow-x: hidden;
+  border-radius: 8px;
+  border: 1px solid var(--studio-border, #4a4d6a);
+  background: var(--studio-code, #12121c);
+  scroll-behavior: smooth;
+}
+
+.cursor-acp-stream-anchor {
+  height: 1px;
+  width: 100%;
+}
+
+.cursor-acp-md.rulego-log-markdown-body {
+  max-height: none !important;
+  margin: 0 !important;
+  padding: 12px !important;
+  background: transparent !important;
+  border: none !important;
+  color: var(--studio-text, #e8e8f0);
+}
+
+.cursor-acp-ask-md {
+  max-height: 200px !important;
+  overflow-y: auto !important;
+}
+
+.cursor-acp-ask-title-wrap {
+  min-height: 0;
+}
+
+.cursor-acp-muted-only {
+  margin: 0;
+  font-size: 13px;
+  color: var(--studio-muted, #a8a8c0);
+}
+
+.cursor-acp-field-label {
+  font-size: 12px !important;
+  color: var(--studio-muted, #a8a8c0) !important;
+}
+
+.cursor-acp-textarea {
+  width: 100%;
+  font-family: ui-sans-serif, system-ui, sans-serif;
+  font-size: 13px;
+  line-height: 1.5;
+  background: var(--studio-deep, #08080e);
+  color: var(--studio-text, #e8e8f0);
+  border: 1px solid var(--studio-border, #4a4d6a);
+  border-radius: 8px;
+  padding: 10px 12px;
+  resize: vertical;
+  min-height: 72px;
+}
+
+.cursor-acp-footnote {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.55;
+  color: var(--studio-muted, #a8a8c0);
+}
+
+.cursor-acp-actions {
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+  margin-top: 4px !important;
+  justify-content: flex-start !important;
+}
+
+.cursor-acp-options {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.cursor-acp-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--studio-text, #e8e8f0);
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.cursor-acp-option:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: var(--studio-border, #4a4d6a);
+}
+
+.cursor-acp-radio {
+  margin-top: 3px;
+  accent-color: #818cf8;
+}
+
+.cursor-acp-option-text {
+  flex: 1;
+  min-width: 0;
+  line-height: 1.45;
+}
+
+@media (max-width: 640px) {
+  .rulego-logs-table .table-head.rulego-logs-head,
+  .rulego-logs-table .table-row.rulego-logs-row {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .rulego-logs-table .table-head.rulego-logs-head {
+    display: none;
+  }
+
+  .rulego-logs-table .table-row.rulego-logs-row {
+    padding: 14px 16px;
+    border-bottom: 1px solid #e2e8f0;
+  }
+
+  .rulego-logs-row .table-cell {
+    padding: 2px 0;
+  }
+
+  .rulego-logs-row .table-cell[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    color: #64748b;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 2px;
+  }
+
+  .rulego-logs-row .table-actions {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 8px;
+  }
 }
 
 /* Curl Compare / 接口对比 */

@@ -578,6 +578,30 @@ function BlockConfigModal({
       next.ACP_ARGS_JSON = String(block.getFieldValue("ACP_ARGS_JSON") ?? "").trim() || "[]";
       next.MAX_PROMPT_ROUNDS = get("MAX_PROMPT_ROUNDS") || "20";
       next.CONTINUATION_PROMPT = get("CONTINUATION_PROMPT");
+      next.USE_REGISTERED_AFTER_ROUND_HOOK = block.getField("USE_REGISTERED_AFTER_ROUND_HOOK")
+        ? getBool("USE_REGISTERED_AFTER_ROUND_HOOK")
+        : false;
+      next.USE_ASK_QUESTION_DIALOG = block.getField("USE_ASK_QUESTION_DIALOG")
+        ? getBool("USE_ASK_QUESTION_DIALOG")
+        : false;
+      next.AUTO_PLAN_OPTION_ID = get("AUTO_PLAN_OPTION_ID") || "approve";
+      next.AUTO_ASK_OPTION_INDEX = get("AUTO_ASK_OPTION_INDEX") || "0";
+      next.ELICIT_URL_ACTION = get("ELICIT_URL_ACTION") || "decline";
+      next.ACP_VERBOSE_LOG = block.getField("ACP_VERBOSE_LOG") ? getBool("ACP_VERBOSE_LOG") : true;
+    }
+    if (block.type === "rulego_cursorAcpAgentStep") {
+      next.ACP_AGENT_PRESET = get("ACP_AGENT_PRESET") || "path";
+      next.AGENT_CMD = get("AGENT_CMD") || "agent";
+      next.ACP_TIMEOUT_PRESET = get("ACP_TIMEOUT_PRESET") || "3600";
+      next.TIMEOUT_SEC = get("TIMEOUT_SEC") || "3600";
+      next.WORK_DIR = get("WORK_DIR");
+      next.ACP_SESSION_MODE = get("ACP_SESSION_MODE") || "agent";
+      next.PERM_OPTION = get("PERM_OPTION") || "allow-once";
+      next.ACP_ARGS_PRESET = get("ACP_ARGS_PRESET") || "default";
+      next.ACP_ARGS_JSON = String(block.getFieldValue("ACP_ARGS_JSON") ?? "").trim() || "[]";
+      next.USE_ASK_QUESTION_DIALOG = block.getField("USE_ASK_QUESTION_DIALOG")
+        ? getBool("USE_ASK_QUESTION_DIALOG")
+        : false;
       next.AUTO_PLAN_OPTION_ID = get("AUTO_PLAN_OPTION_ID") || "approve";
       next.AUTO_ASK_OPTION_INDEX = get("AUTO_ASK_OPTION_INDEX") || "0";
       next.ELICIT_URL_ACTION = get("ELICIT_URL_ACTION") || "decline";
@@ -1110,7 +1134,11 @@ function BlockConfigModal({
       const totalJoin = (mainPrevJoin ? 1 : 0) + joinExtraIncomings.length;
       block.setFieldValue(totalJoin >= 2 ? ` (${totalJoin}路)` : "", "JOIN_ROUTES_LABEL");
     }
-    if (block.type === "rulego_cursorAcp" || block.type === "rulego_cursorAcpAgent") {
+    if (
+      block.type === "rulego_cursorAcp" ||
+      block.type === "rulego_cursorAcpAgent" ||
+      block.type === "rulego_cursorAcpAgentStep"
+    ) {
       block.setFieldValue(form.ACP_VERBOSE_LOG ? "TRUE" : "FALSE", "ACP_VERBOSE_LOG");
     }
       onSaved?.();
@@ -2140,7 +2168,9 @@ function BlockConfigModal({
           </p>
         </>
       )}
-      {(block.type === "rulego_cursorAcp" || block.type === "rulego_cursorAcpAgent") && (
+      {(block.type === "rulego_cursorAcp" ||
+        block.type === "rulego_cursorAcpAgent" ||
+        block.type === "rulego_cursorAcpAgentStep") && (
         <>
           <label className="form-field" style={{ gridColumn: "1 / -1" }}>
             <span>Agent 可执行文件</span>
@@ -2183,7 +2213,8 @@ function BlockConfigModal({
             <span>执行超时</span>
             <select
               value={String(
-                form.ACP_TIMEOUT_PRESET ?? (block.type === "rulego_cursorAcpAgent" ? "3600" : "1800"),
+                form.ACP_TIMEOUT_PRESET ??
+                  (block.type === "rulego_cursorAcpAgent" || block.type === "rulego_cursorAcpAgentStep" ? "3600" : "1800"),
               )}
               onChange={(e) => {
                 const v = e.target.value;
@@ -2207,7 +2238,10 @@ function BlockConfigModal({
               <input
                 type="number"
                 min={30}
-                value={String(form.TIMEOUT_SEC ?? (block.type === "rulego_cursorAcpAgent" ? "3600" : "1800"))}
+                value={String(
+                  form.TIMEOUT_SEC ??
+                    (block.type === "rulego_cursorAcpAgent" || block.type === "rulego_cursorAcpAgentStep" ? "3600" : "1800"),
+                )}
                 onChange={(e) => setForm((f) => ({ ...f, TIMEOUT_SEC: e.target.value }))}
               />
             </label>
@@ -2290,6 +2324,16 @@ function BlockConfigModal({
           </label>
           {block.type === "rulego_cursorAcpAgent" && (
             <>
+              <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form.USE_REGISTERED_AFTER_ROUND_HOOK)}
+                    onChange={(e) => setForm((f) => ({ ...f, USE_REGISTERED_AFTER_ROUND_HOOK: e.target.checked }))}
+                  />
+                  每轮结束后弹出全局续聊窗（Wails）；需桌面端运行且 maxPromptRounds≥2
+                </span>
+              </label>
               <label className="form-field">
                 <span>最大 Prompt 轮数 (maxPromptRounds)</span>
                 <input
@@ -2301,7 +2345,7 @@ function BlockConfigModal({
                 />
               </label>
               <label className="form-field" style={{ gridColumn: "1 / -1" }}>
-                <span>后续跟进提示 (continuationPrompt，空则用内置默认)</span>
+                <span>后续跟进提示 (continuationPrompt，空则用内置默认；与 Hook 同时启用时 Hook 优先)</span>
                 <textarea
                   value={String(form.CONTINUATION_PROMPT ?? "")}
                   onChange={(e) => setForm((f) => ({ ...f, CONTINUATION_PROMPT: e.target.value }))}
@@ -2311,6 +2355,10 @@ function BlockConfigModal({
                   spellCheck={false}
                 />
               </label>
+            </>
+          )}
+          {(block.type === "rulego_cursorAcpAgent" || block.type === "rulego_cursorAcpAgentStep") && (
+            <>
               <label className="form-field">
                 <span>规划自动批复 optionId (autoPlanOptionId)</span>
                 <input
@@ -2321,6 +2369,16 @@ function BlockConfigModal({
                   autoCorrect="off"
                   autoComplete="off"
                 />
+              </label>
+              <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+                <span style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(form.USE_ASK_QUESTION_DIALOG)}
+                    onChange={(e) => setForm((f) => ({ ...f, USE_ASK_QUESTION_DIALOG: e.target.checked }))}
+                  />
+                  cursor/ask_question 在桌面端用弹窗手动选选项（useAskQuestionDialog）；关闭时仍用下方自动下标
+                </span>
               </label>
               <label className="form-field">
                 <span>问答自动选项下标 (autoAskQuestionOptionIndex)</span>
@@ -2366,7 +2424,13 @@ function BlockConfigModal({
                 {" "}
                 Agent 块在同一 <code>sessionId</code> 下连续 <code>session/prompt</code>，并对 <code>cursor/create_plan</code>、
                 <code>cursor/ask_question</code>、<code>session/elicitation</code> 等自动批复；具体 JSON 形状若随 CLI 版本变化需在{" "}
-                <code>cursoracp/autoreply.go</code> 中调整。
+                <code>cursoracp/autoreply.go</code> 中调整。人机多轮由桌面弹窗续聊；弹窗中「完成标记结束」对应 metadata <code>cursor_acp_stop_reason</code> 为{" "}
+                <code>end_marker</code>，「主动结束」为 <code>user_end</code>。
+              </>
+            ) : block.type === "rulego_cursorAcpAgentStep" ? (
+              <>
+                {" "}
+                单步块仅执行一轮 <code>session/prompt</code>，用于链式编排；每触发一次消息为一次新的 ACP 会话。可与延迟、飞书、人工确认等节点交错串联。
               </>
             ) : (
               <>

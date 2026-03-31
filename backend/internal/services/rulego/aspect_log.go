@@ -107,6 +107,8 @@ func (a *LogAspect) Before(ctx types.RuleContext, msg types.RuleMsg, relationTyp
 				msg.Metadata = types.NewMetadata()
 			}
 			msg.Metadata.PutValue(executionIDKey, row.ID)
+			msg.Metadata.PutValue("_rule_id", chainId)
+			msg.Metadata.PutValue("_rule_name", ruleName)
 			if ctx.ChainCache() != nil && msg.GetId() != "" {
 				_ = ctx.ChainCache().Set(chainExecIDCachePrefix+msg.GetId(), row.ID, "")
 			}

@@ -141,7 +141,7 @@ func autoReplyCursorExtension(method string, params json.RawMessage, cfg AutoRep
 	case "cursor/create_plan":
 		return autoPlanApproveResult(cfg.planOption())
 	case "cursor/ask_question":
-		return autoReplyAskQuestion(params, cfg.askIndex())
+		return nil
 	case "cursor/update_todos", "cursor/task", "cursor/generate_image":
 		return map[string]interface{}{}
 	default:

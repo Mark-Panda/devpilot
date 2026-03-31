@@ -95,23 +95,30 @@ func (n *cursorACPNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) {
 	runCtx, cancel := context.WithTimeout(context.Background(), time.Duration(n.cfg.TimeoutSec)*time.Second)
 	defer cancel()
 
-	pr, stream, err := cursoracp.RunOnce(runCtx, cfg, cwd, prompt)
+	once, err := cursoracp.RunOnce(runCtx, cfg, cwd, prompt)
 	if err != nil {
 		log.Printf("[rulego] cursor/acp 失败: %v", err)
 		ctx.TellFailure(msg, err)
 		return
 	}
+	pr := once.Prompt
+	stream := once.Stream
 
 	out := msg.Copy()
 	if out.Metadata == nil {
 		out.Metadata = types.NewMetadata()
 	}
-	out.Metadata.PutValue("cursor_acp_stop_reason", pr.StopReason)
+	if pr != nil {
+		out.Metadata.PutValue("cursor_acp_stop_reason", pr.StopReason)
+	}
 	if stream != "" {
 		out.Metadata.PutValue("cursor_acp_stream_text", stream)
 	}
+	if strings.TrimSpace(once.StderrTail) != "" {
+		out.Metadata.PutValue("cursor_acp_stderr_tail", once.StderrTail)
+	}
 	final := stream
-	if strings.TrimSpace(final) == "" && len(pr.Raw) > 0 {
+	if pr != nil && strings.TrimSpace(final) == "" && len(pr.Raw) > 0 {
 		final = string(pr.Raw)
 	}
 	out.SetData(final)

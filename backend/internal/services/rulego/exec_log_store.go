@@ -37,6 +37,11 @@ func (s *ExecutionLogStore) UpdateNodeLogByExecutionAndNode(ctx context.Context,
 	return pebble.UpdateRuleGoExecutionNodeLogByExecutionAndNode(ctx, s.db, executionID, nodeID, outputData, outputMetadata, errorMessage, finishedAt)
 }
 
+// PatchNodeLogProgress 写入进行中节点的出参预览（不写入 finished_at），供 Cursor ACP 等长任务轮询展示。
+func (s *ExecutionLogStore) PatchNodeLogProgress(ctx context.Context, executionID, nodeID, outputData, outputMetadata string) error {
+	return pebble.PatchRuleGoExecutionNodeLogProgress(ctx, s.db, executionID, nodeID, outputData, outputMetadata)
+}
+
 func (s *ExecutionLogStore) ListExecutionLogs(ctx context.Context, limit, offset int) ([]models.RuleGoExecutionLog, error) {
 	return pebble.ListRuleGoExecutionLogs(ctx, s.db, limit, offset)
 }

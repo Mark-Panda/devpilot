@@ -1,8 +1,10 @@
-import { useEffect, useState, type MouseEvent } from "react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getExecutionLog } from "./useRuleGoApi";
 import type { RuleGoExecutionLog, RuleGoExecutionNodeLog } from "./useRuleGoApi";
 import { formatRelationTypeForDisplay } from "./relationLabels";
+import { CursorACPExecutionDetailSection } from "./CursorACPExecutionDetailSection";
+import { LogTextPreview, isStrictJson } from "./LogTextPreview";
 
 function formatTime(iso: string) {
   if (!iso) return "-";
@@ -34,8 +36,10 @@ function tryFormatJson(s: string): string {
 function JsonBlock({ title, raw, emptyLabel = "无" }: { title: string; raw: string; emptyLabel?: string }) {
   const [open, setOpen] = useState(true);
   const [copyTip, setCopyTip] = useState<string | null>(null);
-  const text = raw?.trim() ? tryFormatJson(raw) : "";
+  const rawTrim = raw?.trim() ?? "";
+  const text = rawTrim ? tryFormatJson(raw) : "";
   const bodyText = text || emptyLabel;
+  const isJson = !!rawTrim && isStrictJson(rawTrim);
 
   const handleCopy = async (e: MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
@@ -72,11 +76,12 @@ function JsonBlock({ title, raw, emptyLabel = "无" }: { title: string; raw: str
           ) : null}
         </div>
       </div>
-      {open && (
-        <pre className="rulego-log-json-body">
-          {bodyText}
-        </pre>
-      )}
+      {open &&
+        (isJson ? (
+          <pre className="rulego-log-json-body">{bodyText}</pre>
+        ) : (
+          <LogTextPreview text={bodyText} preClassName="rulego-log-json-body" markdownClassName="rulego-log-markdown-body" />
+        ))}
     </div>
   );
 }
@@ -110,6 +115,7 @@ function NodeStepCard({ node, index }: { node: RuleGoExecutionNodeLog; index: nu
       </button>
       {open && (
         <div className="rulego-log-node-body">
+          <CursorACPExecutionDetailSection outputData={node.output_data} outputMetadataRaw={node.output_metadata} />
           <div className="rulego-log-node-section">
             <JsonBlock title="入参 Data" raw={node.input_data} />
             <JsonBlock title="入参 Metadata" raw={node.input_metadata} />
@@ -121,7 +127,7 @@ function NodeStepCard({ node, index }: { node: RuleGoExecutionNodeLog; index: nu
           {hasError ? (
             <div className="rulego-log-node-error">
               <strong>错误信息：</strong>
-              <pre>{node.error_message}</pre>
+              <LogTextPreview text={node.error_message ?? ""} markdownClassName="rulego-log-markdown-body" />
             </div>
           ) : null}
           <div className="rulego-log-node-meta">
@@ -145,6 +151,8 @@ export default function RuleGoLogDetailPage() {
     if (!id) return;
     setLoading(true);
     setError(null);
+    setLog(null);
+    setNodes([]);
     getExecutionLog(id)
       .then((res) => {
         setLog(res.log);
@@ -153,6 +161,27 @@ export default function RuleGoLogDetailPage() {
       .catch((e) => setError((e as Error).message))
       .finally(() => setLoading(false));
   }, [id]);
+
+  const isLive = Boolean(log && !(log.finished_at ?? "").trim());
+
+  useEffect(() => {
+    if (!id || !isLive) return;
+    const tick = () => {
+      void getExecutionLog(id)
+        .then((res) => {
+          setLog(res.log);
+          setNodes(res.nodes ?? []);
+        })
+        .catch(() => {});
+    };
+    const t = setInterval(tick, 400);
+    return () => clearInterval(t);
+  }, [id, isLive]);
+
+  const sortedNodes = useMemo(
+    () => [...nodes].sort((a, b) => (a.order_index ?? 0) - (b.order_index ?? 0)),
+    [nodes],
+  );
 
   if (!id) {
     return (
@@ -197,11 +226,23 @@ export default function RuleGoLogDetailPage() {
           </p>
         </div>
         <div className="page-actions">
+          {isLive ? (
+            <span className="rulego-log-detail-live-badge" title="执行未完成，本页自动轮询刷新">
+              <span className="rulego-exec-live-dot" aria-hidden />
+              实时更新
+            </span>
+          ) : null}
           <button className="text-button" type="button" onClick={() => navigate("/rulego/logs")}>
             返回列表
           </button>
         </div>
       </div>
+
+      {isLive ? (
+        <p className="rulego-log-detail-live-hint">
+          该次执行尚未结束，节点与出参会随引擎写入自动刷新；完成后停止轮询。
+        </p>
+      ) : null}
 
       <div className="rulego-log-detail-summary">
         <div className="rulego-log-detail-grid">
@@ -231,7 +272,7 @@ export default function RuleGoLogDetailPage() {
         {log.error_message ? (
           <div className="rulego-log-detail-error">
             <strong>执行错误：</strong>
-            <pre>{log.error_message}</pre>
+            <LogTextPreview text={log.error_message} markdownClassName="rulego-log-markdown-body" />
           </div>
         ) : null}
         <div className="rulego-log-detail-io">
@@ -243,12 +284,12 @@ export default function RuleGoLogDetailPage() {
       </div>
 
       <div className="rulego-log-detail-nodes">
-        <h3 className="rulego-log-nodes-title">节点执行顺序（{nodes.length} 个）</h3>
-        {nodes.length === 0 ? (
+        <h3 className="rulego-log-nodes-title">节点执行顺序（{sortedNodes.length} 个）</h3>
+        {sortedNodes.length === 0 ? (
           <p className="rulego-log-nodes-empty">无节点步骤记录</p>
         ) : (
           <div className="rulego-log-nodes-list">
-            {nodes.map((node, i) => (
+            {sortedNodes.map((node, i) => (
               <NodeStepCard key={node.id} node={node} index={i} />
             ))}
           </div>

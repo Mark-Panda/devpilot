@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { JsonEditor } from "../../shared/components";
 import { extractNodesFromRuleDefinition, getEnabledFromDefinition, getRuleChainRootKind } from "./dslUtils";
 import type { RuleChainParamNode } from "./ruleChainRequestParams";
 import {
@@ -18,16 +17,9 @@ import {
   type RuleGoExecutionNodeLog,
 } from "./useRuleGoApi";
 import { useRuleGoRules } from "./useRuleGoRules";
-
-function prettyJsonForDisplay(raw: string, emptyPlaceholder: string): string {
-  const t = raw?.trim() ?? "";
-  if (!t) return emptyPlaceholder;
-  try {
-    return JSON.stringify(JSON.parse(t), null, 2);
-  } catch {
-    return t;
-  }
-}
+import { CursorACPExecutionDetailSection } from "./CursorACPExecutionDetailSection";
+import { LogTextPreview } from "./LogTextPreview";
+import { NodePayloadPreview } from "./NodePayloadPreview";
 
 type ChainVisual = "idle" | "waiting" | "running" | "done" | "error";
 
@@ -81,8 +73,8 @@ function RuleParamFields({
         }
         if (n.type === "array" && n.children.length > 0) {
           return (
-            <div key={n.id} style={{ marginBottom: 12 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 6, color: "#334155" }}>{n.key}（数组元素）</div>
+            <div key={n.id} className="rulego-exec-param-array-wrap">
+              <div className="rulego-exec-param-array-label">{n.key}（数组元素）</div>
               <RuleParamFields nodes={n.children} values={values} onChange={onChange} depth={depth + 1} />
             </div>
           );
@@ -213,7 +205,7 @@ export default function RuleGoExecuteRulePage() {
         }
       };
       void tick();
-      pollRef.current = setInterval(() => void tick(), 400);
+      pollRef.current = setInterval(() => void tick(), 320);
     },
     [stopPoll]
   );
@@ -271,6 +263,20 @@ export default function RuleGoExecuteRulePage() {
 
   const running = Boolean(execId && pollLog && !(pollLog.finished_at ?? "").trim());
   const finished = Boolean((pollLog?.finished_at ?? "").trim());
+
+  useEffect(() => {
+    setSelectedNode((prev) => {
+      if (!prev?.id) return prev;
+      const u = pollNodes.find((n) => n.id === prev.id);
+      return u ?? prev;
+    });
+  }, [pollNodes]);
+
+  const timelineEndRef = useRef<HTMLLIElement | null>(null);
+  useEffect(() => {
+    if (!running || pollNodes.length === 0) return;
+    timelineEndRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [pollNodes.length, running]);
 
   const selectLogForDslNode = useCallback(
     (nodeId: string) => {
@@ -396,6 +402,12 @@ export default function RuleGoExecuteRulePage() {
             ) : (
               <>
                 <div className="rulego-exec-status-bar">
+                  {running ? (
+                    <span className="rulego-exec-live-badge" title="约每 0.32s 拉取一次执行日志">
+                      <span className="rulego-exec-live-dot" aria-hidden />
+                      实时刷新中
+                    </span>
+                  ) : null}
                   {running && <span className="rulego-log-status pending">执行中</span>}
                   {finished && pollLog?.success && <span className="rulego-log-status success">成功</span>}
                   {finished && !pollLog?.success && <span className="rulego-log-status failure">失败</span>}
@@ -403,9 +415,18 @@ export default function RuleGoExecuteRulePage() {
                     ID <code>{execId}</code>
                   </span>
                 </div>
+                {running ? (
+                  <p className="rulego-exec-live-hint">
+                    节点轨迹与下方详情会随轮询自动更新；若含 Cursor ACP，流式正文写入日志后也会同步显示。
+                  </p>
+                ) : null}
                 {finished && pollLog?.error_message ? (
                   <div className="form-error" style={{ marginBottom: 16 }}>
-                    {pollLog.error_message}
+                    <LogTextPreview
+                      text={pollLog.error_message}
+                      preStyle={{ margin: 0, whiteSpace: "pre-wrap" }}
+                      markdownClassName="rulego-log-markdown-body rulego-log-markdown--danger"
+                    />
                   </div>
                 ) : null}
 
@@ -458,7 +479,8 @@ export default function RuleGoExecuteRulePage() {
 
                 <div className="rulego-exec-section-title">节点执行轨迹</div>
                 <p className="form-hint" style={{ marginTop: 0, marginBottom: 8, fontSize: 12 }}>
-                  按实际进入顺序排列；蓝色为执行中，绿色为已完成，红色为节点报错。
+                  按实际进入顺序排列；蓝色为执行中，绿色为已完成，红色为节点报错。若包含 Cursor ACP（<code>cursor/acp</code>、
+                  <code>cursor/acp_agent</code>）节点，须等该节点整段跑完后才会写入出参；进行中时出参可能仍为空。
                 </p>
                 {pollNodes.length === 0 ? (
                   <div className="rulego-exec-empty-hint" style={{ padding: "16px 12px" }}>
@@ -466,13 +488,13 @@ export default function RuleGoExecuteRulePage() {
                   </div>
                 ) : (
                   <ul className="rulego-exec-timeline" aria-label="节点执行轨迹">
-                    {pollNodes.map((n) => {
+                    {pollNodes.map((n, ni) => {
                       const done = Boolean((n.finished_at ?? "").trim());
                       const hasErr = Boolean((n.error_message ?? "").trim());
                       const active = selectedNode?.id === n.id;
                       const rel = formatRelationTypeForDisplay(n.relation_type);
                       return (
-                        <li key={n.id}>
+                        <li key={n.id} ref={ni === pollNodes.length - 1 ? timelineEndRef : undefined}>
                           <button
                             type="button"
                             className={`rulego-exec-timeline-item${active ? " is-selected" : ""}${!done ? " is-running" : ""}${done && hasErr ? " is-error" : ""}${done && !hasErr ? " is-done" : ""}`}
@@ -505,64 +527,59 @@ export default function RuleGoExecuteRulePage() {
                     <div className="rulego-exec-detail-title">
                       节点详情 · {selectedNode.node_name || selectedNode.node_id}
                     </div>
+                    <CursorACPExecutionDetailSection
+                      outputData={selectedNode.output_data}
+                      outputMetadataRaw={selectedNode.output_metadata}
+                    />
                     <label className="form-field">
                       <span>入参 data</span>
-                      <JsonEditor
-                        value={prettyJsonForDisplay(selectedNode.input_data ?? "", "(空)")}
-                        onChange={() => {}}
-                        readOnly
+                      <NodePayloadPreview
+                        raw={selectedNode.input_data}
+                        emptyPlaceholder="(空)"
                         height={140}
                         minHeight={80}
-                        showExpandButton
-                        showCopyButton
                         expandTitle="节点入参 data"
                       />
                     </label>
                     <label className="form-field">
                       <span>入参 metadata</span>
-                      <JsonEditor
-                        value={prettyJsonForDisplay(selectedNode.input_metadata ?? "", "(空)")}
-                        onChange={() => {}}
-                        readOnly
+                      <NodePayloadPreview
+                        raw={selectedNode.input_metadata}
+                        emptyPlaceholder="(空)"
                         height={120}
                         minHeight={72}
-                        showExpandButton
-                        showCopyButton
                         expandTitle="节点入参 metadata"
                       />
                     </label>
                     <label className="form-field">
                       <span>出参 data</span>
-                      <JsonEditor
-                        value={prettyJsonForDisplay(selectedNode.output_data ?? "", "(空)")}
-                        onChange={() => {}}
-                        readOnly
-                        height={140}
-                        minHeight={80}
-                        showExpandButton
-                        showCopyButton
+                      <NodePayloadPreview
+                        raw={selectedNode.output_data}
+                        emptyPlaceholder="(空)"
+                        height={160}
+                        minHeight={88}
                         expandTitle="节点出参 data"
                       />
                     </label>
                     <label className="form-field">
                       <span>出参 metadata</span>
-                      <JsonEditor
-                        value={prettyJsonForDisplay(selectedNode.output_metadata ?? "", "(空)")}
-                        onChange={() => {}}
-                        readOnly
+                      <NodePayloadPreview
+                        raw={selectedNode.output_metadata}
+                        emptyPlaceholder="(空)"
                         height={120}
                         minHeight={72}
-                        showExpandButton
-                        showCopyButton
                         expandTitle="节点出参 metadata"
                       />
                     </label>
                     {(selectedNode.error_message ?? "").trim() ? (
                       <label className="form-field">
                         <span>错误</span>
-                        <pre className="form-error" style={{ whiteSpace: "pre-wrap", fontSize: 12, padding: 8 }}>
-                          {selectedNode.error_message}
-                        </pre>
+                        <LogTextPreview
+                          text={(selectedNode.error_message ?? "").trim()}
+                          preClassName="form-error"
+                          preStyle={{ whiteSpace: "pre-wrap", fontSize: 12, padding: 8, margin: 0 }}
+                          markdownClassName="rulego-log-markdown-body rulego-log-markdown--danger"
+                        />
                       </label>
                     ) : null}
                   </div>

@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
+import CursorACPAfterRoundHost from "../../../modules/rulego/CursorACPAfterRoundHost";
 
 const menuGroups: { group?: string; items: { path: string; label: string; end?: boolean }[] }[] = [
   {
@@ -86,6 +87,7 @@ export default function Layout({ children }: LayoutProps) {
       <main className={`app-content${isChatRoute ? " app-content--chat" : ""}`}>
         <div className={`app-route${isChatRoute ? " app-route--chat-fill" : ""}`}>{children}</div>
       </main>
+      <CursorACPAfterRoundHost />
     </div>
   );
 }

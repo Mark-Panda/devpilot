@@ -24,6 +24,7 @@ func (a *App) startup(ctx context.Context) {
 	backend.InitRuleChainExecutor(a.runtime)
 	backend.BindStudioProgressEvents(ctx, a.runtime.AgentService())
 	backend.BindStudioAssistantEvents(ctx, a.runtime.AgentService())
+	backend.BindCursorACPAfterRoundDialog(ctx)
 }
 
 // OpenSkillZipDialog 打开系统文件选择对话框，让用户选择技能包 zip 文件。返回选中文件路径，取消时返回空字符串。
@@ -56,9 +57,20 @@ func (a *App) SetAgentWorkspaceRoot(path string) error {
 }
 
 func (a *App) shutdown(ctx context.Context) {
+	backend.ClearCursorACPAfterRoundDialogs()
 	if a.runtime != nil {
 		_ = a.runtime.Close()
 	}
+}
+
+// ResolveCursorACPAfterRound 规则链 cursor/acp_agent 人机续跑弹窗：继续下一轮、主动结束（user_end）或完成标记结束（end_marker）。
+func (a *App) ResolveCursorACPAfterRound(requestID string, nextPrompt string, stop bool, endMarker bool) {
+	backend.ResolveCursorACPAfterRound(requestID, nextPrompt, stop, endMarker)
+}
+
+// ResolveCursorACPAskQuestion 规则链中 cursor/ask_question 弹窗：提交所选 optionId；空字符串表示使用节点 autoAskQuestionOptionIndex。
+func (a *App) ResolveCursorACPAskQuestion(requestID string, optionID string) {
+	backend.ResolveCursorACPAskQuestion(requestID, optionID)
 }
 
 // ============ Agent Service Methods ============

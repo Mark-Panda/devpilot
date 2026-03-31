@@ -119,18 +119,18 @@ func (s *Service) StartExecuteRule(ruleID string, input ExecuteRuleInput) (Start
 
 	if existing, ok := rulego.Get(ruleID); ok && existing.Initialized() {
 		_ = existing.ReloadSelf(defBytes, ruleEngineOpts(&LogAspect{})...)
-		go s.runExecuteRuleInBackground(existing, ruleID, input, execLog.ID, true)
+		go s.runExecuteRuleInBackground(existing, ruleID, rule.Name, input, execLog.ID, true)
 		return StartExecuteRuleResult{ExecutionID: execLog.ID}, nil
 	}
 	engine, createErr := rulego.New(ruleID, defBytes, ruleEngineOpts(&LogAspect{})...)
 	if createErr != nil {
 		return zero, createErr
 	}
-	go s.runExecuteRuleInBackground(engine, ruleID, input, execLog.ID, false)
+	go s.runExecuteRuleInBackground(engine, ruleID, rule.Name, input, execLog.ID, false)
 	return StartExecuteRuleResult{ExecutionID: execLog.ID}, nil
 }
 
-func (s *Service) runExecuteRuleInBackground(engine types.RuleEngine, ruleID string, input ExecuteRuleInput, execLogID string, fromPool bool) {
+func (s *Service) runExecuteRuleInBackground(engine types.RuleEngine, ruleID, ruleName string, input ExecuteRuleInput, execLogID string, fromPool bool) {
 	defer func() {
 		if !fromPool {
 			engine.Stop(nil)
@@ -142,6 +142,8 @@ func (s *Service) runExecuteRuleInBackground(engine types.RuleEngine, ruleID str
 	for k, v := range input.Metadata {
 		metadata.PutValue(k, v)
 	}
+	metadata.PutValue("_rule_id", ruleID)
+	metadata.PutValue("_rule_name", ruleName)
 	metadata.PutValue("_execution_id", execLogID)
 	data := input.Data
 	if data == "" {
@@ -205,6 +207,8 @@ func (s *Service) ExecuteRule(ruleID string, input ExecuteRuleInput) (ExecuteRul
 	for k, v := range input.Metadata {
 		metadata.PutValue(k, v)
 	}
+	metadata.PutValue("_rule_id", ruleID)
+	metadata.PutValue("_rule_name", rule.Name)
 	data := input.Data
 	if data == "" {
 		data = "{}"
@@ -275,6 +279,8 @@ func (s *Service) ExecuteRuleDefinition(definition string, input ExecuteRuleInpu
 	for k, v := range input.Metadata {
 		metadata.PutValue(k, v)
 	}
+	metadata.PutValue("_rule_id", testRuleID)
+	metadata.PutValue("_rule_name", "测试执行")
 	data := input.Data
 	if data == "" {
 		data = "{}"

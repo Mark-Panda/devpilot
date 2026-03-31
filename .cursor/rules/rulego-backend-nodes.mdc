@@ -17,6 +17,7 @@ alwaysApply: false
 - comment
 - cursor/acp
 - cursor/acp_agent
+- cursor/acp_agent_step
 - dbClient
 - delay
 - end
