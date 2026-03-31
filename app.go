@@ -45,6 +45,13 @@ func (a *App) OpenAgentWorkspaceDialog() (string, error) {
 	})
 }
 
+// OpenWorkspaceProjectDirDialog 选择要添加到 Workspace 的项目根目录。
+func (a *App) OpenWorkspaceProjectDirDialog() (string, error) {
+	return runtime.OpenDirectoryDialog(a.ctx, runtime.OpenDialogOptions{
+		Title: "选择项目根目录",
+	})
+}
+
 // SetAgentWorkspaceRoot 将 Agent 项目根切换为 path；与 RuleGo 画布上的 workDir 无关。
 func (a *App) SetAgentWorkspaceRoot(path string) error {
 	if strings.TrimSpace(path) == "" {

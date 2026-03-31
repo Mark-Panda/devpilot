@@ -13,6 +13,7 @@ import (
 	"devpilot/backend/internal/services/rulego"
 	"devpilot/backend/internal/services/skill_repo"
 	"devpilot/backend/internal/store/pebble"
+	"devpilot/backend/internal/workspace"
 )
 
 // ruleGoLLMConfigLister 将模型管理列表转为 rulego.LLMConfigLister，供规则链执行时用模型管理中的 API Key 覆盖 ai/llm 节点。
@@ -40,6 +41,7 @@ type Runtime struct {
 	curlCompare   *curl_compare.Service
 	agentService  *agent.Service
 	agentWrapper  *AgentServiceWrapper
+	workspaceSvc  *workspace.WorkspaceService
 	close         func() error
 }
 
@@ -84,6 +86,12 @@ func InitRuntime(dataDir string, initSkillsFS fs.FS) (*Runtime, error) {
 
 	agentWrapper := NewAgentServiceWrapper(agentService)
 
+	// Workspace 服务（多项目工作区）：持久化在 dataDir（~/.devpilot）下的 workspaces.json 与每个 workspaceRoot 的 WORKSPACE.json。
+	wsStore := workspace.NewJSONWorkspaceStoreAt(dataDir)
+	wsSvc := workspace.NewWorkspaceService(wsStore, dataDir)
+	// 让 rulego 节点解析 workspaceId 时复用同一 resolver，避免重复初始化与路径不一致。
+	rulego.SetGlobalWorkspaceRootResolver(wsSvc)
+
 	return &Runtime{
 		routeRewrite: routeRewriteService,
 		modelManage:  modelService,
@@ -92,6 +100,7 @@ func InitRuntime(dataDir string, initSkillsFS fs.FS) (*Runtime, error) {
 		curlCompare:  curl_compare.NewService(),
 		agentService: agentService,
 		agentWrapper: agentWrapper,
+		workspaceSvc: wsSvc,
 		close:        db.Close,
 	}, nil
 }
@@ -122,6 +131,10 @@ func (r *Runtime) AgentService() *agent.Service {
 
 func (r *Runtime) AgentWrapper() *AgentServiceWrapper {
 	return r.agentWrapper
+}
+
+func (r *Runtime) WorkspaceService() *workspace.WorkspaceService {
+	return r.workspaceSvc
 }
 
 func (r *Runtime) Close() error {

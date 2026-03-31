@@ -67,6 +67,7 @@ const cursorAcpAgentStepDef: BlockTypeDef = {
         );
         config.appendField(new B.FieldTextInput("3600"), "TIMEOUT_SEC");
         config.appendField(new B.FieldTextInput(""), "WORK_DIR");
+        config.appendField(new B.FieldTextInput(""), "WORKSPACE_ID");
         config.appendField(
           new B.FieldDropdown(cursorAcpSessionModeOptions.map((o) => [o.label, o.value] as [string, string])),
           "ACP_SESSION_MODE",
@@ -139,6 +140,7 @@ const cursorAcpAgentStepDef: BlockTypeDef = {
       args,
       timeoutSec,
       workDir: helpers.getFieldValue(block, "WORK_DIR"),
+      workspaceId: helpers.getFieldValue(block, "WORKSPACE_ID"),
       sessionMode,
       permissionOptionId: helpers.getFieldValue(block, "PERM_OPTION") || "allow-once",
       useAskQuestionDialog: helpers.getBooleanField(block, "USE_ASK_QUESTION_DIALOG"),
@@ -161,6 +163,7 @@ const cursorAcpAgentStepDef: BlockTypeDef = {
     block.setFieldValue(String(ts), "TIMEOUT_SEC");
 
     block.setFieldValue(String(c.workDir ?? ""), "WORK_DIR");
+    block.setFieldValue(String(c.workspaceId ?? ""), "WORKSPACE_ID");
 
     const sm = String(c.sessionMode ?? "agent").trim() || "agent";
     block.setFieldValue(["agent", "plan", "ask"].includes(sm) ? sm : "agent", "ACP_SESSION_MODE");

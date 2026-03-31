@@ -51,6 +51,7 @@ func main() {
 			runtime.RuleGoService(),
 			runtime.SkillRepoService(),
 			runtime.CurlCompareService(),
+			runtime.WorkspaceService(),
 		},
 	})
 	if err != nil {

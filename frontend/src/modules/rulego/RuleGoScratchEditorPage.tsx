@@ -52,6 +52,7 @@ import {
   DEFAULT_SOURCEGRAPH_REPO_BACKEND,
   DEFAULT_SOURCEGRAPH_REPO_FRONTEND,
 } from "./sourcegraph/buildTracerSourcegraphQuery";
+import { workspaceApi } from "../workspace/workspaceApi";
 
 const volcTlsKnownRegionSet = new Set(VOLC_TLS_KNOWN_REGIONS.map((r) => r.value));
 const OPENSEARCH_DEFAULT_BODY = '{"size":100,"sort":[{"@timestamp":{"order":"desc"}}],"query":{"match_all":{}}}';
@@ -450,6 +451,8 @@ function BlockConfigModal({
   const [confirmUnsavedOpen, setConfirmUnsavedOpen] = useState(false);
   const [openSearchRecentEndpoints, setOpenSearchRecentEndpoints] = useState<string[]>([]);
   const [openSearchRecentIndexes, setOpenSearchRecentIndexes] = useState<string[]>([]);
+  const [workspaceOptions, setWorkspaceOptions] = useState<Array<{ id: string; name: string }>>([]);
+  const [workspaceOptionsError, setWorkspaceOptionsError] = useState<string | null>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const joinTargetSelectRef = useRef<HTMLSelectElement>(null);
   const llmSelectedConfig = useMemo(() => {
@@ -508,6 +511,32 @@ function BlockConfigModal({
     }
     setOpenSearchRecentEndpoints(loadOpenSearchRecentEndpoints());
     setOpenSearchRecentIndexes(loadOpenSearchRecentIndexes());
+  }, [block?.type, blockId]);
+
+  useEffect(() => {
+    const need =
+      block?.type === "rulego_cursorAcpAgent" || block?.type === "rulego_cursorAcpAgentStep";
+    if (!need || !blockId) return;
+    let cancelled = false;
+    setWorkspaceOptionsError(null);
+    void (async () => {
+      try {
+        const list = await workspaceApi.listWorkspaces();
+        if (cancelled) return;
+        setWorkspaceOptions(
+          (list ?? [])
+            .map((w: any) => ({ id: String(w?.id ?? ""), name: String(w?.name ?? "") }))
+            .filter((x) => x.id),
+        );
+      } catch (e) {
+        if (cancelled) return;
+        setWorkspaceOptions([]);
+        setWorkspaceOptionsError(e instanceof Error ? e.message : String(e));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, [block?.type, blockId]);
 
   useEffect(() => {
@@ -588,6 +617,7 @@ function BlockConfigModal({
       next.AUTO_ASK_OPTION_INDEX = get("AUTO_ASK_OPTION_INDEX") || "0";
       next.ELICIT_URL_ACTION = get("ELICIT_URL_ACTION") || "decline";
       next.ACP_VERBOSE_LOG = block.getField("ACP_VERBOSE_LOG") ? getBool("ACP_VERBOSE_LOG") : true;
+      next.WORKSPACE_ID = get("WORKSPACE_ID");
     }
     if (block.type === "rulego_cursorAcpAgentStep") {
       next.ACP_AGENT_PRESET = get("ACP_AGENT_PRESET") || "path";
@@ -606,6 +636,7 @@ function BlockConfigModal({
       next.AUTO_ASK_OPTION_INDEX = get("AUTO_ASK_OPTION_INDEX") || "0";
       next.ELICIT_URL_ACTION = get("ELICIT_URL_ACTION") || "decline";
       next.ACP_VERBOSE_LOG = block.getField("ACP_VERBOSE_LOG") ? getBool("ACP_VERBOSE_LOG") : true;
+      next.WORKSPACE_ID = get("WORKSPACE_ID");
     }
     if (block.type === "rulego_sourcegraphSearch") {
       next.SG_ENDPOINT = get("SG_ENDPOINT") || "https://sourcegraph.com";
@@ -2359,6 +2390,29 @@ function BlockConfigModal({
           )}
           {(block.type === "rulego_cursorAcpAgent" || block.type === "rulego_cursorAcpAgentStep") && (
             <>
+              <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+                <span>工作区 (workspaceId，可选)</span>
+                <select
+                  value={String(form.WORKSPACE_ID ?? "")}
+                  onChange={(e) => setForm((f) => ({ ...f, WORKSPACE_ID: e.target.value }))}
+                >
+                  <option value="">（不使用工作区，沿用 workDir/metadata）</option>
+                  {workspaceOptions.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name ? `${w.name} (${w.id})` : w.id}
+                    </option>
+                  ))}
+                </select>
+                <small className="form-hint" style={{ display: "block", marginTop: 6 }}>
+                  选择后后端会强制使用 workspaceRoot 作为 ACP cwd，并注入 <code>--workspace</code>。若工作区不健康将阻止执行。
+                  {workspaceOptionsError ? (
+                    <>
+                      <br />
+                      <span style={{ color: "var(--danger, #dc2626)" }}>加载工作区列表失败：{workspaceOptionsError}</span>
+                    </>
+                  ) : null}
+                </small>
+              </label>
               <label className="form-field">
                 <span>规划自动批复 optionId (autoPlanOptionId)</span>
                 <input

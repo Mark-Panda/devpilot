@@ -32,6 +32,7 @@ const menuGroups: { group?: string; items: { path: string; label: string; end?: 
       { path: "/settings/agents", label: "Agent 管理" },
       { path: "/settings/mcp", label: "MCP 配置" },
       { path: "/settings/models", label: "模型管理" },
+      { path: "/settings/workspaces", label: "工作区" },
     ],
   },
 ];
