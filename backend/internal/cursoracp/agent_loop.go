@@ -98,6 +98,7 @@ func RunAgentLoop(ctx context.Context, cfg Config, p AgentLoopParams) (*AgentLoo
 	}
 
 	var combined strings.Builder
+	combinedTail := newTailBuffer(streamTailDefaultMax)
 	var last *PromptResult
 	var lastStream string
 	roundPrompt := strings.TrimSpace(p.InitialPrompt)
@@ -119,18 +120,18 @@ func RunAgentLoop(ctx context.Context, cfg Config, p AgentLoopParams) (*AgentLoo
 		}
 		if p.OnStreamProgress != nil {
 			cl.SetOnChunk(func(_ string) {
-				cur := cl.StreamText()
+				curTail := strings.TrimSpace(cl.StreamTail(streamTailDefaultMax))
+				baseTail := strings.TrimSpace(combinedTail.String())
+				if baseTail == "" && curTail == "" {
+					return
+				}
 				var preview strings.Builder
-				base := combined.String()
-				preview.WriteString(base)
-				if base != "" && strings.TrimSpace(cur) != "" {
+				preview.WriteString(baseTail)
+				if baseTail != "" && curTail != "" {
 					preview.WriteString("\n\n---\n\n")
 				}
-				preview.WriteString(cur)
-				s := preview.String()
-				if strings.TrimSpace(s) != "" {
-					p.OnStreamProgress(s)
-				}
+				preview.WriteString(curTail)
+				p.OnStreamProgress(preview.String())
 			})
 		} else {
 			cl.SetOnChunk(nil)
@@ -148,8 +149,10 @@ func RunAgentLoop(ctx context.Context, cfg Config, p AgentLoopParams) (*AgentLoo
 		}
 		if i > 0 && combined.Len() > 0 && strings.TrimSpace(chunk) != "" {
 			combined.WriteString("\n\n---\n\n")
+			combinedTail.AppendString("\n\n---\n\n")
 		}
 		combined.WriteString(chunk)
+		combinedTail.AppendString(chunk)
 
 		sr := strings.TrimSpace(pr.StopReason)
 		if sr == "refusal" || sr == "cancelled" {

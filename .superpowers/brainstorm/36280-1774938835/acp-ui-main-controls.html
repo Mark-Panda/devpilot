@@ -1,0 +1,89 @@
+<h2>ACP（方案 B2）：主区控制条（流式输出上的操作）</h2>
+<p class="subtitle">选一个“控制条组织方式”。目标：不打断阅读、但关键操作随手可达。</p>
+
+<div class="options">
+  <div class="option" data-choice="c1" onclick="toggleSelect(this)">
+    <div class="letter">C1</div>
+    <div class="content">
+      <h3>单行工具条（紧凑）</h3>
+      <p>一行放齐：滚动、尾部、搜索、复制。适合熟练用户。</p>
+      <div class="mockup">
+        <div class="mockup-header">预览：工具条</div>
+        <div class="mockup-body">
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <button class="mock-button">暂停滚动</button>
+            <button class="mock-button">只看尾部</button>
+            <input class="mock-input" placeholder="搜索输出（/）" style="flex:1;min-width:180px" />
+            <button class="mock-button">复制：本轮</button>
+            <button class="mock-button">复制：全部</button>
+          </div>
+          <div class="placeholder" style="height:160px;margin-top:10px">输出区（滚动）</div>
+        </div>
+      </div>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>最快</li><li>最省空间</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>按钮密集</li><li>新手不易理解“只看尾部”</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c2" onclick="toggleSelect(this)">
+    <div class="letter">C2</div>
+    <div class="content">
+      <h3>分组工具条（推荐）</h3>
+      <p>按心智模型分组：阅读（滚动/尾部）→ 查找（搜索）→ 导出（复制）。</p>
+      <div class="mockup">
+        <div class="mockup-header">预览：分组</div>
+        <div class="mockup-body">
+          <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+            <div style="display:flex;gap:8px;align-items:center">
+              <div class="label" style="margin:0">阅读</div>
+              <button class="mock-button">暂停滚动</button>
+              <button class="mock-button">只看尾部</button>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex:1;min-width:220px">
+              <div class="label" style="margin:0">查找</div>
+              <input class="mock-input" placeholder="搜索输出（/）" style="flex:1;min-width:160px" />
+              <button class="mock-button">上一个</button>
+              <button class="mock-button">下一个</button>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <div class="label" style="margin:0">导出</div>
+              <button class="mock-button">复制：本轮</button>
+              <button class="mock-button">复制：全部</button>
+            </div>
+          </div>
+          <div class="placeholder" style="height:160px;margin-top:10px">输出区（滚动）</div>
+        </div>
+      </div>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>可发现性好</li><li>不容易误触</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>占用更宽</li><li>移动端需要折叠</li></ul></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="c3" onclick="toggleSelect(this)">
+    <div class="letter">C3</div>
+    <div class="content">
+      <h3>极简 + 溢出菜单</h3>
+      <p>只保留 2 个高频按钮（暂停/尾部），其余进 “更多”。</p>
+      <div class="mockup">
+        <div class="mockup-header">预览：极简</div>
+        <div class="mockup-body">
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="mock-button">暂停滚动</button>
+            <button class="mock-button">只看尾部</button>
+            <button class="mock-button">更多…</button>
+            <div class="subtitle">（更多里：搜索/复制/导出）</div>
+          </div>
+          <div class="placeholder" style="height:160px;margin-top:10px">输出区（滚动）</div>
+        </div>
+      </div>
+      <div class="pros-cons">
+        <div class="pros"><h4>优点</h4><ul><li>最干净</li><li>适合窄屏</li></ul></div>
+        <div class="cons"><h4>缺点</h4><ul><li>二次点击成本</li><li>搜索不够显眼</li></ul></div>
+      </div>
+    </div>
+  </div>
+</div>

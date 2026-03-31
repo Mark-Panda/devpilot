@@ -134,7 +134,11 @@ func runCursorACPAgent(ctx types.RuleContext, msg types.RuleMsg, cfg *cursorACPA
 		}
 	}
 
-	runCtx, cancel := context.WithTimeout(context.Background(), time.Duration(cfg.TimeoutSec)*time.Second)
+	parent := ctx.GetContext()
+	if parent == nil {
+		parent = context.Background()
+	}
+	runCtx, cancel := context.WithTimeout(parent, time.Duration(cfg.TimeoutSec)*time.Second)
 	defer cancel()
 
 	execID := ""

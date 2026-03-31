@@ -98,15 +98,38 @@ function RuleParamFields({
                 <option value="false">false</option>
               </select>
             ) : (
-              <input
-                type={n.type === "number" ? "number" : "text"}
-                className="form-input"
-                value={values[n.id] ?? ""}
-                onChange={(e) => onChange(n.id, e.target.value)}
-                autoCapitalize="off"
-                autoCorrect="off"
-                spellCheck={false}
-              />
+              (() => {
+                const v = values[n.id] ?? "";
+                const key = n.key.toLowerCase();
+                const isLong =
+                  n.type === "string" &&
+                  (v.length >= 80 || key === "data" || key.includes("prompt") || key.includes("context"));
+                if (isLong) {
+                  return (
+                    <textarea
+                      className="form-input"
+                      value={v}
+                      onChange={(e) => onChange(n.id, e.target.value)}
+                      rows={4}
+                      style={{ resize: "vertical", minHeight: 96 }}
+                      autoCapitalize="off"
+                      autoCorrect="off"
+                      spellCheck={false}
+                    />
+                  );
+                }
+                return (
+                  <input
+                    type={n.type === "number" ? "number" : "text"}
+                    className="form-input"
+                    value={v}
+                    onChange={(e) => onChange(n.id, e.target.value)}
+                    autoCapitalize="off"
+                    autoCorrect="off"
+                    spellCheck={false}
+                  />
+                );
+              })()
             )}
           </label>
         );
@@ -304,7 +327,7 @@ export default function RuleGoExecuteRulePage() {
 
       <div className="rulego-exec-layout">
         <section className="rulego-exec-panel">
-          <div className="rulego-exec-panel-header">请求参数</div>
+          <div className="rulego-exec-panel-header">执行</div>
           <div className="rulego-exec-panel-body rulego-exec-panel-body--form">
             {loading ? (
               <p className="table-empty">加载中…</p>
@@ -312,7 +335,7 @@ export default function RuleGoExecuteRulePage() {
               <p className="table-empty">暂无已启用的主规则链，请先在规则管理中启用根规则链。</p>
             ) : (
               <>
-                <div className="rulego-exec-section">
+                <div className="rulego-exec-section" style={{ marginTop: 0 }}>
                   <label className="form-field" style={{ marginBottom: 0 }}>
                     <span>规则链</span>
                     <select
@@ -344,28 +367,6 @@ export default function RuleGoExecuteRulePage() {
                   </label>
                 </div>
 
-                <div className="rulego-exec-section">
-                  <div className="rulego-exec-section-title">元数据参数</div>
-                  {metaNodes.length === 0 ? (
-                    <p className="form-hint" style={{ marginBottom: 0 }}>
-                      未配置则发送空 metadata（可在规则表单中编辑「请求元数据参数」）
-                    </p>
-                  ) : (
-                    <RuleParamFields nodes={metaNodes} values={metaLeaves} onChange={updateMetaLeaf} />
-                  )}
-                </div>
-
-                <div className="rulego-exec-section">
-                  <div className="rulego-exec-section-title">消息体参数</div>
-                  {bodyNodes.length === 0 ? (
-                    <p className="form-hint" style={{ marginBottom: 0 }}>
-                      未配置则发送 {"{}"}
-                    </p>
-                  ) : (
-                    <RuleParamFields nodes={bodyNodes} values={bodyLeaves} onChange={updateBodyLeaf} />
-                  )}
-                </div>
-
                 <div className="rulego-exec-actions">
                   <button
                     type="button"
@@ -384,6 +385,31 @@ export default function RuleGoExecuteRulePage() {
 
                 {runError ? <div className="form-error" style={{ marginTop: 12 }}>{runError}</div> : null}
 
+                <details className="rulego-exec-param-details" open>
+                  <summary className="rulego-exec-param-summary">请求参数</summary>
+                  <div className="rulego-exec-section">
+                    <div className="rulego-exec-section-title">元数据参数</div>
+                    {metaNodes.length === 0 ? (
+                      <p className="form-hint" style={{ marginBottom: 0 }}>
+                        未配置则发送空 metadata（可在规则表单中编辑「请求元数据参数」）
+                      </p>
+                    ) : (
+                      <RuleParamFields nodes={metaNodes} values={metaLeaves} onChange={updateMetaLeaf} />
+                    )}
+                  </div>
+
+                  <div className="rulego-exec-section">
+                    <div className="rulego-exec-section-title">消息体参数</div>
+                    {bodyNodes.length === 0 ? (
+                      <p className="form-hint" style={{ marginBottom: 0 }}>
+                        未配置则发送 {"{}"}
+                      </p>
+                    ) : (
+                      <RuleParamFields nodes={bodyNodes} values={bodyLeaves} onChange={updateBodyLeaf} />
+                    )}
+                  </div>
+                </details>
+
                 <p className="form-hint" style={{ marginTop: 14, marginBottom: 0 }}>
                   若规则链含 LLM / 技能等，执行可能持续数分钟；可留在本页查看节点进度，或稍后在「执行日志」中查看完整记录。
                 </p>
@@ -393,7 +419,7 @@ export default function RuleGoExecuteRulePage() {
         </section>
 
         <section className="rulego-exec-panel">
-          <div className="rulego-exec-panel-header">执行与规则链</div>
+          <div className="rulego-exec-panel-header">结果与日志</div>
           <div className="rulego-exec-panel-body">
             {!execId ? (
               <div className="rulego-exec-empty-hint">

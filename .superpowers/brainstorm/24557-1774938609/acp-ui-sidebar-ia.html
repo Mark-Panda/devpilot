@@ -1,0 +1,154 @@
+<h2>ACP（方案 B）：侧栏信息架构 & 交互组织</h2>
+<p class="subtitle">选一个“侧栏分组方式”。主区保持「流式输出 + 控制条」不变。</p>
+
+<div class="options">
+  <div class="option" data-choice="b1" onclick="toggleSelect(this)">
+    <div class="letter">B1</div>
+    <div class="content">
+      <h3>状态优先（推荐）</h3>
+      <p>把“我现在在第几轮/是否卡住/能做什么”放最上面；交互与诊断往下沉。</p>
+      <div class="mockup">
+        <div class="mockup-header">侧栏结构预览</div>
+        <div class="mockup-body">
+          <div class="section">
+            <div class="label">状态</div>
+            <div class="subtitle">round / stopReason / 用时 / 超时倒计时</div>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button class="mock-button">取消</button>
+              <button class="mock-button">重试</button>
+            </div>
+          </div>
+          <div class="section">
+            <div class="label">交互</div>
+            <div class="subtitle">ask_question / after_round（最新一条置顶）</div>
+            <div class="placeholder" style="height:64px">交互历史（可展开）</div>
+          </div>
+          <div class="section">
+            <div class="label">诊断</div>
+            <div class="placeholder" style="height:84px">stderr tail（默认折叠，异常时自动展开）</div>
+          </div>
+          <div class="section">
+            <div class="label">任务信息</div>
+            <div class="subtitle">规则 / 节点 / cwd / sessionId（复制）</div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>适用</h4>
+          <ul>
+            <li>长会话/多轮最顺手</li>
+            <li>“卡住了怎么处理”最直观</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>注意</h4>
+          <ul>
+            <li>交互区需要很克制（避免变成第二个主区）</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b2" onclick="toggleSelect(this)">
+    <div class="letter">B2</div>
+    <div class="content">
+      <h3>交互优先</h3>
+      <p>把“需要你做决定的事情”放最上面（问答/续聊/计划确认）；状态放第二层。</p>
+      <div class="mockup">
+        <div class="mockup-header">侧栏结构预览</div>
+        <div class="mockup-body">
+          <div class="section">
+            <div class="label">交互（置顶）</div>
+            <div class="placeholder" style="height:92px">当前 ask_question（选项）/ after_round（继续/结束）</div>
+          </div>
+          <div class="section">
+            <div class="label">状态</div>
+            <div class="subtitle">round / stopReason / 用时</div>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button class="mock-button">取消</button>
+              <button class="mock-button">重试</button>
+            </div>
+          </div>
+          <div class="section">
+            <div class="label">诊断</div>
+            <div class="placeholder" style="height:72px">stderr tail（折叠）</div>
+          </div>
+          <div class="section">
+            <div class="label">任务信息</div>
+            <div class="subtitle">规则 / 节点 / cwd（复制）</div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>适用</h4>
+          <ul>
+            <li>频繁“人机对话续聊”的工作流</li>
+            <li>希望像“收件箱”一样处理事件</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>注意</h4>
+          <ul>
+            <li>没交互时顶部会显空，需要良好空态</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="b3" onclick="toggleSelect(this)">
+    <div class="letter">B3</div>
+    <div class="content">
+      <h3>诊断优先（偏工程排障）</h3>
+      <p>把 stderr tail / 丢弃行统计 / stopReason 解释放上面，适合经常排查失败原因的团队。</p>
+      <div class="mockup">
+        <div class="mockup-header">侧栏结构预览</div>
+        <div class="mockup-body">
+          <div class="section">
+            <div class="label">诊断（置顶）</div>
+            <div class="placeholder" style="height:110px">stderr tail · 解析丢弃原因 · 复制诊断包</div>
+          </div>
+          <div class="section">
+            <div class="label">状态</div>
+            <div class="subtitle">round / stopReason / 用时</div>
+            <div style="display:flex;gap:8px;margin-top:8px">
+              <button class="mock-button">取消</button>
+              <button class="mock-button">重试</button>
+            </div>
+          </div>
+          <div class="section">
+            <div class="label">交互</div>
+            <div class="subtitle">ask_question / after_round（历史）</div>
+          </div>
+          <div class="section">
+            <div class="label">任务信息</div>
+            <div class="subtitle">规则 / 节点 / cwd（复制）</div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>适用</h4>
+          <ul>
+            <li>失败率较高/经常排障</li>
+            <li>希望把“为什么失败”更快暴露</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>注意</h4>
+          <ul>
+            <li>日常成功路径会显得“太工程化”</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="section" style="margin-top:18px">
+  <div class="label">主区（固定基线，不用选）</div>
+  <div class="subtitle">流式输出为主 + 顶部控制条（暂停滚动 / 只看尾部 / 搜索 / 复制范围）</div>
+</div>

@@ -1,0 +1,121 @@
+<h2>ACP 执行页 / 日志页：布局方向</h2>
+<p class="subtitle">选择你更想要的“信息组织方式”。后续我会按选项继续细化交互与样式。</p>
+
+<div class="options">
+  <div class="option" data-choice="compact" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>紧凑型（单列）</h3>
+      <p>信息密度高，适合熟练用户；在同一页快速扫到输入、进度、结果与错误。</p>
+      <div class="mockup">
+        <div class="mockup-header">预览：单列紧凑</div>
+        <div class="mockup-body">
+          <div class="section">
+            <div class="label">任务</div>
+            <div class="placeholder">规则链 / 节点 / 会话标识（可复制）</div>
+          </div>
+          <div class="section">
+            <div class="label">输入</div>
+            <div class="placeholder" style="height:72px">Prompt（可折叠/展开）</div>
+          </div>
+          <div class="section">
+            <div class="label">运行状态</div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <button class="mock-button">取消</button>
+              <button class="mock-button">重试</button>
+              <div class="subtitle">round 3/20 · stopReason=…</div>
+            </div>
+          </div>
+          <div class="section">
+            <div class="label">流式输出</div>
+            <div class="placeholder" style="height:140px">实时滚动 · 支持“只看尾部/暂停滚动/复制”</div>
+          </div>
+          <div class="section">
+            <div class="label">stderr / 诊断</div>
+            <div class="placeholder" style="height:80px">stderr tail · 解析丢弃原因（verbose）</div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>优点</h4>
+          <ul>
+            <li>一屏内闭环</li>
+            <li>切换成本低</li>
+            <li>适合“只盯输出”场景</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>缺点</h4>
+          <ul>
+            <li>新手信息噪声更大</li>
+            <li>诊断与控制容易被淹没</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="option" data-choice="layered" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>信息分层型（主区 + 侧栏）</h3>
+      <p>把“流式输出”作为主角，控制/诊断/元信息放侧栏；更清晰、更适合长会话。</p>
+      <div class="mockup">
+        <div class="mockup-header">预览：主区 + 侧栏</div>
+        <div class="mockup-body">
+          <div style="display:flex;gap:12px">
+            <div class="mock-content" style="flex:1">
+              <div class="label">流式输出（主区）</div>
+              <div class="placeholder" style="height:260px">实时滚动 · 分段 · 搜索 · 复制</div>
+              <div style="display:flex;gap:8px;margin-top:8px">
+                <button class="mock-button">暂停滚动</button>
+                <button class="mock-button">只看尾部</button>
+                <button class="mock-button">复制本轮</button>
+              </div>
+            </div>
+            <div class="mock-sidebar" style="width:38%">
+              <div class="section">
+                <div class="label">状态</div>
+                <div class="subtitle">round 3/20 · running</div>
+                <div style="display:flex;gap:8px;margin-top:8px">
+                  <button class="mock-button">取消</button>
+                  <button class="mock-button">重试</button>
+                </div>
+              </div>
+              <div class="section">
+                <div class="label">任务信息</div>
+                <div class="subtitle">规则 / 节点 / cwd（可复制）</div>
+              </div>
+              <div class="section">
+                <div class="label">诊断</div>
+                <div class="placeholder" style="height:120px">stderr tail（折叠）</div>
+              </div>
+              <div class="section">
+                <div class="label">交互</div>
+                <div class="subtitle">ask_question / after_round 弹窗入口与历史</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="pros-cons">
+        <div class="pros">
+          <h4>优点</h4>
+          <ul>
+            <li>长输出可读性更好</li>
+            <li>控制与诊断更聚焦</li>
+            <li>更适合“会话式”交互</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>缺点</h4>
+          <ul>
+            <li>占用更多横向空间</li>
+            <li>需要更明确的信息架构</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

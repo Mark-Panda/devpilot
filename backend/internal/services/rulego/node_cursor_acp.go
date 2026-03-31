@@ -92,7 +92,11 @@ func (n *cursorACPNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) {
 		VerboseLog:         n.cfg.VerboseLog,
 	}
 
-	runCtx, cancel := context.WithTimeout(context.Background(), time.Duration(n.cfg.TimeoutSec)*time.Second)
+	parent := ctx.GetContext()
+	if parent == nil {
+		parent = context.Background()
+	}
+	runCtx, cancel := context.WithTimeout(parent, time.Duration(n.cfg.TimeoutSec)*time.Second)
 	defer cancel()
 
 	once, err := cursoracp.RunOnce(runCtx, cfg, cwd, prompt)

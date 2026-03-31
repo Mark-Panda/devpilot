@@ -18,6 +18,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 )
 
 // Config 启动子进程与客户端声明信息。
@@ -113,6 +114,7 @@ type Client struct {
 
 	streamMu sync.Mutex
 	stream   strings.Builder
+	streamTail *tailBuffer
 
 	onChunk func(text string)
 	chunkMu sync.RWMutex
@@ -125,6 +127,57 @@ type Client struct {
 }
 
 const stderrTailMax = 64 * 1024
+const streamTailDefaultMax = 256 * 1024
+const gracefulCloseWait = 1500 * time.Millisecond
+
+type tailBuffer struct {
+	mu  sync.Mutex
+	buf []byte
+	max int
+}
+
+func newTailBuffer(max int) *tailBuffer {
+	if max <= 0 {
+		max = 8 * 1024
+	}
+	return &tailBuffer{max: max}
+}
+
+func (t *tailBuffer) AppendString(s string) {
+	if t == nil || s == "" {
+		return
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	t.buf = append(t.buf, s...)
+	if len(t.buf) > t.max {
+		t.buf = t.buf[len(t.buf)-t.max:]
+	}
+}
+
+func (t *tailBuffer) String() string {
+	if t == nil {
+		return ""
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	return string(t.buf)
+}
+
+func (t *tailBuffer) Tail(max int) string {
+	if t == nil {
+		return ""
+	}
+	if max <= 0 {
+		return ""
+	}
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if max >= len(t.buf) {
+		return string(t.buf)
+	}
+	return string(t.buf[len(t.buf)-max:])
+}
 
 // stderrTailCapture 保留子进程 stderr 尾部，便于写入规则执行日志（仍同时输出到 os.Stderr）。
 type stderrTailCapture struct {
@@ -160,6 +213,7 @@ func NewClient(cfg Config) *Client {
 	return &Client{
 		cfg:     cfg,
 		pending: make(map[int64]chan outcome),
+		streamTail: newTailBuffer(streamTailDefaultMax),
 	}
 }
 
@@ -219,9 +273,20 @@ func (c *Client) Close() error {
 		_ = c.stdin.Close()
 	}
 	var err error
-	if c.cmd != nil && c.cmd.Process != nil {
-		_ = c.cmd.Process.Kill()
-		err = c.cmd.Wait()
+	if c.cmd != nil {
+		waitCh := make(chan error, 1)
+		go func() {
+			waitCh <- c.cmd.Wait()
+		}()
+		select {
+		case err = <-waitCh:
+			// exited
+		case <-time.After(gracefulCloseWait):
+			if c.cmd.Process != nil {
+				_ = c.cmd.Process.Kill()
+			}
+			err = <-waitCh
+		}
 	}
 	c.wg.Wait()
 	return err
@@ -229,21 +294,29 @@ func (c *Client) Close() error {
 
 func (c *Client) readLoop(r io.Reader) {
 	defer c.wg.Done()
-	sc := bufio.NewScanner(r)
-	const max = 1024 * 1024
-	buf := make([]byte, 0, 64*1024)
-	sc.Buffer(buf, max)
-	for sc.Scan() {
-		line := sc.Bytes()
-		if len(bytes.TrimSpace(line)) == 0 {
-			continue
+	br := bufio.NewReaderSize(r, 64*1024)
+	for {
+		line, err := br.ReadBytes('\n')
+		if len(bytes.TrimSpace(line)) > 0 {
+			c.handleIncomingLine(bytes.TrimSpace(line))
 		}
-		c.handleIncomingLine(line)
+		if err != nil {
+			if errors.Is(err, io.EOF) {
+				break
+			}
+			c.readOnce.Do(func() { c.readErr = err })
+			break
+		}
 	}
-	if err := sc.Err(); err != nil {
-		c.readOnce.Do(func() { c.readErr = err })
+	readErr := c.readErr
+	if readErr != nil && c.cfg.VerboseLog {
+		log.Printf("[cursoracp] readLoop exit err=%v", readErr)
 	}
-	c.failAllPending(errors.New("cursoracp: stdout closed"))
+	if readErr != nil {
+		c.failAllPending(fmt.Errorf("cursoracp: stdout closed: %w", readErr))
+	} else {
+		c.failAllPending(errors.New("cursoracp: stdout closed"))
+	}
 }
 
 func (c *Client) failAllPending(err error) {
@@ -276,6 +349,13 @@ func parseID(raw json.RawMessage) (int64, bool) {
 func (c *Client) handleIncomingLine(line []byte) {
 	var m map[string]json.RawMessage
 	if err := json.Unmarshal(line, &m); err != nil {
+		if c.cfg.VerboseLog {
+			s := string(line)
+			if len(s) > 512 {
+				s = s[:512] + "…"
+			}
+			log.Printf("[cursoracp] drop invalid json line: %v line=%q", err, s)
+		}
 		return
 	}
 	_, hasResult := m["result"]
@@ -285,10 +365,16 @@ func (c *Client) handleIncomingLine(line []byte) {
 
 	if hasResult || hasError {
 		if !hasID {
+			if c.cfg.VerboseLog {
+				log.Printf("[cursoracp] drop response without id")
+			}
 			return
 		}
 		id, ok := parseID(idRaw)
 		if !ok {
+			if c.cfg.VerboseLog {
+				log.Printf("[cursoracp] drop response with non-int id raw=%s", string(idRaw))
+			}
 			return
 		}
 		var rpcErr *jsonRPCError
@@ -316,6 +402,9 @@ func (c *Client) handleIncomingLine(line []byte) {
 		if hasID {
 			id, ok := parseID(idRaw)
 			if !ok {
+				if c.cfg.VerboseLog {
+					log.Printf("[cursoracp] drop request with non-int id method=%q raw=%s", method, string(idRaw))
+				}
 				return
 			}
 			switch method {
@@ -404,6 +493,9 @@ func (c *Client) handleSessionUpdate(params json.RawMessage) {
 	c.streamMu.Lock()
 	c.stream.WriteString(text)
 	c.streamMu.Unlock()
+	if c.streamTail != nil {
+		c.streamTail.AppendString(text)
+	}
 	c.chunkMu.RLock()
 	fn := c.onChunk
 	c.chunkMu.RUnlock()
@@ -436,12 +528,6 @@ func (c *Client) call(ctx context.Context, method string, params interface{}) (j
 	c.pending[id] = ch
 	c.mu.Unlock()
 
-	defer func() {
-		c.mu.Lock()
-		delete(c.pending, id)
-		c.mu.Unlock()
-	}()
-
 	msg := map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      id,
@@ -449,11 +535,17 @@ func (c *Client) call(ctx context.Context, method string, params interface{}) (j
 		"params":  params,
 	}
 	if err := c.writeJSON(msg); err != nil {
+		c.mu.Lock()
+		delete(c.pending, id)
+		c.mu.Unlock()
 		return nil, err
 	}
 
 	select {
 	case <-ctx.Done():
+		c.mu.Lock()
+		delete(c.pending, id)
+		c.mu.Unlock()
 		return nil, ctx.Err()
 	case oc := <-ch:
 		if oc.rpcErr != nil {
@@ -562,6 +654,14 @@ func (c *Client) StreamText() string {
 	c.streamMu.Lock()
 	defer c.streamMu.Unlock()
 	return c.stream.String()
+}
+
+// StreamTail 返回当前已收集流式文本的尾部（最多 max 字符），用于高频进度预览，避免全量拷贝。
+func (c *Client) StreamTail(max int) string {
+	if c == nil || c.streamTail == nil {
+		return ""
+	}
+	return c.streamTail.Tail(max)
 }
 
 // StderrTail 返回自 Start 以来子进程 stderr 的保留尾部（用于执行日志）；未启动则为空。
