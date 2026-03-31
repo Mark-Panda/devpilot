@@ -43,6 +43,9 @@ frontend/wailsjs/
 .idea/
 .vscode/
 
+# Git worktrees (project-local)
+.worktrees/
+
 # Env
 .env
 .env.local
