@@ -33,6 +33,7 @@ import {
   cursorAcpSessionModeOptions,
   cursorAcpTimeoutPresetOptions,
 } from "./rulego-blocks/blocks/cursorAcp";
+import { cursorAcpElicitationUrlOptions } from "./rulego-blocks/blocks/cursorAcpAgent";
 import { JsEditor, JsonEditor, SqlEditor } from "../../shared/components";
 import { BlockLibraryPanel, DRAG_TYPE_BLOCK } from "./BlockLibraryPanel";
 import { UI_RELATION_FAILURE } from "./relationLabels";
@@ -563,6 +564,24 @@ function BlockConfigModal({
       next.PERM_OPTION = get("PERM_OPTION") || "allow-once";
       next.ACP_ARGS_PRESET = get("ACP_ARGS_PRESET") || "default";
       next.ACP_ARGS_JSON = String(block.getFieldValue("ACP_ARGS_JSON") ?? "").trim() || "[]";
+      next.ACP_VERBOSE_LOG = block.getField("ACP_VERBOSE_LOG") ? getBool("ACP_VERBOSE_LOG") : true;
+    }
+    if (block.type === "rulego_cursorAcpAgent") {
+      next.ACP_AGENT_PRESET = get("ACP_AGENT_PRESET") || "path";
+      next.AGENT_CMD = get("AGENT_CMD") || "agent";
+      next.ACP_TIMEOUT_PRESET = get("ACP_TIMEOUT_PRESET") || "3600";
+      next.TIMEOUT_SEC = get("TIMEOUT_SEC") || "3600";
+      next.WORK_DIR = get("WORK_DIR");
+      next.ACP_SESSION_MODE = get("ACP_SESSION_MODE") || "agent";
+      next.PERM_OPTION = get("PERM_OPTION") || "allow-once";
+      next.ACP_ARGS_PRESET = get("ACP_ARGS_PRESET") || "default";
+      next.ACP_ARGS_JSON = String(block.getFieldValue("ACP_ARGS_JSON") ?? "").trim() || "[]";
+      next.MAX_PROMPT_ROUNDS = get("MAX_PROMPT_ROUNDS") || "20";
+      next.CONTINUATION_PROMPT = get("CONTINUATION_PROMPT");
+      next.AUTO_PLAN_OPTION_ID = get("AUTO_PLAN_OPTION_ID") || "approve";
+      next.AUTO_ASK_OPTION_INDEX = get("AUTO_ASK_OPTION_INDEX") || "0";
+      next.ELICIT_URL_ACTION = get("ELICIT_URL_ACTION") || "decline";
+      next.ACP_VERBOSE_LOG = block.getField("ACP_VERBOSE_LOG") ? getBool("ACP_VERBOSE_LOG") : true;
     }
     if (block.type === "rulego_sourcegraphSearch") {
       next.SG_ENDPOINT = get("SG_ENDPOINT") || "https://sourcegraph.com";
@@ -1090,6 +1109,9 @@ function BlockConfigModal({
       const mainPrevJoin = block.previousConnection?.targetBlock?.();
       const totalJoin = (mainPrevJoin ? 1 : 0) + joinExtraIncomings.length;
       block.setFieldValue(totalJoin >= 2 ? ` (${totalJoin}路)` : "", "JOIN_ROUTES_LABEL");
+    }
+    if (block.type === "rulego_cursorAcp" || block.type === "rulego_cursorAcpAgent") {
+      block.setFieldValue(form.ACP_VERBOSE_LOG ? "TRUE" : "FALSE", "ACP_VERBOSE_LOG");
     }
       onSaved?.();
       initialFormRef.current = { ...form };
@@ -2118,7 +2140,7 @@ function BlockConfigModal({
           </p>
         </>
       )}
-      {block.type === "rulego_cursorAcp" && (
+      {(block.type === "rulego_cursorAcp" || block.type === "rulego_cursorAcpAgent") && (
         <>
           <label className="form-field" style={{ gridColumn: "1 / -1" }}>
             <span>Agent 可执行文件</span>
@@ -2160,7 +2182,9 @@ function BlockConfigModal({
           <label className="form-field" style={{ gridColumn: "1 / -1" }}>
             <span>执行超时</span>
             <select
-              value={String(form.ACP_TIMEOUT_PRESET ?? "1800")}
+              value={String(
+                form.ACP_TIMEOUT_PRESET ?? (block.type === "rulego_cursorAcpAgent" ? "3600" : "1800"),
+              )}
               onChange={(e) => {
                 const v = e.target.value;
                 setForm((f) => ({
@@ -2183,7 +2207,7 @@ function BlockConfigModal({
               <input
                 type="number"
                 min={30}
-                value={String(form.TIMEOUT_SEC ?? "1800")}
+                value={String(form.TIMEOUT_SEC ?? (block.type === "rulego_cursorAcpAgent" ? "3600" : "1800"))}
                 onChange={(e) => setForm((f) => ({ ...f, TIMEOUT_SEC: e.target.value }))}
               />
             </label>
@@ -2255,6 +2279,74 @@ function BlockConfigModal({
             </label>
           )}
           <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <input
+                type="checkbox"
+                checked={Boolean(form.ACP_VERBOSE_LOG)}
+                onChange={(e) => setForm((f) => ({ ...f, ACP_VERBOSE_LOG: e.target.checked }))}
+              />
+              将工作区目录与 Cursor 流式输出打印到后台日志（verboseLog，对应终端 / Wails 日志）
+            </span>
+          </label>
+          {block.type === "rulego_cursorAcpAgent" && (
+            <>
+              <label className="form-field">
+                <span>最大 Prompt 轮数 (maxPromptRounds)</span>
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
+                  value={String(form.MAX_PROMPT_ROUNDS ?? "20")}
+                  onChange={(e) => setForm((f) => ({ ...f, MAX_PROMPT_ROUNDS: e.target.value }))}
+                />
+              </label>
+              <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+                <span>后续跟进提示 (continuationPrompt，空则用内置默认)</span>
+                <textarea
+                  value={String(form.CONTINUATION_PROMPT ?? "")}
+                  onChange={(e) => setForm((f) => ({ ...f, CONTINUATION_PROMPT: e.target.value }))}
+                  placeholder="第 2 轮及以后发给 Agent 的文本"
+                  rows={3}
+                  style={{ fontFamily: "ui-sans-serif, system-ui", fontSize: 13 }}
+                  spellCheck={false}
+                />
+              </label>
+              <label className="form-field">
+                <span>规划自动批复 optionId (autoPlanOptionId)</span>
+                <input
+                  value={String(form.AUTO_PLAN_OPTION_ID ?? "approve")}
+                  onChange={(e) => setForm((f) => ({ ...f, AUTO_PLAN_OPTION_ID: e.target.value }))}
+                  placeholder="approve"
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  autoComplete="off"
+                />
+              </label>
+              <label className="form-field">
+                <span>问答自动选项下标 (autoAskQuestionOptionIndex)</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={String(form.AUTO_ASK_OPTION_INDEX ?? "0")}
+                  onChange={(e) => setForm((f) => ({ ...f, AUTO_ASK_OPTION_INDEX: e.target.value }))}
+                />
+              </label>
+              <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+                <span>URL 类 elicitation (elicitationUrlAction)</span>
+                <select
+                  value={String(form.ELICIT_URL_ACTION ?? "decline")}
+                  onChange={(e) => setForm((f) => ({ ...f, ELICIT_URL_ACTION: e.target.value }))}
+                >
+                  {cursorAcpElicitationUrlOptions.map((o) => (
+                    <option key={o.value} value={o.value}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </>
+          )}
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
             <span>默认工作目录 (workDir，可选，支持 ~/ 展开)</span>
             <input
               value={String(form.WORK_DIR ?? "")}
@@ -2266,9 +2358,22 @@ function BlockConfigModal({
             />
           </label>
           <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
-            提示词完全来自上游消息的 <code>msg.Data</code>（此处无需填写）。工作目录优先 metadata <code>cursor_acp_cwd</code>，否则{" "}
+            首轮提示词来自上游消息的 <code>msg.Data</code>。工作目录优先 metadata <code>cursor_acp_cwd</code>，否则{" "}
             <code>api_route_tracer_service_path</code>，否则本块 workDir。需本机已安装 Cursor CLI 并完成 <code>agent login</code> 或配置{" "}
-            <code>CURSOR_API_KEY</code>。Plan/Ask 模式通过 <code>session/new</code> 传参（若当前 CLI 版本不支持可能需去掉该配置）。
+            <code>CURSOR_API_KEY</code>。
+            {block.type === "rulego_cursorAcpAgent" ? (
+              <>
+                {" "}
+                Agent 块在同一 <code>sessionId</code> 下连续 <code>session/prompt</code>，并对 <code>cursor/create_plan</code>、
+                <code>cursor/ask_question</code>、<code>session/elicitation</code> 等自动批复；具体 JSON 形状若随 CLI 版本变化需在{" "}
+                <code>cursoracp/autoreply.go</code> 中调整。
+              </>
+            ) : (
+              <>
+                {" "}
+                Plan/Ask 模式通过 <code>session/new</code> 传参（若当前 CLI 版本不支持可能需去掉该配置）。
+              </>
+            )}
           </p>
         </>
       )}

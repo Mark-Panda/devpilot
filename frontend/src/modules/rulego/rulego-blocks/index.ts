@@ -29,6 +29,7 @@ import "./blocks/sourcegraphSearch";
 import "./blocks/sourcegraphQueryBuild";
 import "./blocks/apiRouteTracer";
 import "./blocks/cursorAcp";
+import "./blocks/cursorAcpAgent";
 
 import {
   getBlockDef,
@@ -137,6 +138,7 @@ export const toolbox = {
         { kind: "block" as const, type: "rulego_sourcegraphSearch" },
         { kind: "block" as const, type: "rulego_apiRouteTracer_gitPrepare" },
         { kind: "block" as const, type: "rulego_cursorAcp" },
+        { kind: "block" as const, type: "rulego_cursorAcpAgent" },
       ],
     },
     {

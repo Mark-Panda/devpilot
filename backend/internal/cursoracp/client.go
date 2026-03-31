@@ -11,8 +11,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -34,6 +36,10 @@ type Config struct {
 	// PermissionOptionID 收到 session/request_permission 时自动回复的选项：
 	// allow-once、allow-always、reject-once（与 Cursor 文档一致）。
 	PermissionOptionID string
+	// AutoReply 对 session/elicitation、cursor/create_plan、cursor/ask_question 等客户端请求的自动批复。
+	AutoReply AutoReplyConfig
+	// VerboseLog 为 true 时打印工作区绝对路径（由调用方在 session/new 前记录）以及每条 agent_message_chunk 流式文本。
+	VerboseLog bool
 }
 
 func (c *Config) agentCommand() string {
@@ -269,8 +275,20 @@ func (c *Client) handleIncomingLine(line []byte) {
 		_ = json.Unmarshal(methodRaw, &method)
 		if hasID {
 			id, ok := parseID(idRaw)
-			if ok && method == "session/request_permission" {
+			if !ok {
+				return
+			}
+			switch method {
+			case "session/request_permission":
 				c.replyPermission(id)
+			case "session/elicitation":
+				c.replyRPCResult(id, autoReplyElicitation(m["params"], c.cfg.AutoReply))
+			default:
+				if strings.HasPrefix(method, "cursor/") {
+					if res := autoReplyCursorExtension(method, m["params"], c.cfg.AutoReply); res != nil {
+						c.replyRPCResult(id, res)
+					}
+				}
 			}
 			return
 		}
@@ -280,18 +298,21 @@ func (c *Client) handleIncomingLine(line []byte) {
 	}
 }
 
-func (c *Client) replyPermission(id int64) {
-	opt := c.cfg.permissionOption()
-	result := map[string]interface{}{
-		"outcome": map[string]interface{}{
-			"outcome":  "selected",
-			"optionId": opt,
-		},
-	}
+func (c *Client) replyRPCResult(id int64, result interface{}) {
 	_ = c.writeJSON(map[string]interface{}{
 		"jsonrpc": "2.0",
 		"id":      id,
 		"result":  result,
+	})
+}
+
+func (c *Client) replyPermission(id int64) {
+	opt := c.cfg.permissionOption()
+	c.replyRPCResult(id, map[string]interface{}{
+		"outcome": map[string]interface{}{
+			"outcome":  "selected",
+			"optionId": opt,
+		},
 	})
 }
 
@@ -322,6 +343,9 @@ func (c *Client) handleSessionUpdate(params json.RawMessage) {
 	c.chunkMu.RUnlock()
 	if fn != nil {
 		fn(text)
+	}
+	if c.cfg.VerboseLog && strings.TrimSpace(text) != "" {
+		log.Printf("[cursoracp] stream chunk: %s", text)
 	}
 }
 
@@ -383,6 +407,9 @@ func (c *Client) Initialize(ctx context.Context) error {
 				"writeTextFile": false,
 			},
 			"terminal": false,
+			"elicitation": map[string]interface{}{
+				"form": map[string]interface{}{},
+			},
 		},
 		"clientInfo": map[string]string{
 			"name":    c.cfg.clientName(),
@@ -485,6 +512,9 @@ func RunOnce(ctx context.Context, cfg Config, cwd, prompt string) (*PromptResult
 	if err := cl.Authenticate(ctx); err != nil {
 		return nil, "", fmt.Errorf("authenticate: %w", err)
 	}
+	if cfg.VerboseLog {
+		logWorkspaceCwd("cursor/acp", cwd)
+	}
 	sid, err := cl.NewSession(ctx, NewSessionParams{
 		Cwd:  cwd,
 		Mode: strings.TrimSpace(cfg.SessionMode),
@@ -497,5 +527,19 @@ func RunOnce(ctx context.Context, cfg Config, cwd, prompt string) (*PromptResult
 		return nil, "", fmt.Errorf("session/prompt: %w", err)
 	}
 	stream := cl.StreamText()
+	if cfg.VerboseLog && pr != nil {
+		log.Printf("[cursoracp] cursor/acp prompt done stopReason=%q streamChars=%d", pr.StopReason, len(stream))
+	}
 	return pr, stream, nil
+}
+
+func logWorkspaceCwd(scope, cwd string) {
+	abs := strings.TrimSpace(cwd)
+	if abs == "" {
+		return
+	}
+	if a, err := filepath.Abs(abs); err == nil {
+		abs = a
+	}
+	log.Printf("[cursoracp] %s workspace cwd=%s", scope, abs)
 }

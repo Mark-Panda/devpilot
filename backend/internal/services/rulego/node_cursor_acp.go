@@ -2,6 +2,7 @@ package rulego
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log"
 	"os"
@@ -30,6 +31,7 @@ type cursorACPConfig struct {
 	PermissionOptionID string   `json:"permissionOptionId"`
 	ClientName         string   `json:"clientName"`
 	ClientVersion      string   `json:"clientVersion"`
+	VerboseLog         bool     `json:"verboseLog"`
 }
 
 func (n *cursorACPNode) Type() string { return "cursor/acp" }
@@ -47,6 +49,7 @@ func (n *cursorACPNode) Init(_ types.Config, configuration types.Configuration) 
 	if n.cfg.TimeoutSec <= 0 {
 		n.cfg.TimeoutSec = 1800
 	}
+	cursorACPVerboseLogDefault(configuration, &n.cfg.VerboseLog)
 	return nil
 }
 
@@ -86,6 +89,7 @@ func (n *cursorACPNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) {
 		ClientName:         n.cfg.ClientName,
 		ClientVersion:      n.cfg.ClientVersion,
 		PermissionOptionID: n.cfg.PermissionOptionID,
+		VerboseLog:         n.cfg.VerboseLog,
 	}
 
 	runCtx, cancel := context.WithTimeout(context.Background(), time.Duration(n.cfg.TimeoutSec)*time.Second)
@@ -136,6 +140,25 @@ func normalizeACPSessionMode(s string) string {
 		return strings.TrimSpace(strings.ToLower(s))
 	default:
 		return ""
+	}
+}
+
+// cursorACPVerboseLogDefault 未在 DSL 中配置 verboseLog 时默认 true，便于观察工作区与流式输出。
+func cursorACPVerboseLogDefault(configuration types.Configuration, verbose *bool) {
+	if configuration == nil {
+		*verbose = true
+		return
+	}
+	b, err := json.Marshal(configuration)
+	if err != nil {
+		return
+	}
+	var m map[string]interface{}
+	if err := json.Unmarshal(b, &m); err != nil {
+		return
+	}
+	if _, ok := m["verboseLog"]; !ok {
+		*verbose = true
 	}
 }
 

@@ -16,6 +16,7 @@ alwaysApply: false
 - cacheSet
 - comment
 - cursor/acp
+- cursor/acp_agent
 - dbClient
 - delay
 - end
@@ -43,6 +44,8 @@ alwaysApply: false
 - net
 - opensearch/search
 - ref
+- refactor/apiIoContext
+- refactor/evidencePack
 - restApiCall
 - sendEmail
 - sourcegraph/queryBuild

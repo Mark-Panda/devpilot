@@ -1,46 +1,19 @@
 /**
- * Cursor ACP：通过 `agent acp` JSON-RPC 执行一次 Prompt。
+ * Cursor ACP Agent：同一会话内多轮 session/prompt，并对规划 / 问答 / elicitation 等自动批复。
  */
 import type { Block } from "blockly/core";
 import type { BlockTypeDef } from "../types";
 import { registerBlockType } from "../registry";
 import { UI_RELATION_FAILURE } from "../../relationLabels";
+import {
+  cursorAcpAgentPresetOptions,
+  cursorAcpArgsPresetOptions,
+  cursorAcpPermissionOptions,
+  cursorAcpSessionModeOptions,
+  cursorAcpTimeoutPresetOptions,
+} from "./cursorAcp";
 
 const category = "rulego_tracer" as const;
-
-/** 可执行文件：与配置模态共用选项 */
-export const cursorAcpAgentPresetOptions = [
-  { value: "path", label: "agent（系统 PATH）" },
-  { value: "local", label: "~/.local/bin/agent（常见安装路径）" },
-  { value: "custom", label: "自定义命令或路径…" },
-] as const;
-
-export const cursorAcpTimeoutPresetOptions = [
-  { value: "300", label: "5 分钟（300 秒）" },
-  { value: "900", label: "15 分钟（900 秒）" },
-  { value: "1800", label: "30 分钟（1800 秒）" },
-  { value: "3600", label: "60 分钟（3600 秒）" },
-  { value: "7200", label: "120 分钟（7200 秒）" },
-  { value: "custom", label: "自定义秒数…" },
-] as const;
-
-export const cursorAcpArgsPresetOptions = [
-  { value: "default", label: "默认（仅 acp）" },
-  { value: "k_acp", label: "-k + acp（与文档示例一致）" },
-  { value: "custom", label: "自定义 JSON 数组…" },
-] as const;
-
-export const cursorAcpSessionModeOptions = [
-  { value: "agent", label: "Agent（工具全开）" },
-  { value: "plan", label: "Plan（只读规划）" },
-  { value: "ask", label: "Ask（只读问答）" },
-] as const;
-
-export const cursorAcpPermissionOptions = [
-  { value: "allow-once", label: "允许一次（allow-once）" },
-  { value: "allow-always", label: "始终允许（allow-always）" },
-  { value: "reject-once", label: "拒绝一次（reject-once）" },
-] as const;
 
 const LOCAL_AGENT_CMD = "~/.local/bin/agent";
 
@@ -70,18 +43,24 @@ function inferArgsPreset(args: unknown): string {
   return "custom";
 }
 
-const cursorAcpDef: BlockTypeDef = {
-  blockType: "rulego_cursorAcp",
-  nodeType: "cursor/acp",
+export const cursorAcpElicitationUrlOptions = [
+  { value: "decline", label: "拒绝外链（decline，默认）" },
+  { value: "accept", label: "接受（accept，自动化慎用）" },
+  { value: "cancel", label: "取消（cancel）" },
+] as const;
+
+const cursorAcpAgentDef: BlockTypeDef = {
+  blockType: "rulego_cursorAcpAgent",
+  nodeType: "cursor/acp_agent",
   category,
   register(ScratchBlocks, BlocklyF) {
     const blocks = (ScratchBlocks as { Blocks: Record<string, object> }).Blocks;
     const B = BlocklyF as any;
-    blocks[cursorAcpDef.blockType] = {
+    blocks[cursorAcpAgentDef.blockType] = {
       init: function (this: Block) {
-        (this as Block).appendDummyInput("HEAD").appendField(new B.FieldTextInput("追踪·Cursor ACP"), "NODE_NAME");
+        (this as Block).appendDummyInput("HEAD").appendField(new B.FieldTextInput("追踪·Cursor ACP Agent"), "NODE_NAME");
         const config = (this as Block).appendDummyInput("CONFIG");
-        config.appendField(new B.FieldTextInput("cursor_acp1"), "NODE_ID");
+        config.appendField(new B.FieldTextInput("cursor_acp_agent1"), "NODE_ID");
         config.appendField(
           new B.FieldDropdown(cursorAcpAgentPresetOptions.map((o) => [o.label, o.value] as [string, string])),
           "ACP_AGENT_PRESET",
@@ -91,7 +70,7 @@ const cursorAcpDef: BlockTypeDef = {
           new B.FieldDropdown(cursorAcpTimeoutPresetOptions.map((o) => [o.label, o.value] as [string, string])),
           "ACP_TIMEOUT_PRESET",
         );
-        config.appendField(new B.FieldTextInput("1800"), "TIMEOUT_SEC");
+        config.appendField(new B.FieldTextInput("3600"), "TIMEOUT_SEC");
         config.appendField(new B.FieldTextInput(""), "WORK_DIR");
         config.appendField(
           new B.FieldDropdown(cursorAcpSessionModeOptions.map((o) => [o.label, o.value] as [string, string])),
@@ -107,6 +86,14 @@ const cursorAcpDef: BlockTypeDef = {
         );
         config.appendField(new B.FieldTextInput("[]"), "ACP_ARGS_JSON");
         config.appendField(new B.FieldCheckbox(true), "ACP_VERBOSE_LOG");
+        config.appendField(new B.FieldTextInput("20"), "MAX_PROMPT_ROUNDS");
+        config.appendField(new B.FieldTextInput(""), "CONTINUATION_PROMPT");
+        config.appendField(new B.FieldTextInput("approve"), "AUTO_PLAN_OPTION_ID");
+        config.appendField(new B.FieldTextInput("0"), "AUTO_ASK_OPTION_INDEX");
+        config.appendField(
+          new B.FieldDropdown(cursorAcpElicitationUrlOptions.map((o) => [o.label, o.value] as [string, string])),
+          "ELICIT_URL_ACTION",
+        );
         (this as Block).appendStatementInput("branch_failure").appendField(UI_RELATION_FAILURE);
         const configInput = (this as Block).getInput("CONFIG");
         if (configInput?.setVisible) configInput.setVisible(false);
@@ -125,12 +112,12 @@ const cursorAcpDef: BlockTypeDef = {
       agentCommand = String(helpers.getFieldValue(block, "AGENT_CMD") ?? "").trim() || "agent";
     }
 
-    const tp = String(helpers.getFieldValue(block, "ACP_TIMEOUT_PRESET") ?? "1800");
-    let timeoutSec = Number(helpers.getFieldValue(block, "TIMEOUT_SEC") || "1800");
+    const tp = String(helpers.getFieldValue(block, "ACP_TIMEOUT_PRESET") ?? "3600");
+    let timeoutSec = Number(helpers.getFieldValue(block, "TIMEOUT_SEC") || "3600");
     if (tp !== "custom") {
-      timeoutSec = Number(tp) || 1800;
+      timeoutSec = Number(tp) || 3600;
     }
-    if (timeoutSec <= 0) timeoutSec = 1800;
+    if (timeoutSec <= 0) timeoutSec = 3600;
 
     let args: string[] = [];
     const ap = String(helpers.getFieldValue(block, "ACP_ARGS_PRESET") ?? "default");
@@ -150,6 +137,10 @@ const cursorAcpDef: BlockTypeDef = {
 
     const sessionMode = String(helpers.getFieldValue(block, "ACP_SESSION_MODE") ?? "agent").trim() || "agent";
 
+    const maxRounds = Math.max(1, parseInt(String(helpers.getFieldValue(block, "MAX_PROMPT_ROUNDS") ?? "20"), 10) || 20);
+    const askIdx = parseInt(String(helpers.getFieldValue(block, "AUTO_ASK_OPTION_INDEX") ?? "0"), 10);
+    const elicitUrl = String(helpers.getFieldValue(block, "ELICIT_URL_ACTION") ?? "decline").trim() || "decline";
+
     return {
       agentCommand,
       args,
@@ -157,6 +148,11 @@ const cursorAcpDef: BlockTypeDef = {
       workDir: helpers.getFieldValue(block, "WORK_DIR"),
       sessionMode,
       permissionOptionId: helpers.getFieldValue(block, "PERM_OPTION") || "allow-once",
+      maxPromptRounds: maxRounds,
+      continuationPrompt: helpers.getFieldValue(block, "CONTINUATION_PROMPT"),
+      autoPlanOptionId: helpers.getFieldValue(block, "AUTO_PLAN_OPTION_ID") || "approve",
+      autoAskQuestionOptionIndex: Number.isFinite(askIdx) ? askIdx : 0,
+      elicitationUrlAction: elicitUrl,
       verboseLog: helpers.getBooleanField(block, "ACP_VERBOSE_LOG"),
     };
   },
@@ -167,7 +163,7 @@ const cursorAcpDef: BlockTypeDef = {
     block.setFieldValue(agentPreset, "ACP_AGENT_PRESET");
     block.setFieldValue(agentPreset === "custom" ? cmd : agentPreset === "path" ? "agent" : LOCAL_AGENT_CMD, "AGENT_CMD");
 
-    const ts = Number(c.timeoutSec ?? 1800) || 1800;
+    const ts = Number(c.timeoutSec ?? 3600) || 3600;
     const tp = inferTimeoutPreset(ts);
     block.setFieldValue(tp, "ACP_TIMEOUT_PRESET");
     block.setFieldValue(String(ts), "TIMEOUT_SEC");
@@ -184,6 +180,15 @@ const cursorAcpDef: BlockTypeDef = {
     const ap = inferArgsPreset(args);
     block.setFieldValue(ap, "ACP_ARGS_PRESET");
     block.setFieldValue(JSON.stringify(args.length > 0 ? args : []), "ACP_ARGS_JSON");
+
+    const mr = Number(c.maxPromptRounds ?? 20) || 20;
+    block.setFieldValue(String(Math.max(1, mr)), "MAX_PROMPT_ROUNDS");
+    block.setFieldValue(String(c.continuationPrompt ?? ""), "CONTINUATION_PROMPT");
+    block.setFieldValue(String(c.autoPlanOptionId ?? "approve"), "AUTO_PLAN_OPTION_ID");
+    const aidx = Number(c.autoAskQuestionOptionIndex ?? 0);
+    block.setFieldValue(String(Number.isFinite(aidx) ? aidx : 0), "AUTO_ASK_OPTION_INDEX");
+    const eu = String(c.elicitationUrlAction ?? "decline");
+    block.setFieldValue(["decline", "accept", "cancel"].includes(eu) ? eu : "decline", "ELICIT_URL_ACTION");
     block.setFieldValue(c.verboseLog === false ? "FALSE" : "TRUE", "ACP_VERBOSE_LOG");
   },
   getConnectionBranches() {
@@ -201,6 +206,6 @@ const cursorAcpDef: BlockTypeDef = {
   defaultConnectionType: "Success",
 };
 
-registerBlockType(cursorAcpDef);
+registerBlockType(cursorAcpAgentDef);
 
-export default cursorAcpDef;
+export default cursorAcpAgentDef;
