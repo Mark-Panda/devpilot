@@ -14,6 +14,14 @@ export const workspaceApi = {
     return await WorkspaceService.ListWorkspaces();
   },
 
+  deleteWorkspace: async (workspaceId: string): Promise<void> => {
+    await WorkspaceService.DeleteWorkspace(workspaceId);
+  },
+
+  deleteWorkspaceForce: async (workspaceId: string): Promise<void> => {
+    await WorkspaceService.DeleteWorkspaceForce(workspaceId);
+  },
+
   getWorkspace: async (id: string): Promise<workspace.Workspace> => {
     return await WorkspaceService.GetWorkspace(id);
   },

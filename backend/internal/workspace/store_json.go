@@ -2,7 +2,6 @@ package workspace
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -38,6 +37,9 @@ type WorkspaceStore interface {
 // - 文件读写锁：写入阶段全局串行；读取可并发，且不会读到半文件（rename 原子）。
 type JSONWorkspaceStore struct {
 	path string
+	// fallbacks 是可选的备用读取路径（只读）。用于 dataDir 变更/迁移期间避免“重启后丢失”。
+	// 约束：写入始终只写 s.path。
+	fallbacks []string
 
 	fileMu sync.RWMutex
 }
@@ -56,6 +58,28 @@ func NewJSONWorkspaceStoreAt(appDataDir string) *JSONWorkspaceStore {
 	return &JSONWorkspaceStore{
 		path: filepath.Join(appDataDir, "workspaces.json"),
 	}
+}
+
+// NewJSONWorkspaceStoreAtWithFallbacks 使用指定 appDataDir 并追加若干 fallback appDataDir（只读）作为回退读取来源。
+// 写入始终只写 primary appDataDir 下的 workspaces.json。
+func NewJSONWorkspaceStoreAtWithFallbacks(appDataDir string, fallbackAppDataDirs ...string) *JSONWorkspaceStore {
+	appDataDir = strings.TrimSpace(appDataDir)
+	primary := filepath.Join(appDataDir, "workspaces.json")
+
+	fallbacks := make([]string, 0, len(fallbackAppDataDirs))
+	for _, d := range fallbackAppDataDirs {
+		d = strings.TrimSpace(d)
+		if d == "" {
+			continue
+		}
+		fp := filepath.Join(d, "workspaces.json")
+		if filepath.Clean(fp) == filepath.Clean(primary) {
+			continue
+		}
+		fallbacks = append(fallbacks, fp)
+	}
+
+	return &JSONWorkspaceStore{path: primary, fallbacks: fallbacks}
 }
 
 func (s *JSONWorkspaceStore) List() ([]Workspace, error) {
@@ -168,19 +192,15 @@ func (s *JSONWorkspaceStore) loadUnlocked() (*workspaceStoreFileDoc, error) {
 		return nil, fmt.Errorf("workspaces.json path empty")
 	}
 
-	b, err := os.ReadFile(s.path)
+	paths := append([]string{s.path}, s.fallbacks...)
+	best, err := readBestWorkspaceStoreDoc(paths, doc)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return doc, nil
-		}
 		return nil, err
 	}
-	if len(strings.TrimSpace(string(b))) == 0 {
+	if best == nil {
 		return doc, nil
 	}
-	if err := json.Unmarshal(b, doc); err != nil {
-		return nil, fmt.Errorf("parse workspaces.json: %w", err)
-	}
+	doc = best
 	if doc.Version == 0 {
 		doc.Version = workspaceStoreFileVersion
 	}
@@ -188,6 +208,71 @@ func (s *JSONWorkspaceStore) loadUnlocked() (*workspaceStoreFileDoc, error) {
 		doc.Items = make(map[string]Workspace)
 	}
 	return doc, nil
+}
+
+func readBestWorkspaceStoreDoc(paths []string, into *workspaceStoreFileDoc) (*workspaceStoreFileDoc, error) {
+	type cand struct {
+		path string
+		mt   time.Time
+	}
+
+	seen := make(map[string]struct{}, len(paths))
+	cands := make([]cand, 0, len(paths))
+	for _, p := range paths {
+		p = strings.TrimSpace(p)
+		if p == "" {
+			continue
+		}
+		cp := filepath.Clean(p)
+		if _, ok := seen[cp]; ok {
+			continue
+		}
+		seen[cp] = struct{}{}
+		st, err := os.Stat(cp)
+		if err != nil {
+			continue
+		}
+		if st.IsDir() {
+			continue
+		}
+		cands = append(cands, cand{path: cp, mt: st.ModTime()})
+	}
+
+	// 优先读最近修改的文件（更符合“用户刚刚创建但 dataDir 改了”的直觉）。
+	sort.Slice(cands, func(i, j int) bool { return cands[i].mt.After(cands[j].mt) })
+	for _, c := range cands {
+		b, err := os.ReadFile(c.path)
+		if err != nil {
+			continue
+		}
+		if len(strings.TrimSpace(string(b))) == 0 {
+			continue
+		}
+		tmp := into
+		if tmp == nil {
+			tmp = &workspaceStoreFileDoc{}
+		}
+		*tmp = workspaceStoreFileDoc{Version: workspaceStoreFileVersion, Items: make(map[string]Workspace), Order: nil}
+		if err := json.Unmarshal(b, tmp); err != nil {
+			// 文件损坏则继续尝试其它候选（不要因为一个坏文件导致“全部丢失”）
+			continue
+		}
+		return tmp, nil
+	}
+
+	// 如果 primary 存在但读不了，按原行为报错更利于排查；但此时上面已尝试其它候选。
+	primary := ""
+	if len(paths) > 0 {
+		primary = strings.TrimSpace(paths[0])
+	}
+	if primary != "" {
+		if b, err := os.ReadFile(primary); err == nil && len(strings.TrimSpace(string(b))) > 0 {
+			// primary 有内容但无法解析，且其它候选也不可用
+			return nil, fmt.Errorf("parse workspaces.json: %w", fmt.Errorf("no valid candidates (primary may be corrupted): %s", primary))
+		}
+	}
+
+	return nil, nil
 }
 
 func (s *JSONWorkspaceStore) saveUnlocked(doc *workspaceStoreFileDoc) error {

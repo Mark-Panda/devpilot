@@ -33,9 +33,17 @@ export default function WorkspacePage() {
   const [report, setReport] = useState<WorkspaceValidationReport | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
 
+  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; id: string | null }>({ open: false, id: null });
+  const [deleteForceDir, setDeleteForceDir] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
   const selectedSummary = useMemo(
     () => workspaces.find((w) => w.id === selectedId) ?? null,
     [selectedId, workspaces]
+  );
+  const deleteTarget = useMemo(
+    () => (deleteDialog.id ? workspaces.find((w) => w.id === deleteDialog.id) ?? null : null),
+    [deleteDialog.id, workspaces]
   );
 
   const loadList = useCallback(async () => {
@@ -96,6 +104,43 @@ export default function WorkspacePage() {
       setListError(e instanceof Error ? e.message : String(e));
     } finally {
       setCreating(false);
+    }
+  };
+
+  const openDeleteDialog = (id: string) => {
+    setDeleteForceDir(false);
+    setDeleteDialog({ open: true, id });
+  };
+
+  const closeDeleteDialog = () => {
+    if (deleting) return;
+    setDeleteDialog({ open: false, id: null });
+    setDeleteForceDir(false);
+  };
+
+  const confirmDelete = async () => {
+    const id = deleteDialog.id;
+    if (!deleteDialog.open || !id) return;
+    setDeleting(true);
+    setListError(null);
+    try {
+      if (deleteForceDir) {
+        await workspaceApi.deleteWorkspaceForce(id);
+      } else {
+        await workspaceApi.deleteWorkspace(id);
+      }
+      if (selectedId === id) {
+        setSelectedId(null);
+      }
+      await loadList();
+      setReport(null);
+      setReportError(null);
+      setDeleteDialog({ open: false, id: null });
+      setDeleteForceDir(false);
+    } catch (e) {
+      setListError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -249,18 +294,32 @@ export default function WorkspacePage() {
                   >
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
                       <div style={{ fontWeight: 600 }}>{safeStr(w.name, "(未命名)")}</div>
-                      <span
-                        style={{
-                          fontSize: 12,
-                          padding: "2px 8px",
-                          borderRadius: 999,
-                          background: healthBg,
-                          color: healthFg,
-                          whiteSpace: "nowrap",
-                        }}
-                      >
-                        {health.text}
-                      </span>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                        <span
+                          style={{
+                            fontSize: 12,
+                            padding: "2px 8px",
+                            borderRadius: 999,
+                            background: healthBg,
+                            color: healthFg,
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {health.text}
+                        </span>
+                        <button
+                          className="text-button danger"
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            openDeleteDialog(w.id);
+                          }}
+                          title="删除该工作区"
+                        >
+                          删除
+                        </button>
+                      </div>
                     </div>
                     <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
                       项目数：{typeof count === "number" ? count : "—"} · ID：<code>{w.id}</code>
@@ -427,6 +486,97 @@ export default function WorkspacePage() {
           {detailError ? <div className="table-error">{detailError}</div> : null}
         </div>
       </div>
+
+      {deleteDialog.open ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="删除工作区"
+          onMouseDown={(e) => {
+            // 点击遮罩关闭（仅在未进行删除时）
+            if (e.target === e.currentTarget) closeDeleteDialog();
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            background: "rgba(2,6,23,0.55)",
+            backdropFilter: "blur(6px)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: 16,
+            zIndex: 9999,
+          }}
+        >
+          <div
+            className="table-card"
+            style={{
+              width: "min(620px, 92vw)",
+              padding: 16,
+            }}
+          >
+            <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: 16 }}>删除工作区</div>
+                <div style={{ marginTop: 6, fontSize: 12, opacity: 0.85 }}>
+                  {deleteTarget ? (
+                    <>
+                      将删除：<b>{safeStr(deleteTarget.name, "(未命名)")}</b> · ID：<code>{deleteTarget.id}</code>
+                    </>
+                  ) : (
+                    <>ID：<code>{deleteDialog.id}</code></>
+                  )}
+                </div>
+              </div>
+              <button className="text-button" type="button" onClick={closeDeleteDialog} disabled={deleting}>
+                关闭
+              </button>
+            </div>
+
+            <div style={{ marginTop: 12, fontSize: 13, lineHeight: 1.55, opacity: 0.9 }}>
+              <div>默认会从列表移除该工作区。</div>
+              <div style={{ marginTop: 6 }}>
+                勾选“同时删除目录（危险）”将尝试删除该工作区的 workspaceRoot。系统会校验
+                <code style={{ marginLeft: 6, marginRight: 6 }}>WORKSPACE.json</code>
+                的 id 与当前 workspaceId 匹配后才执行删除。
+              </div>
+            </div>
+
+            <div style={{ marginTop: 12, padding: 12, borderRadius: 10, background: "rgba(15,23,42,0.28)" }}>
+              <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: deleting ? "not-allowed" : "pointer" }}>
+                <input
+                  type="checkbox"
+                  checked={deleteForceDir}
+                  disabled={deleting}
+                  onChange={(e) => setDeleteForceDir(e.target.checked)}
+                  style={{ marginTop: 2 }}
+                />
+                <span>
+                  <b>同时删除目录（危险）</b>
+                  <div style={{ marginTop: 4, fontSize: 12, opacity: 0.85 }}>
+                    仅删除 workspaceRoot，不会删除真实项目目录（项目是以 symlink 形式挂在 workspaceRoot 下）。
+                  </div>
+                </span>
+              </label>
+            </div>
+
+            <div style={{ marginTop: 14, display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <button className="text-button" type="button" onClick={closeDeleteDialog} disabled={deleting}>
+                取消
+              </button>
+              <button
+                className={`primary-button ${deleteForceDir ? "danger" : ""}`}
+                type="button"
+                onClick={confirmDelete}
+                disabled={deleting}
+                title={deleteForceDir ? "将删除 workspaceRoot 目录（危险）" : "仅删除工作区（保留目录）"}
+              >
+                {deleting ? "删除中…" : deleteForceDir ? "删除工作区并删除目录" : "删除工作区"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

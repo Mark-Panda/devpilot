@@ -222,6 +222,69 @@ func TestJSONWorkspaceStore_List_JSONCorruptedReturnsError(t *testing.T) {
 	}
 }
 
+func TestJSONWorkspaceStore_List_FallsBackWhenPrimaryMissing(t *testing.T) {
+	primaryDir := t.TempDir()
+	fallbackDir := t.TempDir()
+
+	// 只在 fallback 写入
+	fdoc := workspaceStoreFileDoc{
+		Version: workspaceStoreFileVersion,
+		Items: map[string]Workspace{
+			"w1": {ID: "w1", Name: "one", RootPath: "/abs/one"},
+		},
+		Order: []string{"w1"},
+	}
+	b, err := json.MarshalIndent(fdoc, "", "  ")
+	if err != nil {
+		t.Fatalf("MarshalIndent: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(fallbackDir, "workspaces.json"), b, 0o600); err != nil {
+		t.Fatalf("WriteFile fallback: %v", err)
+	}
+
+	s := NewJSONWorkspaceStoreAtWithFallbacks(primaryDir, fallbackDir)
+	list, err := s.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(list) != 1 || list[0].ID != "w1" {
+		t.Fatalf("unexpected list: %+v", list)
+	}
+}
+
+func TestJSONWorkspaceStore_List_FallsBackWhenPrimaryCorrupted(t *testing.T) {
+	primaryDir := t.TempDir()
+	fallbackDir := t.TempDir()
+
+	if err := os.WriteFile(filepath.Join(primaryDir, "workspaces.json"), []byte("{bad"), 0o600); err != nil {
+		t.Fatalf("WriteFile primary: %v", err)
+	}
+
+	fdoc := workspaceStoreFileDoc{
+		Version: workspaceStoreFileVersion,
+		Items: map[string]Workspace{
+			"w1": {ID: "w1", Name: "one", RootPath: "/abs/one"},
+		},
+		Order: []string{"w1"},
+	}
+	b, err := json.MarshalIndent(fdoc, "", "  ")
+	if err != nil {
+		t.Fatalf("MarshalIndent: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(fallbackDir, "workspaces.json"), b, 0o600); err != nil {
+		t.Fatalf("WriteFile fallback: %v", err)
+	}
+
+	s := NewJSONWorkspaceStoreAtWithFallbacks(primaryDir, fallbackDir)
+	list, err := s.List()
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(list) != 1 || list[0].ID != "w1" {
+		t.Fatalf("unexpected list: %+v", list)
+	}
+}
+
 // itoa 避免引入 strconv（保持测试依赖最小）
 func itoa(i int) string {
 	if i == 0 {

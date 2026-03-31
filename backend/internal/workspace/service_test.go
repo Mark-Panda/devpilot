@@ -114,6 +114,84 @@ func TestWorkspaceService_RemoveProject_DeletesSymlink(t *testing.T) {
 	}
 }
 
+func TestWorkspaceService_GetWorkspace_NotFound(t *testing.T) {
+	appData := t.TempDir()
+	store := NewJSONWorkspaceStoreAt(appData)
+	svc := NewWorkspaceService(store, appData)
+
+	_, err := svc.GetWorkspace("nope")
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+}
+
+func TestWorkspaceService_DeleteWorkspace_RemovesFromStoreAndCleansDefaultRoot(t *testing.T) {
+	appData := t.TempDir()
+	store := NewJSONWorkspaceStoreAt(appData)
+	svc := NewWorkspaceService(store, appData)
+
+	w, err := svc.CreateWorkspace("demo")
+	if err != nil {
+		t.Fatalf("CreateWorkspace: %v", err)
+	}
+	root := w.RootPath
+	if _, err := os.Stat(root); err != nil {
+		t.Fatalf("expected root exists: %v", err)
+	}
+
+	if err := svc.DeleteWorkspace(w.ID); err != nil {
+		t.Fatalf("DeleteWorkspace: %v", err)
+	}
+	_, ok, err := store.Get(w.ID)
+	if err != nil {
+		t.Fatalf("store.Get: %v", err)
+	}
+	if ok {
+		t.Fatalf("expected deleted from store")
+	}
+	if _, err := os.Stat(root); err == nil {
+		t.Fatalf("expected root removed")
+	}
+}
+
+func TestWorkspaceService_DeleteWorkspaceForce_DeletesCustomRootWhenVerified(t *testing.T) {
+	appData := t.TempDir()
+	store := NewJSONWorkspaceStoreAt(appData)
+	svc := NewWorkspaceService(store, appData)
+
+	w, err := svc.CreateWorkspace("demo")
+	if err != nil {
+		t.Fatalf("CreateWorkspace: %v", err)
+	}
+
+	// 将 root_path 改为自定义目录（不在默认 workspaces/<id> 下）
+	customRoot := filepath.Join(t.TempDir(), "custom-root")
+	w.RootPath = customRoot
+	if err := svc.ensureWorkspaceDirs(customRoot); err != nil {
+		t.Fatalf("ensureWorkspaceDirs: %v", err)
+	}
+	if err := svc.writeWorkspaceFileAtomic(customRoot, w); err != nil {
+		t.Fatalf("writeWorkspaceFileAtomic: %v", err)
+	}
+	if err := store.Upsert(w); err != nil {
+		t.Fatalf("store.Upsert: %v", err)
+	}
+
+	if err := svc.DeleteWorkspaceForce(w.ID); err != nil {
+		t.Fatalf("DeleteWorkspaceForce: %v", err)
+	}
+	if _, err := os.Stat(customRoot); err == nil {
+		t.Fatalf("expected custom root removed")
+	}
+	_, ok, err := store.Get(w.ID)
+	if err != nil {
+		t.Fatalf("store.Get: %v", err)
+	}
+	if ok {
+		t.Fatalf("expected deleted from store")
+	}
+}
+
 type failingUpsertStore struct {
 	inner     WorkspaceStore
 	upsertErr error

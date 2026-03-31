@@ -90,8 +90,122 @@ func (s *WorkspaceService) ListWorkspaces() ([]Workspace, error) {
 	return s.store.List()
 }
 
-func (s *WorkspaceService) GetWorkspace(id string) (Workspace, bool, error) {
-	return s.store.Get(id)
+// DeleteWorkspaceForce 强制删除 workspaceRoot 目录（危险操作）。
+//
+// 安全校验：
+// - workspaceRoot 下必须存在 WORKSPACE.json，且其中 id 必须与 workspaceID 一致
+// - 仅删除目录本身；不触碰项目真实目录（项目只以 symlink 形式存在于 workspaceRoot/projects 下）
+//
+// 说明：
+// - 元数据仍会从 store 中移除
+// - 若目录校验失败，将只删除元数据，不删除目录（返回错误以便前端提示）
+func (s *WorkspaceService) DeleteWorkspaceForce(workspaceID string) error {
+	return s.deleteWorkspace(workspaceID, true)
+}
+
+// DeleteWorkspace 删除 workspace 元数据；并在满足安全条件时清理 workspaceRoot（仅限默认目录下）。
+//
+// 安全约束：
+// - 只允许删除位于 <appDataDir>/workspaces/<id> 的目录，避免误删用户任意目录
+// - 即使目录不删除，也会从 store 中移除（让 UI 列表消失）
+func (s *WorkspaceService) DeleteWorkspace(workspaceID string) error {
+	return s.deleteWorkspace(workspaceID, false)
+}
+
+func (s *WorkspaceService) deleteWorkspace(workspaceID string, force bool) error {
+	workspaceID = strings.TrimSpace(workspaceID)
+	if workspaceID == "" {
+		return fmt.Errorf("workspaceId 不能为空")
+	}
+	unlock := s.locks.Lock(workspaceID)
+	defer unlock()
+
+	w, ok, err := s.store.Get(workspaceID)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return nil
+	}
+
+	// 先删 store，确保“列表消失”优先满足；目录清理失败不会让条目复活。
+	if err := s.store.Delete(workspaceID); err != nil {
+		return err
+	}
+
+	root := strings.TrimSpace(w.RootPath)
+	if root == "" {
+		return nil
+	}
+
+	rootAbs, err := filepath.Abs(root)
+	if err != nil {
+		return nil
+	}
+	rootAbs = filepath.Clean(rootAbs)
+
+	if force {
+		if err := verifyWorkspaceRootForDeletion(rootAbs, workspaceID); err != nil {
+			return err
+		}
+		return os.RemoveAll(rootAbs)
+	}
+
+	// 非强制：仅删除默认根路径下的目录：<appDataDir>/workspaces/<id>
+	base := strings.TrimSpace(s.appDataDir)
+	if base == "" {
+		if d, err := agent.AgentGlobalDataDir(); err == nil {
+			base = strings.TrimSpace(d)
+		}
+	}
+	if base == "" {
+		return nil
+	}
+	want := filepath.Join(base, "workspaces", workspaceID)
+	wantAbs, err := filepath.Abs(want)
+	if err != nil {
+		return nil
+	}
+	if filepath.Clean(rootAbs) != filepath.Clean(wantAbs) {
+		return nil
+	}
+	_ = os.RemoveAll(wantAbs)
+	return nil
+}
+
+func verifyWorkspaceRootForDeletion(rootAbs string, workspaceID string) error {
+	if strings.TrimSpace(rootAbs) == "" || strings.TrimSpace(workspaceID) == "" {
+		return fmt.Errorf("invalid workspace root/id")
+	}
+	// 防止误删极端目录
+	if rootAbs == string(filepath.Separator) {
+		return fmt.Errorf("refuse to delete root directory")
+	}
+	metaPath := filepath.Join(rootAbs, workspaceMetaFileName)
+	b, err := os.ReadFile(metaPath)
+	if err != nil {
+		return fmt.Errorf("workspaceRoot 缺少 WORKSPACE.json，拒绝强制删除: %v", err)
+	}
+	var onDisk Workspace
+	if err := json.Unmarshal(b, &onDisk); err != nil {
+		return fmt.Errorf("WORKSPACE.json 解析失败，拒绝强制删除: %v", err)
+	}
+	if strings.TrimSpace(onDisk.ID) != strings.TrimSpace(workspaceID) {
+		return fmt.Errorf("WORKSPACE.json id 不匹配，拒绝强制删除: want=%s got=%s", workspaceID, strings.TrimSpace(onDisk.ID))
+	}
+	return nil
+}
+
+// GetWorkspace 返回指定 workspace；若不存在返回错误（Wails 导出方法避免使用 (T, bool, error) 形态）。
+func (s *WorkspaceService) GetWorkspace(id string) (Workspace, error) {
+	w, ok, err := s.store.Get(id)
+	if err != nil {
+		return Workspace{}, err
+	}
+	if !ok {
+		return Workspace{}, fmt.Errorf("workspace 不存在: %s", strings.TrimSpace(id))
+	}
+	return w, nil
 }
 
 // ResolveRoot 返回 workspaceId 对应的 workspaceRoot（绝对路径）。
