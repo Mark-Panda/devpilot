@@ -14,6 +14,8 @@ export default function RuleGoPage() {
   const [editingRule, setEditingRule] = useState<RuleGoRule | null>(null);
   const [confirmingRule, setConfirmingRule] = useState<RuleGoRule | null>(null);
   const [actionFeedback, setActionFeedback] = useState<{ msg: string; isError?: boolean } | null>(null);
+  const [chainKindFilter, setChainKindFilter] = useState<"all" | "root" | "sub">("all");
+  const [enabledFilter, setEnabledFilter] = useState<"all" | "enabled" | "disabled">("all");
   /** 正在生成技能的规则 ID，用于显示“生成中...”并禁用按钮 */
   const [generatingSkillRuleId, setGeneratingSkillRuleId] = useState<string | null>(null);
   /** 正在切换启用状态的规则 ID，防止重复点击 */
@@ -31,6 +33,26 @@ export default function RuleGoPage() {
     }
   };
 
+  const filteredRules = rules.filter((rule) => {
+    const rootKind = getRuleChainRootKind(rule.definition);
+    const effectiveEnabled = getEnabledFromDefinition(rule.definition);
+
+    const kindOk =
+      chainKindFilter === "all"
+        ? true
+        : chainKindFilter === "root"
+          ? rootKind === "root"
+          : rootKind === "sub";
+
+    const enabledOk =
+      enabledFilter === "all"
+        ? true
+        : enabledFilter === "enabled"
+          ? effectiveEnabled
+          : !effectiveEnabled;
+    return kindOk && enabledOk;
+  });
+
   return (
     <div className="page animate-fade-in">
       <div className="page-header">
@@ -39,6 +61,36 @@ export default function RuleGoPage() {
           <p className="page-subtitle">管理规则链定义</p>
         </div>
         <div className="page-actions">
+          <div className="dp-filter-bar" role="group" aria-label="规则筛选">
+            <label className="dp-filter-field">
+              <span className="dp-filter-label">类型</span>
+              <select
+                className="dp-select"
+                value={chainKindFilter}
+                onChange={(e) => setChainKindFilter(e.target.value as "all" | "root" | "sub")}
+                aria-label="规则链类型筛选"
+              >
+                <option value="all">全部</option>
+                <option value="root">主规则链</option>
+                <option value="sub">子规则链</option>
+              </select>
+            </label>
+            <label className="dp-filter-field">
+              <span className="dp-filter-label">状态</span>
+              <select
+                className="dp-select"
+                value={enabledFilter}
+                onChange={(e) =>
+                  setEnabledFilter(e.target.value as "all" | "enabled" | "disabled")
+                }
+                aria-label="规则开启状态筛选"
+              >
+                <option value="all">全部</option>
+                <option value="enabled">已开启</option>
+                <option value="disabled">已关闭</option>
+              </select>
+            </label>
+          </div>
           <button
             className="primary-button"
             type="button"
@@ -67,9 +119,11 @@ export default function RuleGoPage() {
           </div>
         ) : rules.length === 0 ? (
           <div className="table-empty">暂无数据</div>
+        ) : filteredRules.length === 0 ? (
+          <div className="table-empty">无匹配规则</div>
         ) : (
           <div className="table-body">
-            {rules.map((rule) => {
+            {filteredRules.map((rule) => {
               // 状态以 definition 中 DSL 的 ruleChain.disabled 为准（表中已无 enabled 字段）
               const effectiveEnabled = getEnabledFromDefinition(rule.definition);
               const hasDefinition = Boolean(rule.definition);
