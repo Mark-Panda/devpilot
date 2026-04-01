@@ -338,6 +338,8 @@ export default function CursorACPAfterRoundHost() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [badgePulse, setBadgePulse] = useState(false);
   const [notifyHint, setNotifyHint] = useState<string>("");
+  const autoContinuedRequestIdsRef = useRef<Set<string>>(new Set());
+  const autoContinueCooldownRef = useRef<number>(0);
 
   const fabRef = useRef<HTMLButtonElement>(null);
   const drawerTitleRef = useRef<HTMLHeadingElement>(null);
@@ -404,6 +406,34 @@ export default function CursorACPAfterRoundHost() {
       off2?.();
     };
   }, []);
+
+  // 自动续聊：当最新流式文本出现 "Taking longer than expected..." 时，自动提交 "继续" 让 Cursor 接着跑
+  useEffect(() => {
+    const now = Date.now();
+    // 简单限频：避免多个并发事件在同一瞬间重复触发
+    if (now - autoContinueCooldownRef.current < 350) return;
+
+    const phrase = "Taking longer than expected";
+    const candidates = pending
+      .filter((p) => p.kind === "after-round")
+      .map((p) => p as PendingAfterRound)
+      .filter((p) => {
+        const t = (p.data.last_stream_text ?? "").trim();
+        if (!t) return false;
+        // 同一 request 只自动处理一次
+        if (autoContinuedRequestIdsRef.current.has(p.requestId)) return false;
+        return t.includes(phrase);
+      });
+
+    if (candidates.length === 0) return;
+    autoContinueCooldownRef.current = now;
+
+    // 优先处理最新（pending 是 append 到末尾）
+    const item = candidates[candidates.length - 1];
+    autoContinuedRequestIdsRef.current.add(item.requestId);
+    resolveAfterRoundCall(item.requestId, "继续", false, false);
+    setPending((prev) => prev.filter((p) => p.requestId !== item.requestId));
+  }, [pending]);
 
   // 任务去重/通知：基于 request_id 集合变化判断新增
   const seenRequestIdsRef = useRef<Set<string>>(new Set());
