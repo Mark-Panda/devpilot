@@ -1,9 +1,114 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { runCompareCurl } from "./useCurlCompareApi";
 import type { CompareCurlOutput } from "./useCurlCompareApi";
 import type { curl_compare } from "../../../wailsjs/go/models";
 
 type JSONDiffItem = curl_compare.JSONDiffItem;
+
+const URL_HISTORY_MAX = 20;
+
+function loadHistory(key: string): string[] {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveHistory(key: string, newUrl: string): string[] {
+  const existing = loadHistory(key);
+  const deduped = [newUrl, ...existing.filter((u) => u !== newUrl)];
+  const trimmed = deduped.slice(0, URL_HISTORY_MAX);
+  localStorage.setItem(key, JSON.stringify(trimmed));
+  return trimmed;
+}
+
+interface UrlInputWithHistoryProps {
+  id: string;
+  value: string;
+  onChange: (v: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  historyKey: string;
+}
+
+function UrlInputWithHistory({
+  id,
+  value,
+  onChange,
+  placeholder,
+  disabled,
+  historyKey,
+}: UrlInputWithHistoryProps) {
+  const [history, setHistory] = useState<string[]>(() => loadHistory(historyKey));
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const filtered = history.filter(
+    (u) => u.toLowerCase().includes(value.toLowerCase()) || value === ""
+  );
+
+  function handleSelect(url: string) {
+    onChange(url);
+    setOpen(false);
+  }
+
+  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    onChange(e.target.value);
+    setOpen(true);
+  }
+
+  function handleFocus() {
+    if (history.length > 0) setOpen(true);
+  }
+
+  function refreshHistory() {
+    setHistory(loadHistory(historyKey));
+  }
+
+  return (
+    <div className="curl-compare-url-wrap" ref={wrapRef}>
+      <input
+        id={id}
+        type="text"
+        placeholder={placeholder}
+        value={value}
+        onChange={handleInputChange}
+        onFocus={() => { refreshHistory(); handleFocus(); }}
+        disabled={disabled}
+        autoComplete="off"
+      />
+      {open && filtered.length > 0 && (
+        <ul className="curl-compare-url-dropdown" role="listbox">
+          {filtered.map((url) => (
+            <li
+              key={url}
+              role="option"
+              className="curl-compare-url-dropdown-item"
+              onMouseDown={() => handleSelect(url)}
+              title={url}
+            >
+              {url}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 function DiffKindBadge({ kind }: { kind: string }) {
   const label =
@@ -237,6 +342,9 @@ function ResultView({ result }: { result: CompareCurlOutput }) {
   );
 }
 
+const SOURCE_URL_KEY = "curl-compare:source-url-history";
+const TARGET_URL_KEY = "curl-compare:target-url-history";
+
 export default function CurlComparePage() {
   const [sourceURL, setSourceURL] = useState("");
   const [targetURL, setTargetURL] = useState("");
@@ -266,6 +374,8 @@ export default function CurlComparePage() {
         target_url: targetURL.trim(),
         curl_raw: curlRaw.trim(),
       });
+      saveHistory(SOURCE_URL_KEY, sourceURL.trim());
+      saveHistory(TARGET_URL_KEY, targetURL.trim());
       setResult(out);
     } catch (err) {
       setSubmitError(err instanceof Error ? err.message : "执行对比失败");
@@ -288,24 +398,24 @@ export default function CurlComparePage() {
       <form onSubmit={handleSubmit} className="curl-compare-form">
         <div className="curl-compare-field">
           <label htmlFor="curl-compare-source">来源 URL *</label>
-          <input
+          <UrlInputWithHistory
             id="curl-compare-source"
-            type="text"
-            placeholder="例如 https://api-source.example.com"
             value={sourceURL}
-            onChange={(e) => setSourceURL(e.target.value)}
+            onChange={setSourceURL}
+            placeholder="例如 https://api-source.example.com"
             disabled={loading}
+            historyKey={SOURCE_URL_KEY}
           />
         </div>
         <div className="curl-compare-field">
           <label htmlFor="curl-compare-target">目标 URL *</label>
-          <input
+          <UrlInputWithHistory
             id="curl-compare-target"
-            type="text"
-            placeholder="例如 https://api-target.example.com"
             value={targetURL}
-            onChange={(e) => setTargetURL(e.target.value)}
+            onChange={setTargetURL}
+            placeholder="例如 https://api-target.example.com"
             disabled={loading}
+            historyKey={TARGET_URL_KEY}
           />
         </div>
         <div className="curl-compare-field">

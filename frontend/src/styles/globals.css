@@ -5287,6 +5287,43 @@ body {
   max-width: 720px;
 }
 
+.curl-compare-url-wrap {
+  position: relative;
+}
+
+.curl-compare-url-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--studio-panel);
+  border: 1px solid var(--studio-border);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  list-style: none;
+  margin: 0;
+  padding: 4px 0;
+  z-index: 100;
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.curl-compare-url-dropdown-item {
+  padding: 8px 14px;
+  font-size: 13px;
+  color: var(--studio-text);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  transition: background 0.1s;
+}
+
+.curl-compare-url-dropdown-item:hover {
+  background: var(--studio-panel-2);
+  color: var(--studio-hot);
+}
+
 .curl-compare-field label {
   display: block;
   font-size: 13px;
