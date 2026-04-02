@@ -37,6 +37,7 @@ type cursorACPAgentConfig struct {
 	WorkDir                    string   `json:"workDir"`
 	WorkspaceID                string   `json:"workspaceId"`
 	WorkspacePath              string   `json:"workspacePath"`
+	Model                      string   `json:"model"`
 	SessionMode                string   `json:"sessionMode"`
 	PermissionOptionID         string   `json:"permissionOptionId"`
 	ClientName                 string   `json:"clientName"`
@@ -60,6 +61,7 @@ func initCursorACPAgentConfig(configuration types.Configuration, cfg *cursorACPA
 	cfg.AgentCommand = strings.TrimSpace(cfg.AgentCommand)
 	cfg.WorkspaceID = strings.TrimSpace(cfg.WorkspaceID)
 	cfg.WorkspacePath = strings.TrimSpace(cfg.WorkspacePath)
+	cfg.Model = strings.TrimSpace(cfg.Model)
 	if cfg.AgentCommand == "" {
 		cfg.AgentCommand = "agent"
 	}
@@ -205,6 +207,59 @@ func normalizeACPArgsForWorkspace(args []string, workspaceRoot string) []string 
 	return args
 }
 
+func removeModelArgs(args []string) []string {
+	if len(args) == 0 {
+		return nil
+	}
+	out := make([]string, 0, len(args))
+	for i := 0; i < len(args); i++ {
+		a := strings.TrimSpace(args[i])
+		if a == "--model" {
+			if i+1 < len(args) && !strings.HasPrefix(strings.TrimSpace(args[i+1]), "-") {
+				i++
+			}
+			continue
+		}
+		if strings.HasPrefix(a, "--model=") {
+			continue
+		}
+		out = append(out, args[i])
+	}
+	return out
+}
+
+func injectModelArg(args []string, model string) []string {
+	model = strings.TrimSpace(model)
+	if model == "" {
+		return args
+	}
+	pos := -1
+	for i, a := range args {
+		if strings.TrimSpace(a) == "acp" {
+			pos = i
+			break
+		}
+	}
+	if pos < 0 {
+		return append(append([]string{"--model", model}, args...), "acp")
+	}
+	out := make([]string, 0, len(args)+2)
+	out = append(out, args[:pos]...)
+	out = append(out, "--model", model)
+	out = append(out, args[pos:]...)
+	return out
+}
+
+// applyConfiguredACPModel：始终移除 args 中的 --model；仅当 model 配置非空时再注入一条，保证未配置时绝不会向 CLI 传 --model。
+func applyConfiguredACPModel(args []string, model string) []string {
+	args = removeModelArgs(args)
+	args = ensureACPSubcommand(args)
+	if strings.TrimSpace(model) == "" {
+		return args
+	}
+	return injectModelArg(args, strings.TrimSpace(model))
+}
+
 func resolveCursorACPCwd(cfg *cursorACPAgentConfig, msg types.RuleMsg, workspaceEnabled bool, workspaceRoot string, nodeType string) (string, error) {
 	if workspaceEnabled {
 		workspaceRoot = strings.TrimSpace(workspaceRoot)
@@ -273,6 +328,7 @@ func runCursorACPAgent(ctx types.RuleContext, msg types.RuleMsg, cfg *cursorACPA
 	if workspaceEnabled {
 		args = normalizeACPArgsForWorkspace(args, workspaceRoot)
 	}
+	args = applyConfiguredACPModel(args, cfg.Model)
 
 	acpCfg := cursoracp.Config{
 		SessionMode:        normalizeACPSessionMode(cfg.SessionMode),

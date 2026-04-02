@@ -27,6 +27,7 @@ type cursorACPConfig struct {
 	Args               []string `json:"args"`
 	TimeoutSec         int      `json:"timeoutSec"`
 	WorkDir            string   `json:"workDir"`
+	Model              string   `json:"model"`
 	SessionMode        string   `json:"sessionMode"`
 	PermissionOptionID string   `json:"permissionOptionId"`
 	ClientName         string   `json:"clientName"`
@@ -49,6 +50,7 @@ func (n *cursorACPNode) Init(_ types.Config, configuration types.Configuration) 
 	if n.cfg.TimeoutSec <= 0 {
 		n.cfg.TimeoutSec = 1800
 	}
+	n.cfg.Model = strings.TrimSpace(n.cfg.Model)
 	cursorACPVerboseLogDefault(configuration, &n.cfg.VerboseLog)
 	return nil
 }
@@ -81,10 +83,12 @@ func (n *cursorACPNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) {
 		agentCmd = "agent"
 	}
 
+	args := applyConfiguredACPModel(append([]string(nil), n.cfg.Args...), n.cfg.Model)
+
 	cfg := cursoracp.Config{
 		SessionMode:        normalizeACPSessionMode(n.cfg.SessionMode),
 		AgentCommand:       agentCmd,
-		Args:               n.cfg.Args,
+		Args:               args,
 		Env:                os.Environ(),
 		ClientName:         n.cfg.ClientName,
 		ClientVersion:      n.cfg.ClientVersion,

@@ -93,6 +93,7 @@ const cursorAcpDef: BlockTypeDef = {
         );
         config.appendField(new B.FieldTextInput("1800"), "TIMEOUT_SEC");
         config.appendField(new B.FieldTextInput(""), "WORK_DIR");
+        config.appendField(new B.FieldTextInput(""), "ACP_MODEL");
         config.appendField(
           new B.FieldDropdown(cursorAcpSessionModeOptions.map((o) => [o.label, o.value] as [string, string])),
           "ACP_SESSION_MODE",
@@ -155,6 +156,7 @@ const cursorAcpDef: BlockTypeDef = {
       args,
       timeoutSec,
       workDir: helpers.getFieldValue(block, "WORK_DIR"),
+      model: String(helpers.getFieldValue(block, "ACP_MODEL") ?? "").trim(),
       sessionMode,
       permissionOptionId: helpers.getFieldValue(block, "PERM_OPTION") || "allow-once",
       verboseLog: helpers.getBooleanField(block, "ACP_VERBOSE_LOG"),
@@ -173,6 +175,7 @@ const cursorAcpDef: BlockTypeDef = {
     block.setFieldValue(String(ts), "TIMEOUT_SEC");
 
     block.setFieldValue(String(c.workDir ?? ""), "WORK_DIR");
+    block.setFieldValue(String(c.model ?? ""), "ACP_MODEL");
 
     const sm = String(c.sessionMode ?? "agent").trim() || "agent";
     block.setFieldValue(["agent", "plan", "ask"].includes(sm) ? sm : "agent", "ACP_SESSION_MODE");

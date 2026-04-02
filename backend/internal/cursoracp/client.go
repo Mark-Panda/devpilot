@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -233,6 +234,7 @@ func (c *Client) Start(ctx context.Context) error {
 	c.cancel = cancel
 
 	args := c.cfg.args()
+	logSpawnArgv(c.cfg.agentCommand(), args)
 	c.cmd = exec.CommandContext(runCtx, c.cfg.agentCommand(), args...)
 	if c.cfg.Env != nil {
 		c.cmd.Env = c.cfg.Env
@@ -729,4 +731,18 @@ func logWorkspaceCwd(scope, cwd string) {
 		abs = a
 	}
 	log.Printf("[cursoracp] %s workspace cwd=%s", scope, abs)
+}
+
+// logSpawnArgv 打印即将 exec 的 Cursor agent 命令与参数（与 shell 类似的引号转义，便于核对）。
+func logSpawnArgv(cmd string, args []string) {
+	cmd = strings.TrimSpace(cmd)
+	if cmd == "" {
+		cmd = "agent"
+	}
+	parts := make([]string, 0, 1+len(args))
+	parts = append(parts, strconv.Quote(cmd))
+	for _, a := range args {
+		parts = append(parts, strconv.Quote(a))
+	}
+	log.Printf("[cursoracp] spawn %s", strings.Join(parts, " "))
 }

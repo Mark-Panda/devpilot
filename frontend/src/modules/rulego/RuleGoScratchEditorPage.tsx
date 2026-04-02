@@ -589,6 +589,7 @@ function BlockConfigModal({
       next.ACP_TIMEOUT_PRESET = get("ACP_TIMEOUT_PRESET") || "1800";
       next.TIMEOUT_SEC = get("TIMEOUT_SEC") || "1800";
       next.WORK_DIR = get("WORK_DIR");
+      next.ACP_MODEL = get("ACP_MODEL");
       next.ACP_SESSION_MODE = get("ACP_SESSION_MODE") || "agent";
       next.PERM_OPTION = get("PERM_OPTION") || "allow-once";
       next.ACP_ARGS_PRESET = get("ACP_ARGS_PRESET") || "default";
@@ -601,6 +602,7 @@ function BlockConfigModal({
       next.ACP_TIMEOUT_PRESET = get("ACP_TIMEOUT_PRESET") || "3600";
       next.TIMEOUT_SEC = get("TIMEOUT_SEC") || "3600";
       next.WORK_DIR = get("WORK_DIR");
+      next.ACP_MODEL = get("ACP_MODEL");
       next.ACP_SESSION_MODE = get("ACP_SESSION_MODE") || "agent";
       next.PERM_OPTION = get("PERM_OPTION") || "allow-once";
       next.ACP_ARGS_PRESET = get("ACP_ARGS_PRESET") || "default";
@@ -625,6 +627,7 @@ function BlockConfigModal({
       next.ACP_TIMEOUT_PRESET = get("ACP_TIMEOUT_PRESET") || "3600";
       next.TIMEOUT_SEC = get("TIMEOUT_SEC") || "3600";
       next.WORK_DIR = get("WORK_DIR");
+      next.ACP_MODEL = get("ACP_MODEL");
       next.ACP_SESSION_MODE = get("ACP_SESSION_MODE") || "agent";
       next.PERM_OPTION = get("PERM_OPTION") || "allow-once";
       next.ACP_ARGS_PRESET = get("ACP_ARGS_PRESET") || "default";
@@ -2302,6 +2305,21 @@ function BlockConfigModal({
                 </option>
               ))}
             </select>
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>模型 (model，可选)</span>
+            <input
+              value={String(form.ACP_MODEL ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, ACP_MODEL: e.target.value }))}
+              placeholder="留空则使用 Cursor CLI 默认，不向进程传 --model"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+            <small className="form-hint" style={{ display: "block", marginTop: 6 }}>
+              对应 CLI <code>--model</code>，例如 <code>gpt-5</code>、<code>sonnet-4</code>。填写后仅使用此处模型名；留空则 CLI 使用默认且<strong>不会</strong>传{" "}
+              <code>--model</code>（「自定义 args」里的 <code>--model</code> 也会被移除）。
+            </small>
           </label>
           <label className="form-field" style={{ gridColumn: "1 / -1" }}>
             <span>CLI 附加参数（须含 acp）</span>
