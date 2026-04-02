@@ -6,6 +6,7 @@ import { ModelManagementPage } from "./modules/model-management";
 import {
   RuleGoPage,
   RuleGoScratchEditorPage,
+  RuleGoReactFlowEditorPage,
   RuleGoLogsPage,
   RuleGoLogDetailPage,
   RuleGoExecuteRulePage,
@@ -38,6 +39,7 @@ export default function App() {
           <Route path="/rulego" element={<RuleGoPage />} />
           <Route path="/rulego/editor" element={<RuleGoScratchEditorPage />} />
           <Route path="/rulego/editor/:id" element={<RuleGoScratchEditorPage />} />
+          <Route path="/rulego/flow/:id" element={<RuleGoReactFlowEditorPage />} />
           <Route path="/rulego/execute" element={<RuleGoExecuteRulePage />} />
           <Route path="/rulego/logs" element={<RuleGoLogsPage />} />
           <Route path="/rulego/logs/:id" element={<RuleGoLogDetailPage />} />

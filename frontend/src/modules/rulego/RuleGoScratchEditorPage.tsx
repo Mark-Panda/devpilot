@@ -6092,6 +6092,19 @@ export default function RuleGoScratchEditorPage() {
           >
             测试
           </button>
+          {id && (
+            <button
+              className="rulego-toolbar-btn"
+              type="button"
+              title="切换到流程图编辑器"
+              onClick={() => {
+                if (isDirty && !confirm("有未保存的修改，切换后将丢失。是否继续？")) return;
+                navigate(`/rulego/flow/${id}`);
+              }}
+            >
+              流程图 ↗
+            </button>
+          )}
         </div>
         <div className="rulego-editor-view-controls">
           <button

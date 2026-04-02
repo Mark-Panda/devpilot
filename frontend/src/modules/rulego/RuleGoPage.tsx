@@ -158,7 +158,14 @@ export default function RuleGoPage() {
                     type="button"
                     onClick={() => navigate(`/rulego/editor/${rule.id}`)}
                   >
-                    可视化
+                    积木
+                  </button>
+                  <button
+                    className="text-button"
+                    type="button"
+                    onClick={() => navigate(`/rulego/flow/${rule.id}`)}
+                  >
+                    流程图
                   </button>
                   <button
                     className="text-button"
