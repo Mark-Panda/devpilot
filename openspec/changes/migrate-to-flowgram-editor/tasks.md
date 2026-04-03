@@ -793,6 +793,36 @@ export default function RuleGoFreeEditorPage() {
 
 ---
 
+### T6.5: 节点配置统一弹窗（与 Blockly「块属性」一致）✅
+
+**任务描述**：
+- 可配置项在 **弹窗** 中编辑，不再使用右侧栏；交互对齐 Blockly「选中积木 → 编辑属性」：工具栏 **「节点配置」**（需单选）或 **双击** 画布节点打开。
+- 画布节点卡片改为 **紧凑展示**（标题 + 提示文案），完整表单在弹窗中；内部哨兵节点（`nodePanelVisible: false`）不打开配置。
+- 结构化表单与 Blockly 字段一致：通过注册表 **`renderConfigSidebar`** 提供（与旧侧栏共用类型 `RuleGoConfigSidebarRenderProps`）；未提供表单的类型在弹窗中编辑 **JSON**（与此前侧栏兜底一致）。
+- **data 合并**：`mergeRuleGoNodeData` 对 `params` / `headers` / `query` 等嵌套对象做一层合并，避免覆盖。
+
+**交付物**：
+- `frontend/src/modules/rulego-free/components/RuleGoNodeConfigModal.tsx`
+- `frontend/src/modules/rulego-free/context/RuleGoNodeConfigModalContext.tsx`
+- `frontend/src/modules/rulego-free/utils/mergeRuleGoNodeData.ts`
+- `frontend/src/modules/rulego-free/components/base-node/RuleGoBaseNode.tsx`（紧凑卡片）
+- `frontend/src/modules/rulego-free/nodes/llm/LlmConfigForm.tsx` + `LlmNodeRender` 委托（LLM 已接 `renderConfigSidebar`）
+- `RuleGoFreeEditorPage.tsx`：移除右侧 `RuleGoConfigSidebar` 挂载，改为 `RuleGoNodeConfigModalProvider` + `RuleGoNodeConfigModal`
+
+**后续迭代**（未列入本任务验收）：
+- 将其余节点的 `useNodeRender` 内联表单逐步抽取为 `renderConfigSidebar`，直至与 Blockly `BlockConfigModal` 分支全覆盖。
+
+**验收标准**：
+- [x] 主编辑区无右侧配置栏；配置在弹窗完成
+- [x] 工具栏「节点配置」与双击节点可打开弹窗
+- [x] LLM、ForLoop 等已注册 `renderConfigSidebar` 的类型在弹窗中为结构化表单；其余为 JSON
+
+**依赖**：T6.4
+
+**预估时间**：1 天
+
+---
+
 ## Phase 7: 完善 DSL 适配层（Week 7）
 
 ### T7.1: 完善多分支节点 DSL 处理 ✅
@@ -912,7 +942,7 @@ export default function RuleGoFreeEditorPage() {
 
 ---
 
-### T8.2: Agent 规划功能集成
+### T8.2: Agent 规划功能集成 ✅
 
 **任务描述**：
 迁移 Agent 规划功能到新编辑器。
@@ -923,9 +953,13 @@ export default function RuleGoFreeEditorPage() {
 - 应用到画布
 
 **验收标准**：
-- [ ] Agent 规划功能正常
-- [ ] 生成的节点能正确添加到画布
-- [ ] 与旧编辑器行为一致
+- [x] Agent 规划功能正常（`RuleGoFreeEditorPage` + `RuleGoDslModals`：`generateRuleGoPlan` / 模型配置 / 追问 / 预览勾选）
+- [x] 生成的节点能正确添加到画布（`applyAgentSelectionsToDsl` + `loadRuleGoDsl`）
+- [x] 与旧编辑器行为一致（同一 Wails `GenerateRuleGoPlan`、同一 `agentPlanner` 合并语义）
+
+**交付物**：
+- `frontend/src/modules/rulego-free/RuleGoFreeEditorPage.tsx`（Agent 状态与调用）
+- `frontend/src/modules/rulego-free/components/RuleGoDslModals.tsx`（规划 UI）
 
 **依赖**：T8.1
 

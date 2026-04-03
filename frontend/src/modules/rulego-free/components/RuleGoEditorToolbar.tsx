@@ -4,8 +4,11 @@
 
 import React, { useCallback, useEffect, useState } from 'react';
 import { Button, Input } from '@douyinfe/semi-ui';
+import { useListenEvents, useService, WorkflowSelectService } from '@flowgram.ai/free-layout-core';
 import { useClientContext } from '@flowgram.ai/free-layout-editor';
 import type { FreeLayoutPluginContext } from '@flowgram.ai/free-layout-editor';
+
+import { useRuleGoNodeConfigModal } from '../context/RuleGoNodeConfigModalContext';
 
 export interface RuleGoEditorToolbarProps {
   ruleName: string;
@@ -31,8 +34,12 @@ export function RuleGoEditorToolbar({
   onSave,
 }: RuleGoEditorToolbarProps) {
   const ctx = useClientContext() as FreeLayoutPluginContext;
+  const select = useService(WorkflowSelectService);
+  const { openNodeConfig } = useRuleGoNodeConfigModal();
+  useListenEvents(select.onSelectionChanged);
   const [canUndo, setCanUndo] = useState(false);
   const [canRedo, setCanRedo] = useState(false);
+  const oneNodeSelected = (select.selectedNodes?.length ?? 0) === 1;
 
   const refreshHistory = useCallback(() => {
     const h = ctx?.history;
@@ -108,6 +115,9 @@ export function RuleGoEditorToolbar({
         </Button>
         <Button size="small" onClick={onOpenExportModal}>
           导出 DSL
+        </Button>
+        <Button size="small" type="tertiary" disabled={!oneNodeSelected} onClick={openNodeConfig}>
+          节点配置
         </Button>
         <Button size="small" theme="solid" type="tertiary" onClick={onOpenAgentModal}>
           Agent 规划

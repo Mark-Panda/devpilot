@@ -12,6 +12,7 @@ import { createFreeNodePanelPlugin } from '@flowgram.ai/free-node-panel-plugin';
 import type { RuleGoNodeRegistry } from '../types';
 import { RuleGoBaseNode } from '../components/base-node';
 import { RuleGoFreeNodePanelRender } from '../components/RuleGoFreeNodePanelRender';
+import { getWorkflowNodeFrontendType } from '../utils/getWorkflowNodeFrontendType';
 
 export interface UseRuleGoEditorPropsOptions {
   initialData: any;
@@ -96,8 +97,9 @@ export function useRuleGoEditorProps(
       canDeleteLine: () => true,
 
       canDeleteNode: (_ctx: any, node: any) => {
-        // BlockStart/BlockEnd 不可删除
-        if (node.type === 'block-start' || node.type === 'block-end') {
+        // BlockStart/BlockEnd 不可删除（运行时 node.type 可能为 FlowNodeEntity，需用 toJSON().type）
+        const t = getWorkflowNodeFrontendType(node);
+        if (t === 'block-start' || t === 'block-end') {
           return false;
         }
         return true;
@@ -112,7 +114,8 @@ export function useRuleGoEditorProps(
         if (!dropNode) {
           return true;
         }
-        const targetRegistry = nodeRegistries.find((r) => r.type === dropNode.type);
+        const dropType = getWorkflowNodeFrontendType(dropNode);
+        const targetRegistry = nodeRegistries.find((r) => r.type === dropType);
         if (!targetRegistry?.meta.isContainer) {
           return false;
         }

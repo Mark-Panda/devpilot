@@ -6,7 +6,7 @@ import type { FlowNodeRegistry } from '@flowgram.ai/editor';
 import type { FC } from 'react';
 import type { RuleGoCategory } from '../nodes/constants';
 
-/** 右侧配置侧栏：表单模式（替代 JSON 文本） */
+/** 节点配置表单（原右侧栏；现用于「节点配置」弹窗，与 Blockly 块属性字段对齐） */
 export type RuleGoConfigSidebarRenderProps = {
   data: Record<string, unknown>;
   /** 与当前 data 合并后写回节点 */
@@ -53,7 +53,7 @@ export interface RuleGoNodeRegistry {
   };
   onAdd?: () => any;
   formMeta?: FormMeta;
-  /** 若提供，侧栏用表单编辑该类型 data，而非原始 JSON */
+  /** 若提供，节点配置弹窗用结构化表单编辑该类型 data；未提供时弹窗为 JSON（与旧侧栏行为一致） */
   renderConfigSidebar?: FC<RuleGoConfigSidebarRenderProps>;
 
   // RuleGo 扩展字段

@@ -5,6 +5,7 @@
 import React from 'react';
 import type { RuleGoNodeRegistry } from '../../types';
 import { ActionNodeType } from '../constants';
+import { LlmConfigForm } from './LlmConfigForm';
 import { LlmNodeRender } from './LlmNodeRender';
 import type { LlmConfig } from './types';
 
@@ -96,6 +97,8 @@ export const LlmRegistry: RuleGoNodeRegistry = {
       enabled_skill_names: [],
     } satisfies LlmConfig,
   }),
+  /** 与 Blockly「块属性」、节点配置弹窗共用同一套表单 */
+  renderConfigSidebar: LlmConfigForm,
   formMeta,
   serializeConfiguration: (data) => toBackendConfiguration(data as LlmConfig),
   deserializeConfiguration: (config) => ({ ...config }) as Record<string, unknown>,

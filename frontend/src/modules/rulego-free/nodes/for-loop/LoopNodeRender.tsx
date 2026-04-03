@@ -36,7 +36,7 @@ export function LoopNodeRender() {
     <LoopContainerStyle
       className={`rulego-free-node-for-loop ${selected ? 'selected' : ''} ${invalid ? 'error' : ''}`}
     >
-      <LoopHeader>
+      <LoopHeader className="rulego-for-loop-header">
         <LoopHeaderIcon>🔁</LoopHeaderIcon>
         <LoopHeaderInfo>
           <LoopTitle>{title}</LoopTitle>
@@ -55,7 +55,9 @@ export function LoopNodeRender() {
       </LoopBody>
 
       {invalid && (
-        <LoopErrorIndicator title="配置有误，请检查">⚠️</LoopErrorIndicator>
+        <LoopErrorIndicator className="rulego-for-loop-error" title="配置有误，请检查">
+          ⚠️
+        </LoopErrorIndicator>
       )}
     </LoopContainerStyle>
   );

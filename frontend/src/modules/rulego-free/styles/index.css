@@ -34,6 +34,30 @@
   min-height: 168px;
 }
 
+/*
+ * 内部子节点与 for 容器在 DOM 上是兄弟（各自 gedit-flow-activity-node），叠在子画布区域上。
+ * WorkflowNodeRenderer 的根 div（.rulego-base-node，draggable）仍包裹整块表单；仅把 SubCanvas
+ * 设为 pointer-events:none 不够，该根 div 默认仍会命中并挡住下方同坐标处的子节点。
+ * 对「含 for 容器」的节点根关闭命中，事件穿透到 z-index 更高的内部节点；头部 / 错误角标 /
+ * SubCanvasTips 再单独恢复可点（连线端口在 Fragment 另一侧，不受影响）。
+ */
+.rulego-free-editor .rulego-base-node:has(.rulego-free-node-for-loop) {
+  pointer-events: none !important;
+}
+
+.rulego-free-editor .rulego-free-node-for-loop .rulego-for-loop-header {
+  pointer-events: auto !important;
+}
+
+.rulego-free-editor .rulego-free-node-for-loop .rulego-for-loop-error {
+  pointer-events: auto !important;
+}
+
+.rulego-free-editor .rulego-free-node-for-loop .sub-canvas-tips,
+.rulego-free-editor .rulego-free-node-for-loop .sub-canvas-tips * {
+  pointer-events: auto !important;
+}
+
 /* Semi Design 覆盖 */
 .semi-input,
 .semi-select,

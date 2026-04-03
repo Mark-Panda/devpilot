@@ -15,15 +15,21 @@ import '@flowgram.ai/free-layout-editor/index.css';
 import './styles/index.css';
 
 import { useRuleGoRules } from '../rulego/useRuleGoRules';
+import { generateRuleGoPlan, type GenerateRuleGoPlanResult } from '../rulego/useRuleGoApi';
+import { applyAgentSelectionsToDsl, buildAgentPreviewItems, type AgentPreviewItem } from '../rulego/agentPlanner';
+import { getEnabledFromDefinition, isSubRuleChain, summarizeRuleNodesForAgent } from '../rulego/dslUtils';
+import { listModelConfigs } from '../model-management/useModelConfigApi';
+import type { ModelConfig } from '../model-management/types';
 import { useRuleGoEditorProps } from './hooks/useRuleGoEditorProps';
 import { rulegoNodeRegistries } from './nodes';
 import { buildRuleGoDsl, formatDslError } from './dsl/buildRuleGoDsl';
 import { loadRuleGoDsl } from './dsl/loadRuleGoDsl';
 import type { RuleGoDsl } from './types/dsl';
-import { RuleGoConfigSidebar } from './components/RuleGoConfigSidebar';
 import { RuleGoDslModals } from './components/RuleGoDslModals';
 import { RuleGoEditorToolbar } from './components/RuleGoEditorToolbar';
+import { RuleGoNodeConfigModal } from './components/RuleGoNodeConfigModal';
 import { RuleGoNodePanel } from './components/RuleGoNodePanel';
+import { RuleGoNodeConfigModalProvider } from './context/RuleGoNodeConfigModalContext';
 
 /**
  * 主编辑器组件
@@ -60,6 +66,18 @@ export default function RuleGoFreeEditorPage() {
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [agentModalOpen, setAgentModalOpen] = useState(false);
   const [exportText, setExportText] = useState('');
+
+  const [agentRequirement, setAgentRequirement] = useState('');
+  const [agentLoading, setAgentLoading] = useState(false);
+  const [agentPlanError, setAgentPlanError] = useState<string | null>(null);
+  const [agentPlanResult, setAgentPlanResult] = useState<GenerateRuleGoPlanResult | null>(null);
+  const [agentPreviewItems, setAgentPreviewItems] = useState<AgentPreviewItem[]>([]);
+  const [agentSelectedIds, setAgentSelectedIds] = useState<Set<string>>(new Set());
+  const [agentQuestionAnswers, setAgentQuestionAnswers] = useState<Record<string, string>>({});
+  const [agentConversationHistory, setAgentConversationHistory] = useState<Array<{ role: string; content: string }>>([]);
+  const [agentModelConfigs, setAgentModelConfigs] = useState<ModelConfig[]>([]);
+  const [agentModelConfigId, setAgentModelConfigId] = useState('');
+  const [agentModelName, setAgentModelName] = useState('');
 
   // 编辑器上下文引用
   const editorContextRef = useRef<FreeLayoutPluginContext | null>(null);
@@ -185,6 +203,58 @@ export default function RuleGoFreeEditorPage() {
 
   const ruleNotFound =
     Boolean(routeRuleId) && !rulesLoading && !editingRule;
+
+  const agentSupportedBackendTypes = useMemo(
+    () =>
+      [
+        ...new Set(
+          rulegoNodeRegistries
+            .filter((r) => !String(r.backendNodeType).startsWith('internal:'))
+            .map((r) => r.backendNodeType)
+        ),
+      ],
+    []
+  );
+
+  const agentSelectedConfig = useMemo(
+    () => agentModelConfigs.find((cfg) => cfg.id === agentModelConfigId) ?? null,
+    [agentModelConfigs, agentModelConfigId]
+  );
+
+  const agentAvailableSubRuleChains = useMemo(
+    () =>
+      rules
+        .filter((r) => isSubRuleChain(r.definition ?? '') && getEnabledFromDefinition(r.definition ?? ''))
+        .filter((r) => r.id !== routeRuleId)
+        .map((r) => ({
+          id: r.id,
+          name: r.name,
+          description: String(r.description ?? '').trim(),
+          node_summary: summarizeRuleNodesForAgent(r.definition ?? ''),
+        })),
+    [rules, routeRuleId]
+  );
+
+  useEffect(() => {
+    if (!agentModalOpen) return;
+    void (async () => {
+      try {
+        const list = await listModelConfigs();
+        setAgentModelConfigs(list);
+        if (!agentModelConfigId && list.length > 0) {
+          setAgentModelConfigId(list[0].id);
+          setAgentModelName(list[0].models?.[0] ?? '');
+        } else if (agentModelConfigId) {
+          const current = list.find((c) => c.id === agentModelConfigId);
+          if (current && current.models.length > 0 && !current.models.includes(agentModelName)) {
+            setAgentModelName(current.models[0]);
+          }
+        }
+      } catch (err) {
+        setAgentPlanError(err instanceof Error ? err.message : String(err));
+      }
+    })();
+  }, [agentModalOpen, agentModelConfigId, agentModelName]);
 
   // 编辑器配置
   const onEditorContentChange = useCallback(
@@ -313,6 +383,134 @@ export default function RuleGoFreeEditorPage() {
     }
   }, [ruleName, debugMode, root, enabled]);
 
+  const handleAgentGenerate = useCallback(
+    async (opts?: { promptText?: string }) => {
+      const prompt = (opts?.promptText ?? agentRequirement).trim();
+      if (!prompt) {
+        setAgentPlanError('请先输入需求描述');
+        return;
+      }
+      const ctx = editorContextRef.current as FreeLayoutPluginContext | null;
+      if (!ctx) {
+        setAgentPlanError('编辑器未就绪');
+        return;
+      }
+      if (!agentSelectedConfig || !agentModelName.trim()) {
+        setAgentPlanError('请选择可用模型配置与模型后再生成预览');
+        return;
+      }
+      setAgentLoading(true);
+      setAgentPlanError(null);
+      try {
+        const currentDsl = buildRuleGoDsl(ctx, ruleName, { debugMode, root, enabled });
+        const plan = await generateRuleGoPlan({
+          prompt,
+          current_dsl: currentDsl || '',
+          node_types: agentSupportedBackendTypes,
+          available_sub_rule_chains: agentAvailableSubRuleChains,
+          conversation_history: agentConversationHistory,
+          base_url: agentSelectedConfig.baseUrl,
+          api_key: agentSelectedConfig.apiKey,
+          model: agentModelName.trim(),
+          fallback_models: agentSelectedConfig.models.filter((m) => m !== agentModelName.trim()),
+        });
+        setAgentPlanResult(plan);
+        setAgentQuestionAnswers((prev) => {
+          const qs = plan.questions ?? [];
+          const next: Record<string, string> = {};
+          for (const q of qs) {
+            if (Object.prototype.hasOwnProperty.call(prev, q)) next[q] = prev[q]!;
+          }
+          return next;
+        });
+        setAgentConversationHistory((prev) => [
+          ...prev,
+          { role: 'user', content: prompt },
+          { role: 'assistant', content: plan.thought?.trim() || '已分析需求并返回规划结果。' },
+        ]);
+        const preview = buildAgentPreviewItems(plan, new Set(agentSupportedBackendTypes));
+        setAgentPreviewItems(preview);
+        const defaults = preview.filter((item) => item.valid && item.confidence >= 0.6).map((item) => item.id);
+        setAgentSelectedIds(new Set(defaults));
+      } catch (err) {
+        setAgentPlanError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setAgentLoading(false);
+      }
+    },
+    [
+      agentRequirement,
+      agentSelectedConfig,
+      agentModelName,
+      agentSupportedBackendTypes,
+      agentAvailableSubRuleChains,
+      agentConversationHistory,
+      ruleName,
+      debugMode,
+      root,
+      enabled,
+    ]
+  );
+
+  const handleSubmitAgentAnswers = useCallback(async () => {
+    if (!agentPlanResult?.questions?.length) return;
+    const qaPairs = agentPlanResult.questions
+      .map((q) => {
+        const a = String(agentQuestionAnswers[q] ?? '').trim();
+        if (!a) return '';
+        return `问题: ${q}\n回答: ${a}`;
+      })
+      .filter(Boolean);
+    if (qaPairs.length === 0) {
+      setAgentPlanError('请至少回答一个 Agent 追问');
+      return;
+    }
+    const mergedPrompt = [agentRequirement.trim(), ...qaPairs].filter(Boolean).join('\n\n');
+    setAgentRequirement(mergedPrompt);
+    await handleAgentGenerate({ promptText: mergedPrompt });
+  }, [agentPlanResult, agentQuestionAnswers, agentRequirement, handleAgentGenerate]);
+
+  const handleAgentApply = useCallback(() => {
+    const ctx = editorContextRef.current as FreeLayoutPluginContext | null;
+    if (!ctx) {
+      setAgentPlanError('编辑器未就绪');
+      return;
+    }
+    try {
+      const currentDslText = buildRuleGoDsl(ctx, ruleName, { debugMode, root, enabled });
+      const merged = applyAgentSelectionsToDsl(currentDslText, agentPreviewItems, agentSelectedIds) as RuleGoDsl;
+      loadRuleGoDsl(merged, ctx);
+      const chain = merged.ruleChain;
+      if (chain && typeof chain === 'object') {
+        setDebugMode(Boolean(chain.debugMode));
+        setRoot(chain.root !== false);
+        setEnabled(typeof chain.disabled === 'boolean' ? !chain.disabled : true);
+      }
+      const nm = merged.ruleChain?.name?.trim();
+      if (nm) setRuleName(nm);
+      setCurrentDsl(JSON.stringify(merged, null, 2));
+      setUnsaved(true);
+      setAgentModalOpen(false);
+      setAgentPlanResult(null);
+      setAgentPreviewItems([]);
+      setAgentSelectedIds(new Set());
+      setAgentQuestionAnswers({});
+      setAgentPlanError(null);
+      setAgentConversationHistory([]);
+    } catch (e: unknown) {
+      setAgentPlanError(formatDslError(e));
+    }
+  }, [ruleName, debugMode, root, enabled, agentPreviewItems, agentSelectedIds]);
+
+  const toggleAgentPreviewId = useCallback((id: string, checked: boolean) => {
+    setAgentSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (checked) next.add(id);
+      else next.delete(id);
+      return next;
+    });
+  }, []);
+
   const handleSave = async () => {
     const ctx = editorContextRef.current;
     if (!ctx) {
@@ -389,6 +587,22 @@ export default function RuleGoFreeEditorPage() {
     }
   };
 
+  const agentQuestionTotal = agentPlanResult?.questions?.length ?? 0;
+  const agentQuestionAnswered = (agentPlanResult?.questions ?? []).filter(
+    (q) => String(agentQuestionAnswers[q] ?? '').trim().length > 0
+  ).length;
+  const agentAllQuestionsAnswered = agentQuestionTotal > 0 && agentQuestionAnswered === agentQuestionTotal;
+  const agentApplyBlockedByClarification =
+    agentPlanResult?.need_clarification === true && agentQuestionTotal > 0 && !agentAllQuestionsAnswered;
+  const agentHasApplicableSelection = agentPreviewItems.some((i) => i.valid && agentSelectedIds.has(i.id));
+  const agentApplyDisabled = agentApplyBlockedByClarification || !agentHasApplicableSelection;
+  const agentApplyDisabledTitle = agentApplyBlockedByClarification
+    ? '请先回答 Agent 追问后再应用'
+    : !agentHasApplicableSelection
+      ? '请至少勾选一项有效预览'
+      : undefined;
+  const agentGenerateDisabled = agentLoading || !agentSelectedConfig || !agentModelName.trim();
+
   return (
     <div
       className="rulego-free-page"
@@ -445,41 +659,79 @@ export default function RuleGoFreeEditorPage() {
       ) : null}
 
       <FreeLayoutEditorProvider key={routeRuleId ?? (isDemoBlankCanvas ? 'demo' : 'new')} {...editorProps}>
-        <RuleGoEditorToolbar
-          ruleName={ruleName}
-          onRuleNameChange={setRuleName}
-          unsaved={unsaved}
-          loading={loading}
-          onImportFile={() => importFileRef.current?.click()}
-          onOpenImportModal={() => setImportModalOpen(true)}
-          onOpenExportModal={() => {
-            refreshExportText();
-            setExportModalOpen(true);
-          }}
-          onOpenAgentModal={() => setAgentModalOpen(true)}
-          onSave={handleSave}
-        />
-        <div
-          className="rulego-free-editor-main"
-          style={{ display: 'flex', flex: 1, minHeight: 0, position: 'relative' }}
-        >
-          <RuleGoNodePanel nodeRegistries={rulegoNodeRegistries} />
-          <div className="rulego-free-editor-canvas" style={{ flex: 1, minWidth: 0, position: 'relative' }}>
-            <EditorRenderer className="rulego-free-editor" />
+        <RuleGoNodeConfigModalProvider>
+          <RuleGoEditorToolbar
+            ruleName={ruleName}
+            onRuleNameChange={setRuleName}
+            unsaved={unsaved}
+            loading={loading}
+            onImportFile={() => importFileRef.current?.click()}
+            onOpenImportModal={() => setImportModalOpen(true)}
+            onOpenExportModal={() => {
+              refreshExportText();
+              setExportModalOpen(true);
+            }}
+            onOpenAgentModal={() => setAgentModalOpen(true)}
+            onSave={handleSave}
+          />
+          <div
+            className="rulego-free-editor-main"
+            style={{ display: 'flex', flex: 1, minHeight: 0, position: 'relative' }}
+          >
+            <RuleGoNodePanel nodeRegistries={rulegoNodeRegistries} />
+            <div className="rulego-free-editor-canvas" style={{ flex: 1, minWidth: 0, position: 'relative' }}>
+              <EditorRenderer className="rulego-free-editor" />
+            </div>
           </div>
-          <RuleGoConfigSidebar />
-        </div>
-        <RuleGoDslModals
+          <RuleGoNodeConfigModal />
+          <RuleGoDslModals
           importOpen={importModalOpen}
           exportOpen={exportModalOpen}
           agentOpen={agentModalOpen}
           onImportOpenChange={setImportModalOpen}
           onExportOpenChange={setExportModalOpen}
-          onAgentOpenChange={setAgentModalOpen}
+          onAgentOpenChange={(open) => {
+            setAgentModalOpen(open);
+            if (!open) {
+              setAgentRequirement('');
+              setAgentPlanError(null);
+              setAgentPlanResult(null);
+              setAgentPreviewItems([]);
+              setAgentSelectedIds(new Set());
+              setAgentQuestionAnswers({});
+              setAgentConversationHistory([]);
+            }
+          }}
           exportText={exportText}
           onApplyImport={applyLoadedDsl}
           onError={setError}
+          agentPlan={{
+            prompt: agentRequirement,
+            onPromptChange: setAgentRequirement,
+            loading: agentLoading,
+            error: agentPlanError,
+            modelConfigs: agentModelConfigs,
+            modelConfigId: agentModelConfigId,
+            onModelConfigIdChange: setAgentModelConfigId,
+            modelName: agentModelName,
+            onModelNameChange: setAgentModelName,
+            planResult: agentPlanResult,
+            previewItems: agentPreviewItems,
+            selectedIds: agentSelectedIds,
+            onTogglePreviewId: toggleAgentPreviewId,
+            questionAnswers: agentQuestionAnswers,
+            onQuestionAnswerChange: (q, a) => {
+              setAgentQuestionAnswers((prev) => ({ ...prev, [q]: a }));
+            },
+            onGenerate: () => void handleAgentGenerate(),
+            onApply: handleAgentApply,
+            onSubmitAnswers: () => void handleSubmitAgentAnswers(),
+            generateDisabled: agentGenerateDisabled,
+            applyDisabled: agentApplyDisabled,
+            applyDisabledTitle: agentApplyDisabledTitle,
+          }}
         />
+        </RuleGoNodeConfigModalProvider>
       </FreeLayoutEditorProvider>
     </div>
   );

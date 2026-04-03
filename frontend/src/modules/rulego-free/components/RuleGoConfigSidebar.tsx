@@ -1,5 +1,8 @@
 /**
- * T6.3 右侧配置侧栏：选中节点时编辑 data（经 FlowNodeEntity.updateExtInfo 写回）
+ * T6.3 右侧配置侧栏（历史实现）
+ *
+ * 节点配置已迁至 `RuleGoNodeConfigModal` + 工具栏「节点配置」/ 双击节点。
+ * 本组件保留供需要时复用；主编辑器页面不再挂载。
  */
 
 import React, { useCallback, useEffect, useState } from 'react';
@@ -7,6 +10,7 @@ import { Banner, Button, TextArea } from '@douyinfe/semi-ui';
 import { useListenEvents, useService, WorkflowNodeEntity, WorkflowSelectService } from '@flowgram.ai/free-layout-core';
 
 import { getNodeRegistry } from '../nodes/registry';
+import { getWorkflowNodeFrontendType } from '../utils/getWorkflowNodeFrontendType';
 
 export function RuleGoConfigSidebar() {
   const select = useService(WorkflowSelectService);
@@ -47,7 +51,7 @@ export function RuleGoConfigSidebar() {
     }
   }, [node, text]);
 
-  const reg = node ? getNodeRegistry(String(node.type)) : undefined;
+  const reg = node ? getNodeRegistry(getWorkflowNodeFrontendType(node)) : undefined;
 
   const applyDataPatch = useCallback(
     (patch: Record<string, unknown>) => {
@@ -110,9 +114,9 @@ export function RuleGoConfigSidebar() {
     >
       <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--panel-border)' }}>
         <div style={{ fontSize: 12, color: 'var(--semi-color-text-2)' }}>选中节点</div>
-        <div style={{ fontWeight: 600, fontSize: 14, marginTop: 4 }}>{reg?.info.description ?? String(node.type)}</div>
+        <div style={{ fontWeight: 600, fontSize: 14, marginTop: 4 }}>{reg?.info.description ?? getWorkflowNodeFrontendType(node)}</div>
         <div style={{ fontSize: 11, color: 'var(--semi-color-text-2)', marginTop: 4, wordBreak: 'break-all' }}>
-          {String(node.type)} · {reg?.backendNodeType ?? ''}
+          {getWorkflowNodeFrontendType(node)} · {reg?.backendNodeType ?? ''}
         </div>
       </div>
       <div style={{ flex: 1, padding: 10, display: 'flex', flexDirection: 'column', gap: 8, minHeight: 0, overflow: 'auto' }}>
