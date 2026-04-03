@@ -1,0 +1,112 @@
+/**
+ * CSS 变量定义
+ * 
+ * 基于 Flowgram demo-free-layout 的设计系统
+ */
+
+:root {
+  /* ===== 节点分类颜色（与原 Blockly 主题一致）===== */
+  --rulego-trigger: #ef4444;
+  --rulego-trigger-light: rgba(239, 68, 68, 0.1);
+  
+  --rulego-action: #3b82f6;
+  --rulego-action-light: rgba(59, 130, 246, 0.1);
+  
+  --rulego-condition: #14b8a6;
+  --rulego-condition-light: rgba(20, 184, 166, 0.1);
+  
+  --rulego-data: #f59e0b;
+  --rulego-data-light: rgba(245, 158, 11, 0.1);
+  
+  --rulego-flow: #8b5cf6;
+  --rulego-flow-light: rgba(139, 92, 246, 0.1);
+  
+  --rulego-db: #0d9488;
+  --rulego-db-light: rgba(13, 148, 136, 0.1);
+  
+  --rulego-file: #b45309;
+  --rulego-file-light: rgba(180, 83, 9, 0.1);
+  
+  --rulego-tracer: #0891b2;
+  --rulego-tracer-light: rgba(8, 145, 178, 0.1);
+  
+  --rulego-rpa: #6366f1;
+  --rulego-rpa-light: rgba(99, 102, 241, 0.1);
+  
+  /* ===== 节点基础样式（Flowgram 风格）===== */
+  --node-bg: #ffffff;
+  --node-border: rgba(6, 7, 9, 0.15);
+  --node-border-hover: rgba(6, 7, 9, 0.25);
+  --node-border-radius: 8px;
+  --node-shadow: 
+    0 2px 6px 0 rgba(0, 0, 0, 0.04),
+    0 4px 12px 0 rgba(0, 0, 0, 0.02);
+  
+  /* 节点选中态 */
+  --node-selected-border: #4e40e5;
+  --node-selected-glow: 0 0 0 3px rgba(78, 64, 229, 0.1);
+  
+  /* 节点错误态 */
+  --node-error-border: #ff0000;
+  --node-error-glow: 0 0 0 3px rgba(255, 0, 0, 0.1);
+  
+  /* ===== 端口颜色 ===== */
+  --port-primary: #4d53e8;
+  --port-secondary: #9197f1;
+  --port-error: #ff0000;
+  --port-bg: #ffffff;
+  --port-border: rgba(6, 7, 9, 0.2);
+  
+  /* ===== 连线颜色 ===== */
+  --line-default: #4d53e8;
+  --line-drawing: #5dd6e3;
+  --line-hover: #37d0ff;
+  --line-selected: #37d0ff;
+  --line-error: #ff0000;
+  
+  /* ===== 画布颜色（与 Flowgram --g-editor-background 一致）===== */
+  --canvas-bg: #f2f3f5;
+  --canvas-grid: rgba(148, 163, 184, 0.28);
+
+  /* Flowgram / Coze 子画布（free-container-plugin SubCanvasBorder 默认回退） */
+  --coz-stroke-plus: rgba(6, 7, 9, 0.15);
+  --coz-bg-plus: rgb(249, 249, 249);
+  
+  /* ===== 面板颜色 ===== */
+  --panel-bg: #ffffff;
+  --panel-border: rgba(6, 7, 9, 0.12);
+  --panel-header-bg: #f8f9fa;
+  
+  /* ===== 容器节点（Loop：外层卡片；内层交给 SubCanvas 点阵，勿再铺大块渐变）===== */
+  --container-loop-bg: #ffffff;
+  --container-loop-header-border: rgba(6, 7, 9, 0.08);
+  --container-loop-body-bg: transparent;
+  --container-loop-label-bg: rgba(242, 243, 245, 0.92);
+  --container-loop-label-color: rgba(15, 21, 40, 0.55);
+  
+  --container-group-bg: #ffffff;
+  --container-group-border: #8b5cf6;
+  --container-group-inner-bg: linear-gradient(to bottom, #ede9fe 0%, #ddd6fe 10%, transparent 20%), #fafafa;
+}
+
+/* 深色主题支持（可选）*/
+[data-theme="dark"] {
+  --node-bg: #222236;
+  --node-border: #4a4d6a;
+  --node-shadow: 
+    0 2px 6px 0 rgba(0, 0, 0, 0.3),
+    0 4px 12px 0 rgba(0, 0, 0, 0.2);
+  
+  --canvas-bg: #12121c;
+  --canvas-grid: rgba(148, 163, 184, 0.15);
+  
+  --panel-bg: #1a1a2e;
+  --panel-border: #4a4d6a;
+  --panel-header-bg: #222236;
+
+  --coz-stroke-plus: rgba(255, 255, 255, 0.12);
+  --coz-bg-plus: rgb(42, 42, 58);
+  --container-loop-header-border: rgba(255, 255, 255, 0.08);
+  --container-loop-label-bg: rgba(30, 30, 44, 0.92);
+  --container-loop-label-color: rgba(255, 255, 255, 0.5);
+}

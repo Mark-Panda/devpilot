@@ -35,6 +35,13 @@ const menuGroups: { group?: string; items: { path: string; label: string; end?: 
       { path: "/settings/workspaces", label: "工作区" },
     ],
   },
+  {
+    group: "测试",
+    items: [
+      { path: "/rulego/editor-v2", label: "Flowgram 规则链" },
+      { path: "/rulego/editor-v2/demo", label: "Flowgram（空白画布）" },
+    ],
+  },
 ];
 
 type LayoutProps = {
@@ -43,7 +50,10 @@ type LayoutProps = {
 
 export default function Layout({ children }: LayoutProps) {
   const location = useLocation();
-  const isRuleGoEditor = location.pathname.startsWith("/rulego/editor");
+  /** 仅 Blockly Scratch 全屏；Flowgram（editor-v2）保留侧栏便于测试切换 */
+  const isRuleGoEditor =
+    location.pathname.startsWith("/rulego/editor") &&
+    !location.pathname.startsWith("/rulego/editor-v2");
   const isChatRoute =
     location.pathname === "/agent" || location.pathname.startsWith("/studios");
   /** OpenClaw 风格浅色侧栏 + 主区底（规则链可视化全屏编辑器除外） */

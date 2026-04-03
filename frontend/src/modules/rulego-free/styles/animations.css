@@ -1,0 +1,78 @@
+/**
+ * 动画定义
+ */
+
+/* 节点出现动画 */
+@keyframes node-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.flow-node-enter {
+  animation: node-appear 0.2s ease-out;
+}
+
+/* 节点脉冲（运行时）*/
+@keyframes node-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.02);
+  }
+}
+
+.node-running {
+  animation: node-pulse 2s infinite;
+}
+
+/* 连线绘制动画 */
+@keyframes line-draw {
+  from {
+    stroke-dashoffset: 1000;
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.line-drawing {
+  stroke-dasharray: 10;
+  animation: line-draw 20s linear infinite;
+}
+
+/* 侧边栏滑入 */
+@keyframes sidebar-slide-in {
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+.sidebar-enter {
+  animation: sidebar-slide-in 0.3s ease-out;
+}
+
+/* 加载动画 */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.loading-spinner {
+  animation: spin 1s linear infinite;
+}

@@ -98,6 +98,14 @@ export default function RuleGoPage() {
           >
             新增规则
           </button>
+          <button
+            className="text-button"
+            type="button"
+            onClick={() => navigate("/rulego/editor-v2")}
+            title="使用 Flowgram 自由布局编辑器新建"
+          >
+            新增 Flowgram
+          </button>
           <button className="text-button" type="button" onClick={refresh}>
             刷新
           </button>
@@ -159,6 +167,14 @@ export default function RuleGoPage() {
                     onClick={() => navigate(`/rulego/editor/${rule.id}`)}
                   >
                     可视化
+                  </button>
+                  <button
+                    className="text-button"
+                    type="button"
+                    onClick={() => navigate(`/rulego/editor-v2/${rule.id}`)}
+                    title="Flowgram 编辑器"
+                  >
+                    Flowgram
                   </button>
                   <button
                     className="text-button"
