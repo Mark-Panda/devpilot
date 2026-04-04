@@ -1,8 +1,7 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import { ListModelConfigs } from "../../../wailsjs/go/model_management/Service";
 import {
-  getEnabledFromDefinition,
   getRuleChainNameFromDefinition,
   getRuleChainRootKind,
   setDisabledInDefinition,
@@ -10,12 +9,37 @@ import {
 import { getSkillDirNameFromDefinition, parseDevPilotFromDefinition } from "./devpilotDsl";
 import RuleGoForm from "./RuleGoForm";
 import type { RuleGoRule } from "./types";
+import type { RuleGoListLocationState } from "./rulegoListNavigation";
+import { humanizeRuleGoLoadFailure } from "./rulegoLoadErrors";
 import { useRuleGoRules } from "./useRuleGoRules";
 
 export default function RuleGoPage() {
   const navigate = useNavigate();
-  const { rules, loading, error, refresh, create, update, remove, loadChain, unloadChain, generateSkill } =
-    useRuleGoRules();
+  const location = useLocation();
+  const {
+    rules,
+    loading,
+    error,
+    refresh,
+    create,
+    update,
+    remove,
+    loadChainAllowDisabled,
+    unloadChain,
+    generateSkill,
+  } = useRuleGoRules({ skipInitialLoad: true });
+
+  useEffect(() => {
+    const st = location.state as RuleGoListLocationState | null;
+    if (st?.rulegoListRefresh) {
+      void refresh({ silent: true });
+      navigate("/rulego", { replace: true });
+      return;
+    }
+    void refresh();
+    // 仅挂载时决定首屏或「带 state 返回」的加载策略
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 避免 refresh/navigate 引用变化导致重复 List
+  }, []);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingRule, setEditingRule] = useState<RuleGoRule | null>(null);
   const [confirmingRule, setConfirmingRule] = useState<RuleGoRule | null>(null);
@@ -26,6 +50,13 @@ export default function RuleGoPage() {
   const [generatingSkillRuleId, setGeneratingSkillRuleId] = useState<string | null>(null);
   /** 正在切换启用状态的规则 ID，防止重复点击 */
   const [togglingRuleId, setTogglingRuleId] = useState<string | null>(null);
+  /** 加载规则链失败时的错误弹框（未加载成功不写 DSL） */
+  const [chainLoadError, setChainLoadError] = useState<{
+    ruleLabel: string;
+    title: string;
+    summary: string;
+    technicalDetail?: string;
+  } | null>(null);
 
   const withFeedback = async (fn: () => Promise<void>, successMsg: string) => {
     try {
@@ -41,7 +72,7 @@ export default function RuleGoPage() {
 
   const filteredRules = rules.filter((rule) => {
     const rootKind = getRuleChainRootKind(rule.definition);
-    const effectiveEnabled = getEnabledFromDefinition(rule.definition);
+    const running = Boolean(rule.definition?.trim()) && rule.engineLoaded === true;
 
     const kindOk =
       chainKindFilter === "all"
@@ -50,13 +81,13 @@ export default function RuleGoPage() {
           ? rootKind === "root"
           : rootKind === "sub";
 
-    const enabledOk =
+    const runOk =
       enabledFilter === "all"
         ? true
         : enabledFilter === "enabled"
-          ? effectiveEnabled
-          : !effectiveEnabled;
-    return kindOk && enabledOk;
+          ? running
+          : !running;
+    return kindOk && runOk;
   });
 
   return (
@@ -82,18 +113,18 @@ export default function RuleGoPage() {
               </select>
             </label>
             <label className="dp-filter-field">
-              <span className="dp-filter-label">状态</span>
+              <span className="dp-filter-label">运行</span>
               <select
                 className="dp-select"
                 value={enabledFilter}
                 onChange={(e) =>
                   setEnabledFilter(e.target.value as "all" | "enabled" | "disabled")
                 }
-                aria-label="规则开启状态筛选"
+                aria-label="规则链引擎运行状态筛选"
               >
                 <option value="all">全部</option>
-                <option value="enabled">已开启</option>
-                <option value="disabled">已关闭</option>
+                <option value="enabled">已加载</option>
+                <option value="disabled">未加载</option>
               </select>
             </label>
           </div>
@@ -115,7 +146,7 @@ export default function RuleGoPage() {
           <div className="table-cell">名称</div>
           <div className="table-cell">描述</div>
           <div className="table-cell">主/子</div>
-          <div className="table-cell">状态</div>
+          <div className="table-cell">运行</div>
           <div className="table-cell">操作</div>
         </div>
         {loading ? (
@@ -130,9 +161,8 @@ export default function RuleGoPage() {
         ) : (
           <div className="table-body">
             {filteredRules.map((rule) => {
-              // 状态以 definition 中 DSL 的 ruleChain.disabled 为准（表中已无 enabled 字段）
-              const effectiveEnabled = getEnabledFromDefinition(rule.definition);
               const hasDefinition = Boolean(rule.definition);
+              const running = hasDefinition && rule.engineLoaded === true;
               const rootKind = getRuleChainRootKind(rule.definition);
               const rootKindLabel = rootKind === "sub" ? "子" : rootKind === "root" ? "主" : "—";
               const displayName = getRuleChainNameFromDefinition(rule.definition) || rule.id;
@@ -144,14 +174,11 @@ export default function RuleGoPage() {
                   {parseDevPilotFromDefinition(rule.definition)?.description?.trim() || "-"}
                 </div>
                 <div className="table-cell">{rootKindLabel}</div>
-                <div className="table-cell">
-                  {hasDefinition
-                    ? effectiveEnabled
-                      ? "已开启"
-                      : "已关闭"
-                    : effectiveEnabled
-                      ? "启用"
-                      : "停用"}
+                <div
+                  className="table-cell"
+                  title="与左侧开关一致：已加载表示规则链在引擎池中且初始化成功；开启时先加载成功再写入 DSL 启用"
+                >
+                  {!hasDefinition ? "—" : running ? "已加载" : "未加载"}
                 </div>
                 <div className="table-cell table-actions">
                   <button
@@ -175,40 +202,80 @@ export default function RuleGoPage() {
                     <button
                       type="button"
                       role="switch"
-                      aria-checked={effectiveEnabled}
-                      aria-label={effectiveEnabled ? "关闭规则" : "开启规则"}
+                      aria-checked={running}
+                      aria-label={running ? "卸载规则链" : "加载规则链"}
                       className="rulego-enable-switch"
                       disabled={togglingRuleId === rule.id}
-                      onClick={() =>
-                        effectiveEnabled
-                          ? withFeedback(async () => {
-                              setTogglingRuleId(rule.id);
+                      onClick={() => {
+                        if (running) {
+                          void withFeedback(async () => {
+                            setTogglingRuleId(rule.id);
+                            try {
+                              await unloadChain(rule.id);
+                              await update(rule.id, {
+                                definition: setDisabledInDefinition(rule.definition, true),
+                              });
+                              await refresh({ silent: true });
+                            } finally {
+                              setTogglingRuleId(null);
+                            }
+                          }, "已卸载");
+                          return;
+                        }
+                        void (async () => {
+                          setTogglingRuleId(rule.id);
+                          let persistFailedAfterEngineLoad = false;
+                          try {
+                            await loadChainAllowDisabled(rule.id);
+                            try {
+                              await update(rule.id, {
+                                definition: setDisabledInDefinition(rule.definition, false),
+                              });
+                            } catch (updateErr) {
+                              persistFailedAfterEngineLoad = true;
                               try {
-                                await update(rule.id, {
-                                  definition: setDisabledInDefinition(rule.definition, true),
-                                });
                                 await unloadChain(rule.id);
-                              } finally {
-                                setTogglingRuleId(null);
+                              } catch (unloadErr) {
+                                console.error(
+                                  "[rulego] 启用状态写入失败后回滚卸载失败",
+                                  unloadErr
+                                );
                               }
-                            }, "已关闭")
-                          : withFeedback(async () => {
-                              setTogglingRuleId(rule.id);
-                              try {
-                                await update(rule.id, {
-                                  definition: setDisabledInDefinition(rule.definition, false),
-                                });
-                                await loadChain(rule.id);
-                              } finally {
-                                setTogglingRuleId(null);
-                              }
-                            }, "已开启")
-                      }
+                              throw updateErr;
+                            }
+                            await refresh({ silent: true });
+                            setActionFeedback({ msg: "已加载" });
+                            setTimeout(() => setActionFeedback(null), 2500);
+                          } catch (e) {
+                            const raw =
+                              (e instanceof Error ? e.message : String(e)).trim() || "操作失败";
+                            if (persistFailedAfterEngineLoad) {
+                              setChainLoadError({
+                                ruleLabel: displayName,
+                                title: "保存启用状态失败",
+                                summary:
+                                  "规则链已在引擎中加载，但写入文件（启用）失败，已从引擎卸载，避免与磁盘上的「停用」状态不一致。请检查权限或稍后重试。",
+                                technicalDetail: raw,
+                              });
+                            } else {
+                              const h = humanizeRuleGoLoadFailure(raw);
+                              setChainLoadError({
+                                ruleLabel: displayName,
+                                title: h.title,
+                                summary: h.summary,
+                                technicalDetail: h.technicalDetail,
+                              });
+                            }
+                          } finally {
+                            setTogglingRuleId(null);
+                          }
+                        })();
+                      }}
                     >
                       <span className="rulego-enable-switch-thumb" aria-hidden />
                     </button>
                   ) : null}
-                  {effectiveEnabled && hasDefinition && rootKind === "root" ? (
+                  {running && rootKind === "root" ? (
                     <button
                       className="text-button"
                       type="button"
@@ -236,7 +303,7 @@ export default function RuleGoPage() {
                               model,
                               fallback
                             );
-                            await refresh();
+                            await refresh({ silent: true });
                           } finally {
                             setGeneratingSkillRuleId(null);
                           }
@@ -304,14 +371,14 @@ export default function RuleGoPage() {
                   await update(editingRule.id, values);
                   setModalOpen(false);
                   setEditingRule(null);
-                  await refresh();
+                  await refresh({ silent: true });
                 } else {
                   // 新增时先关闭弹窗再请求，避免用户再次点击保存产生重复创建
                   setModalOpen(false);
                   setEditingRule(null);
                   try {
                     await create(values);
-                    await refresh();
+                    await refresh({ silent: true });
                   } catch (e) {
                     setActionFeedback({
                       msg: e instanceof Error ? e.message : String(e),
@@ -322,6 +389,74 @@ export default function RuleGoPage() {
                 }
               }}
             />
+          </div>
+        </div>
+      ) : null}
+
+      {chainLoadError ? (
+        <div
+          className="modal-overlay"
+          role="alertdialog"
+          aria-modal="true"
+          aria-labelledby="rulego-load-error-title"
+          aria-describedby="rulego-load-error-desc"
+          onClick={() => setChainLoadError(null)}
+        >
+          <div className="modal" onClick={(event) => event.stopPropagation()}>
+            <div className="modal-header">
+              <h3 id="rulego-load-error-title">{chainLoadError.title}</h3>
+              <button
+                className="text-button"
+                type="button"
+                onClick={() => setChainLoadError(null)}
+              >
+                关闭
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="confirm-text" style={{ marginBottom: 10 }}>
+                规则：<strong>{chainLoadError.ruleLabel}</strong>
+              </p>
+              <p
+                id="rulego-load-error-desc"
+                className="confirm-text"
+                style={{ margin: "0 0 12px", lineHeight: 1.55 }}
+              >
+                {chainLoadError.summary}
+              </p>
+              {chainLoadError.technicalDetail ? (
+                <details className="rulego-load-error-details">
+                  <summary className="text-button" style={{ cursor: "pointer", marginBottom: 8 }}>
+                    查看技术详情（供排查）
+                  </summary>
+                  <pre
+                    className="form-hint"
+                    style={{
+                      margin: 0,
+                      padding: 10,
+                      borderRadius: 8,
+                      background: "var(--color-surface-muted, #f1f5f9)",
+                      whiteSpace: "pre-wrap",
+                      wordBreak: "break-word",
+                      fontSize: 12,
+                      maxHeight: 200,
+                      overflow: "auto",
+                    }}
+                  >
+                    {chainLoadError.technicalDetail}
+                  </pre>
+                </details>
+              ) : null}
+            </div>
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="primary-button"
+                onClick={() => setChainLoadError(null)}
+              >
+                知道了
+              </button>
+            </div>
           </div>
         </div>
       ) : null}
@@ -365,7 +500,7 @@ export default function RuleGoPage() {
                 onClick={async () => {
                   await remove(confirmingRule.id);
                   setConfirmingRule(null);
-                  await refresh();
+                  await refresh({ silent: true });
                 }}
               >
                 删除

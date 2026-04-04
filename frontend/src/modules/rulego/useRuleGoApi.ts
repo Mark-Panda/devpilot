@@ -111,6 +111,27 @@ export async function loadRuleChain(ruleId: string): Promise<void> {
   return LoadRuleChain(ruleId);
 }
 
+type WailsRuleGoService = Record<string, unknown>;
+
+function getRuleGoService(): WailsRuleGoService | undefined {
+  if (typeof window === "undefined") return undefined;
+  const w = window as unknown as { go?: { rulego?: { Service?: WailsRuleGoService } } };
+  return w.go?.rulego?.Service;
+}
+
+/**
+ * 加载到引擎池且不检查 DSL 中 ruleChain.disabled（列表开关「先加载再写启用」）。
+ * 运行时检测绑定：未重新编译的客户端无此方法，抛出明确错误以便展示友好文案。
+ */
+export async function loadRuleChainAllowDisabled(ruleId: string): Promise<void> {
+  const svc = getRuleGoService();
+  const fn = svc?.LoadRuleChainAllowDisabled;
+  if (typeof fn !== "function") {
+    throw new Error("DEVPILOT_RULEGO_BINDING_MISSING");
+  }
+  await (fn as (id: string) => Promise<void>)(ruleId);
+}
+
 /** 从引擎池卸载指定规则链 */
 export async function unloadRuleChain(ruleId: string): Promise<void> {
   return UnloadRuleChain(ruleId);

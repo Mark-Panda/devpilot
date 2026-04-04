@@ -5,6 +5,7 @@ import {
   generateSkillFromRuleChain,
   listRuleGoRules,
   loadRuleChain,
+  loadRuleChainAllowDisabled,
   unloadRuleChain,
   updateRuleGoRule,
 } from "./useRuleGoApi";
@@ -25,6 +26,13 @@ function ruleIdFromWailsModel(rule: unknown): string {
   return typeof v === "string" && v.trim() !== "" ? v.trim() : "";
 }
 
+function pickEngineLoaded(rule: unknown): boolean {
+  if (!rule || typeof rule !== "object") return false;
+  const r = rule as Record<string, unknown>;
+  const v = r.engine_loaded ?? r.engineLoaded;
+  return v === true;
+}
+
 function mapWailsRuleToStore(rule: unknown): RuleGoRule {
   const id = ruleIdFromWailsModel(rule) || (rule as { id?: string }).id || "";
   const r = rule as Record<string, unknown>;
@@ -33,6 +41,7 @@ function mapWailsRuleToStore(rule: unknown): RuleGoRule {
     id,
     definition,
     updatedAt: pickOptionalStringField(rule, "updated_at"),
+    engineLoaded: pickEngineLoaded(rule),
   };
 }
 
@@ -40,14 +49,24 @@ export type RuleGoInput = {
   definition: string;
 };
 
-export function useRuleGoRules() {
+export type UseRuleGoRulesOptions = {
+  /** 为 true 时不自动 List（由页面自行决定首次/返回时如何 refresh，避免与 RuleGoPage 的 location.state 逻辑重复请求） */
+  skipInitialLoad?: boolean;
+};
+
+export function useRuleGoRules(options?: UseRuleGoRulesOptions) {
   const { rules, setRules, addRule, updateRule, removeRule } = useRuleGoStore();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const skipInitialLoad = Boolean(options?.skipInitialLoad);
 
-  const refresh = async () => {
-    setLoading(true);
-    setError(null);
+  /** silent：仅更新列表数据，不置 loading（用于开关等操作后拉取最新 engine_loaded，避免整表闪「加载中」） */
+  const refresh = async (opts?: { silent?: boolean }) => {
+    const silent = Boolean(opts?.silent);
+    if (!silent) {
+      setLoading(true);
+      setError(null);
+    }
     try {
       const data = await listRuleGoRules();
       const list = Array.isArray(data) ? data : [];
@@ -55,7 +74,9 @@ export function useRuleGoRules() {
     } catch (err) {
       setError((err as Error).message || "加载失败");
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   };
 
@@ -93,6 +114,10 @@ export function useRuleGoRules() {
     await loadRuleChain(id);
   };
 
+  const loadChainAllowDisabled = async (id: string) => {
+    await loadRuleChainAllowDisabled(id);
+  };
+
   const unloadChain = async (id: string) => {
     await unloadRuleChain(id);
   };
@@ -108,8 +133,21 @@ export function useRuleGoRules() {
   };
 
   useEffect(() => {
-    refresh();
-  }, []);
+    if (skipInitialLoad) return;
+    void refresh();
+  }, [skipInitialLoad]);
 
-  return { rules, loading, error, refresh, create, update, remove, loadChain, unloadChain, generateSkill };
+  return {
+    rules,
+    loading,
+    error,
+    refresh,
+    create,
+    update,
+    remove,
+    loadChain,
+    loadChainAllowDisabled,
+    unloadChain,
+    generateSkill,
+  };
 }

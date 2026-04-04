@@ -17,6 +17,7 @@ import {
 import { emptyRuleChainParamsJson } from "./ruleChainRequestParams";
 import type { RuleGoRule } from "./types";
 import { isRuleGoTriggerBlockType, validateRuleGoTriggerLayout } from "./rulegoWorkspaceValidation";
+import { rulegoListLinkState } from "./rulegoListNavigation";
 import { useRuleGoRules } from "./useRuleGoRules";
 import {
   executeRuleGoRuleByDefinition,
@@ -6245,7 +6246,7 @@ export default function RuleGoScratchEditorPage() {
           >
             Agent 对话
           </button>
-          <button className="rulego-toolbar-btn text" type="button" onClick={() => navigate("/rulego")}>
+          <button className="rulego-toolbar-btn text" type="button" onClick={() => navigate("/rulego", { state: rulegoListLinkState })}>
             返回列表
           </button>
           <input

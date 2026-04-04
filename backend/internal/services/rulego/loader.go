@@ -80,6 +80,51 @@ func (s *Service) LoadRuleChain(ruleID string) error {
 	return nil
 }
 
+// LoadRuleChainAllowDisabled 与 LoadRuleChain 相同，但不检查 ruleChain.disabled（供列表开关「先加载成功再写入启用」）。
+func (s *Service) LoadRuleChainAllowDisabled(ruleID string) error {
+	ctx := context.Background()
+	rule, err := s.store.GetByID(ctx, ruleID)
+	if err != nil {
+		if errors.Is(err, pebble.ErrNotFound) || errors.Is(err, os.ErrNotExist) {
+			return errors.New("规则不存在")
+		}
+		return err
+	}
+	if rule.Definition == "" {
+		return errors.New("规则定义为空")
+	}
+
+	defStr := rule.Definition
+	if s.llmConfigLister != nil {
+		if patched, err := PatchDefinitionWithLLMKeys(ctx, defStr, s.llmConfigLister); err == nil {
+			defStr = patched
+		}
+	}
+	defStr = AlignDefinitionRuleChainID(defStr, ruleID)
+	defStr = DefinitionForcedEnabledForRuleEngine(defStr)
+	def := []byte(defStr)
+	if eng, ok := rulego.Get(ruleID); ok && eng.Initialized() {
+		if err := eng.ReloadSelf(def, ruleEngineOpts(&LogAspect{})...); err != nil {
+			return err
+		}
+		log.Printf("[rulego] 规则链已重载: id=%s name=%s", ruleID, RuleChainNameFromDefinition(rule.Definition))
+		return nil
+	}
+	engine, err := rulego.New(ruleID, def, ruleEngineOpts(&LogAspect{})...)
+	if err != nil {
+		return err
+	}
+	_ = engine
+	log.Printf("[rulego] 规则链已加载: id=%s name=%s", ruleID, RuleChainNameFromDefinition(rule.Definition))
+	return nil
+}
+
+// EngineLoadedInPool 表示 ruleID 是否已在 RuleGo 运行池中且已完成初始化（加载或重载成功）。
+func EngineLoadedInPool(ruleID string) bool {
+	eng, ok := rulego.Get(ruleID)
+	return ok && eng.Initialized()
+}
+
 // UnloadRuleChain 从规则引擎池中卸载指定规则链。
 func (s *Service) UnloadRuleChain(ruleID string) error {
 	if eng, ok := rulego.Get(ruleID); ok {

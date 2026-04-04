@@ -40,7 +40,14 @@ type UpdateRuleGoRuleInput struct {
 }
 
 func (s *Service) ListRuleGoRules() ([]models.RuleGoRule, error) {
-	return s.store.List(context.Background())
+	rules, err := s.store.List(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	for i := range rules {
+		rules[i].EngineLoaded = EngineLoadedInPool(rules[i].ID)
+	}
+	return rules, nil
 }
 
 func (s *Service) CreateRuleGoRule(input CreateRuleGoRuleInput) (models.RuleGoRule, error) {
@@ -71,6 +78,7 @@ func (s *Service) CreateRuleGoRule(input CreateRuleGoRuleInput) (models.RuleGoRu
 			)
 		}
 	}
+	result.EngineLoaded = EngineLoadedInPool(result.ID)
 	return result, nil
 }
 
@@ -130,6 +138,7 @@ func (s *Service) UpdateRuleGoRule(id string, input UpdateRuleGoRuleInput) (mode
 			result = refreshed
 		}
 	}
+	result.EngineLoaded = EngineLoadedInPool(result.ID)
 	return result, nil
 }
 
@@ -144,7 +153,12 @@ func (s *Service) DeleteRuleGoRule(id string) error {
 }
 
 func (s *Service) GetRuleGoRule(id string) (models.RuleGoRule, error) {
-	return s.store.GetByID(context.Background(), id)
+	rule, err := s.store.GetByID(context.Background(), id)
+	if err != nil {
+		return models.RuleGoRule{}, err
+	}
+	rule.EngineLoaded = EngineLoadedInPool(rule.ID)
+	return rule, nil
 }
 
 func validateRuleChainParamsJSON(raw string) error {

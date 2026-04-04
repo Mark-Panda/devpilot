@@ -1122,10 +1122,10 @@ body {
   gap: 8px;
 }
 
-/* 规则管理表：5 列（名称、描述、主/子、状态、操作），为操作列留足空间 */
+/* 规则管理表：5 列（名称、描述、主/子、运行、操作），为操作列留足空间 */
 .rulego-table .table-head,
 .rulego-table .table-row {
-  grid-template-columns: 1.15fr 1.35fr 0.72fr 0.58fr minmax(280px, auto);
+  grid-template-columns: 1.12fr 1.28fr 0.68fr 0.72fr minmax(280px, auto);
 }
 
 .rulego-table .table-actions {

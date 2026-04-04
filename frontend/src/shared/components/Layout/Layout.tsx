@@ -1,6 +1,7 @@
 import { NavLink, useLocation } from "react-router-dom";
 import type { ReactNode } from "react";
 import CursorACPAfterRoundHost from "../../../modules/rulego/CursorACPAfterRoundHost";
+import { rulegoListLinkState } from "../../../modules/rulego/rulegoListNavigation";
 
 const menuGroups: { group?: string; items: { path: string; label: string; end?: boolean }[] }[] = [
   {
@@ -67,7 +68,11 @@ export default function Layout({ children }: LayoutProps) {
                 {group.items.map((item) => (
                   <NavLink
                     key={item.path}
-                    to={item.path}
+                    to={
+                      item.path === "/rulego"
+                        ? { pathname: "/rulego", state: rulegoListLinkState }
+                        : item.path
+                    }
                     end={item.end ?? false}
                     className={({ isActive }) =>
                       `app-nav-item${isActive ? " is-active" : ""}`

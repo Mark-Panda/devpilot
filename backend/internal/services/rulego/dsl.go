@@ -77,3 +77,26 @@ func AlignDefinitionRuleChainID(definition string, engineID string) string {
 	}
 	return string(out)
 }
+
+// DefinitionForcedEnabledForRuleEngine 返回供 rulego.New / ReloadSelf 使用的 DSL：将 ruleChain.disabled 置为 false。
+// DevPilot 列表开关「先加载成功再写启用」时，存储里可能仍为 disabled:true；RuleGo 否则会返回 "the rule chain has been disabled"。
+func DefinitionForcedEnabledForRuleEngine(definition string) string {
+	definition = strings.TrimSpace(definition)
+	if definition == "" {
+		return definition
+	}
+	var root map[string]interface{}
+	if err := json.Unmarshal([]byte(definition), &root); err != nil {
+		return definition
+	}
+	rc, ok := root["ruleChain"].(map[string]interface{})
+	if !ok || rc == nil {
+		return definition
+	}
+	rc["disabled"] = false
+	out, err := json.Marshal(root)
+	if err != nil {
+		return definition
+	}
+	return string(out)
+}
