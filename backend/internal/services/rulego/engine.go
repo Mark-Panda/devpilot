@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"os"
 	"sync"
 	"time"
 
@@ -81,7 +82,7 @@ func (s *Service) StartExecuteRule(ruleID string, input ExecuteRuleInput) (Start
 	ctx := context.Background()
 	rule, err := s.store.GetByID(ctx, ruleID)
 	if err != nil {
-		if errors.Is(err, pebble.ErrNotFound) {
+		if errors.Is(err, pebble.ErrNotFound) || errors.Is(err, os.ErrNotExist) {
 			return zero, errors.New("规则不存在")
 		}
 		return zero, err
@@ -108,7 +109,7 @@ func (s *Service) StartExecuteRule(ruleID string, input ExecuteRuleInput) (Start
 	}
 	execLog, err := s.execLogStore.CreateExecutionLog(ctx, models.RuleGoExecutionLog{
 		RuleID:        ruleID,
-		RuleName:      rule.Name,
+		RuleName:      RuleChainNameFromDefinition(rule.Definition),
 		TriggerType:   "manual",
 		InputData:     data,
 		InputMetadata: MetadataToJSON(input.Metadata),
@@ -119,14 +120,14 @@ func (s *Service) StartExecuteRule(ruleID string, input ExecuteRuleInput) (Start
 
 	if existing, ok := rulego.Get(ruleID); ok && existing.Initialized() {
 		_ = existing.ReloadSelf(defBytes, ruleEngineOpts(&LogAspect{})...)
-		go s.runExecuteRuleInBackground(existing, ruleID, rule.Name, input, execLog.ID, true)
+		go s.runExecuteRuleInBackground(existing, ruleID, RuleChainNameFromDefinition(rule.Definition), input, execLog.ID, true)
 		return StartExecuteRuleResult{ExecutionID: execLog.ID}, nil
 	}
 	engine, createErr := rulego.New(ruleID, defBytes, ruleEngineOpts(&LogAspect{})...)
 	if createErr != nil {
 		return zero, createErr
 	}
-	go s.runExecuteRuleInBackground(engine, ruleID, rule.Name, input, execLog.ID, false)
+	go s.runExecuteRuleInBackground(engine, ruleID, RuleChainNameFromDefinition(rule.Definition), input, execLog.ID, false)
 	return StartExecuteRuleResult{ExecutionID: execLog.ID}, nil
 }
 
@@ -165,7 +166,7 @@ func (s *Service) ExecuteRule(ruleID string, input ExecuteRuleInput) (ExecuteRul
 	ctx := context.Background()
 	rule, err := s.store.GetByID(ctx, ruleID)
 	if err != nil {
-		if errors.Is(err, pebble.ErrNotFound) {
+		if errors.Is(err, pebble.ErrNotFound) || errors.Is(err, os.ErrNotExist) {
 			return ExecuteRuleOutput{Success: false, Error: "规则不存在"}, err
 		}
 		return ExecuteRuleOutput{Success: false, Error: err.Error()}, err
@@ -208,7 +209,7 @@ func (s *Service) ExecuteRule(ruleID string, input ExecuteRuleInput) (ExecuteRul
 		metadata.PutValue(k, v)
 	}
 	metadata.PutValue("_rule_id", ruleID)
-	metadata.PutValue("_rule_name", rule.Name)
+	metadata.PutValue("_rule_name", RuleChainNameFromDefinition(rule.Definition))
 	data := input.Data
 	if data == "" {
 		data = "{}"
@@ -218,7 +219,7 @@ func (s *Service) ExecuteRule(ruleID string, input ExecuteRuleInput) (ExecuteRul
 	if s.execLogStore != nil {
 		execLog, _ = s.execLogStore.CreateExecutionLog(ctx, models.RuleGoExecutionLog{
 			RuleID:        ruleID,
-			RuleName:      rule.Name,
+			RuleName:      RuleChainNameFromDefinition(rule.Definition),
 			TriggerType:   "manual",
 			InputData:     data,
 			InputMetadata: MetadataToJSON(input.Metadata),

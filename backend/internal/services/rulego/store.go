@@ -4,33 +4,19 @@ import (
 	"context"
 
 	"devpilot/backend/internal/store/models"
-	"devpilot/backend/internal/store/pebble"
+	"devpilot/backend/internal/store/rulegofile"
 )
 
-type Store struct {
-	db *pebble.DB
+// RuleStore 规则链持久化抽象（当前实现为 ~/.devpilot/rulego/*.json，文件内仅为 DSL JSON）。
+type RuleStore interface {
+	Create(ctx context.Context, input models.RuleGoRule) (models.RuleGoRule, error)
+	List(ctx context.Context) ([]models.RuleGoRule, error)
+	Update(ctx context.Context, id string, input models.RuleGoRule) (models.RuleGoRule, error)
+	Delete(ctx context.Context, id string) error
+	GetByID(ctx context.Context, id string) (models.RuleGoRule, error)
 }
 
-func NewStore(db *pebble.DB) *Store {
-	return &Store{db: db}
-}
-
-func (s *Store) Create(ctx context.Context, input models.RuleGoRule) (models.RuleGoRule, error) {
-	return pebble.CreateRuleGoRule(ctx, s.db, input)
-}
-
-func (s *Store) List(ctx context.Context) ([]models.RuleGoRule, error) {
-	return pebble.ListRuleGoRules(ctx, s.db)
-}
-
-func (s *Store) Update(ctx context.Context, id string, input models.RuleGoRule) (models.RuleGoRule, error) {
-	return pebble.UpdateRuleGoRule(ctx, s.db, id, input)
-}
-
-func (s *Store) Delete(ctx context.Context, id string) error {
-	return pebble.DeleteRuleGoRule(ctx, s.db, id)
-}
-
-func (s *Store) GetByID(ctx context.Context, id string) (models.RuleGoRule, error) {
-	return pebble.GetRuleGoRuleByID(ctx, s.db, id)
+// NewFileRuleStore 在 dir 下以每条规则一个 json 文件的方式存储（通常为 rulegofile.DefaultDir()）。
+func NewFileRuleStore(dir string) (RuleStore, error) {
+	return rulegofile.New(dir)
 }

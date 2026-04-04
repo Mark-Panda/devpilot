@@ -17,23 +17,14 @@ import {
   UnloadRuleChain,
   UpdateRuleGoRule,
 } from "../../../wailsjs/go/rulego/Service";
-import type { models } from "../../../wailsjs/go/models";
+import type { models, rulego } from "../../../wailsjs/go/models";
 
 type RuleGoRule = models.RuleGoRule;
 export type RuleGoExecutionLog = models.RuleGoExecutionLog;
 export type RuleGoExecutionNodeLog = models.RuleGoExecutionNodeLog;
 
-type CreateRuleGoRuleInput = {
-  name: string;
-  description: string;
-  definition: string;
-  editor_json: string;
-  request_metadata_params_json: string;
-  request_message_body_params_json: string;
-  response_message_body_params_json: string;
-};
-
-type UpdateRuleGoRuleInput = CreateRuleGoRuleInput;
+type CreateRuleGoRuleInput = rulego.CreateRuleGoRuleInput;
+type UpdateRuleGoRuleInput = rulego.UpdateRuleGoRuleInput;
 
 export async function listRuleGoRules(): Promise<RuleGoRule[]> {
   return ListRuleGoRules();

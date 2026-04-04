@@ -71,12 +71,12 @@ DevPilot 是一个 **Wails 桌面应用**，调用分两个层次：
 前端 JS 通过 Wails IPC 操作规则链，大模型生成的 DSL 由前端代码提交：
 
 ```javascript
-// 创建规则链
+// 规则链落盘为 ~/.devpilot/rulego/{id}.json，API 仅传完整 DSL 字符串（名称/描述/Scratch/三套请求参数均在
+// ruleChain 与 ruleChain.configuration.devpilot 内，见项目 devpilot_dsl 约定）。
+
+// 创建规则链（仅 definition）
 const result = await window.go.rulego.Service.CreateRuleGoRule({
-  name: "链名称",
-  description: "描述",
-  definition: JSON.stringify(dsl),  // 大模型生成的 DSL
-  editor_json: ""
+  definition: JSON.stringify(dsl),
 });
 
 // 测试执行（不存库）
@@ -92,9 +92,9 @@ const out = await window.go.rulego.Service.ExecuteRule(ruleId, {
   data: JSON.stringify({ key: "value" })
 });
 
-// 其他操作
+// 其他操作（列表项仅 id / definition / updated_at，展示字段从 definition 解析）
 await window.go.rulego.Service.ListRuleGoRules();
-await window.go.rulego.Service.UpdateRuleGoRule(id, { name, description, definition: JSON.stringify(dsl), editor_json: "" });
+await window.go.rulego.Service.UpdateRuleGoRule(id, { definition: JSON.stringify(dsl) });
 await window.go.rulego.Service.DeleteRuleGoRule(id);
 ```
 

@@ -13,6 +13,7 @@ import (
 	"devpilot/backend/internal/services/rulego"
 	"devpilot/backend/internal/services/skill_repo"
 	"devpilot/backend/internal/store/pebble"
+	"devpilot/backend/internal/store/rulegofile"
 	"devpilot/backend/internal/workspace"
 )
 
@@ -56,7 +57,19 @@ func InitRuntime(dataDir string, initSkillsFS fs.FS) (*Runtime, error) {
 	routeRewriteService := route_rewrite.NewService(routeRewriteStore)
 	modelStore := model_management.NewStore(db)
 	modelService := model_management.NewService(modelStore)
-	ruleGoStore := rulego.NewStore(db)
+	rulegoDir, err := rulegofile.DefaultDir()
+	if err != nil {
+		return nil, err
+	}
+	if n, mErr := rulegofile.MigrateFromPebbleIfNeeded(context.Background(), db, rulegoDir); mErr != nil {
+		log.Printf("[rulego] 从 Pebble 迁移规则链到 %s 失败: %v", rulegoDir, mErr)
+	} else if n > 0 {
+		log.Printf("[rulego] 已从 Pebble 迁移 %d 条规则链到 %s", n, rulegoDir)
+	}
+	ruleGoStore, err := rulego.NewFileRuleStore(rulegoDir)
+	if err != nil {
+		return nil, err
+	}
 	ruleGoExecLogStore := rulego.NewExecutionLogStore(db)
 	ruleGoService := rulego.NewService(ruleGoStore, ruleGoExecLogStore, &ruleGoLLMConfigLister{s: modelService})
 	if n, err := ruleGoService.LoadAllEnabledRuleChains(); err != nil {

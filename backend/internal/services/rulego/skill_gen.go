@@ -73,7 +73,7 @@ func (s *Service) GenerateSkillFromRuleChain(ruleID string, baseURL, apiKey, mod
 		return "", fmt.Errorf("创建 LLM 客户端失败: %w", err)
 	}
 
-	log.Printf("[rulego] GenerateSkillFromRuleChain 调用大模型 tool loop ruleID=%s name=%s", ruleID, rule.Name)
+	log.Printf("[rulego] GenerateSkillFromRuleChain 调用大模型 tool loop ruleID=%s name=%s", ruleID, RuleChainNameFromDefinition(rule.Definition))
 	userMsg := buildCreateSkillUserMessage(rule)
 	systemPrompt := llm.BuildSkillSystemPrompt([]llm.Skill{*createSkill}, false)
 	messages := llm.BuildSystemUserMessages(systemPrompt, userMsg)
@@ -160,10 +160,22 @@ func (e *createSkillExecutor) writeSkillFile(name, description, body string) (st
 	}
 	log.Printf("[rulego] skill-creator 已写入 path=%s name=%s", skillPath, name)
 
-	e.rule.SkillDirName = dirName
-	if _, err := e.s.store.Update(context.Background(), e.ruleID, e.rule); err != nil {
+	fresh, err := e.s.store.GetByID(context.Background(), e.ruleID)
+	if err != nil {
 		_ = os.Remove(skillPath)
-		_ = os.Remove(skillDir)
+		_ = os.RemoveAll(skillDir)
+		return "", fmt.Errorf("重新读取规则失败: %w", err)
+	}
+	def, normErr := NormalizeRuleGoDefinitionString(fresh.Definition, e.ruleID, &dirName)
+	if normErr != nil {
+		_ = os.Remove(skillPath)
+		_ = os.RemoveAll(skillDir)
+		return "", fmt.Errorf("同步 DSL 失败: %w", normErr)
+	}
+	fresh.Definition = def
+	if _, err := e.s.store.Update(context.Background(), e.ruleID, fresh); err != nil {
+		_ = os.Remove(skillPath)
+		_ = os.RemoveAll(skillDir)
 		return "", fmt.Errorf("更新规则关联失败: %w", err)
 	}
 	e.writtenDir = dirName
@@ -209,19 +221,16 @@ func yamlScalarFallback(s string) string {
 }
 
 func buildCreateSkillUserMessage(rule models.RuleGoRule) string {
+	name, desc, meta, body, resp := DocFieldsFromDefinition(rule.Definition)
 	var b strings.Builder
 	b.WriteString("请根据以下规则链信息，调用 skill-creator 工具提交生成的技能。\n\n")
 	b.WriteString("规则链 ID：")
 	b.WriteString(rule.ID)
 	b.WriteString("\n\n规则链名称：")
-	b.WriteString(rule.Name)
+	b.WriteString(name)
 	b.WriteString("\n\n规则链描述：")
-	b.WriteString(rule.Description)
-	paramsBlock := formatRuleChainParamsForSkillDescription(
-		rule.RequestMetadataParamsJSON,
-		rule.RequestMessageBodyParamsJSON,
-		rule.ResponseMessageBodyParamsJSON,
-	)
+	b.WriteString(desc)
+	paramsBlock := formatRuleChainParamsForSkillDescription(meta, body, resp)
 	if paramsBlock != "" {
 		b.WriteString("\n\n以下「规则链入参与出参说明」章节必须完整并入你在 skill-creator 中提交的 description 字段（可与触发场景说明合并为一段连贯英文描述，但不要省略参数名、类型、是否必填与说明）：\n\n")
 		b.WriteString(paramsBlock)
@@ -232,7 +241,7 @@ func buildCreateSkillUserMessage(rule models.RuleGoRule) string {
 	return b.String()
 }
 
-// DeleteSkillForRuleChain 删除规则链关联的技能目录并清空规则的 SkillDirName。
+// DeleteSkillForRuleChain 删除规则链关联的技能目录并清空 DSL 中 devpilot.skill.dir_name。
 // 供 Wails 绑定时由前端调用，不接收 context.Context 以免 JSON 参数绑定错误。
 func (s *Service) DeleteSkillForRuleChain(ruleID string) error {
 	log.Printf("[rulego] DeleteSkillForRuleChain 开始 ruleID=%s", ruleID)
@@ -242,14 +251,21 @@ func (s *Service) DeleteSkillForRuleChain(ruleID string) error {
 		log.Printf("[rulego] DeleteSkillForRuleChain 获取规则失败 ruleID=%s err=%v", ruleID, err)
 		return err
 	}
-	if rule.SkillDirName == "" {
+	skillName := SkillDirNameFromDefinition(rule.Definition)
+	if skillName == "" {
 		log.Printf("[rulego] DeleteSkillForRuleChain 无关联技能 ruleID=%s", ruleID)
 		return nil
 	}
-	skillDir := filepath.Join(llm.DefaultSkillDir(), rule.SkillDirName)
+	skillDir := filepath.Join(llm.DefaultSkillDir(), skillName)
 	_ = os.RemoveAll(skillDir)
 	log.Printf("[rulego] DeleteSkillForRuleChain 已删除目录 ruleID=%s skillDir=%s", ruleID, skillDir)
-	rule.SkillDirName = ""
+	empty := ""
+	def, normErr := NormalizeRuleGoDefinitionString(rule.Definition, ruleID, &empty)
+	if normErr != nil {
+		log.Printf("[rulego] DeleteSkillForRuleChain 同步 DSL 失败 ruleID=%s err=%v", ruleID, normErr)
+		return normErr
+	}
+	rule.Definition = def
 	_, err = s.store.Update(ctx, ruleID, rule)
 	if err != nil {
 		log.Printf("[rulego] DeleteSkillForRuleChain 更新规则失败 ruleID=%s err=%v", ruleID, err)

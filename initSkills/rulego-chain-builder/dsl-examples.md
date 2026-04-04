@@ -676,10 +676,7 @@ console.log("测试结果:", testResult);
 // 3. 测试通过后创建
 if (testResult.success) {
   const rule = await window.go.rulego.Service.CreateRuleGoRule({
-    name: "我的规则链",
-    description: "LLM 问答规则链",
     definition: JSON.stringify(dsl),
-    editor_json: ""
   });
   console.log("创建成功, ID:", rule.id);
   

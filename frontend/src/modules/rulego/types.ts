@@ -1,15 +1,6 @@
+/** 与后端 models.RuleGoRule 一致：持久化与 API 仅 id + definition + updated_at，展示字段从 definition 解析 */
 export type RuleGoRule = {
   id: string;
-  name: string;
-  description: string;
   definition: string;
-  editorJson: string;
-  /** 规则链请求元数据参数表 JSON 数组字符串 */
-  requestMetadataParamsJson?: string;
-  /** 规则链请求消息体参数表 JSON 数组字符串 */
-  requestMessageBodyParamsJson?: string;
-  /** 规则链响应消息体（输出 data）参数表 JSON 数组字符串 */
-  responseMessageBodyParamsJson?: string;
-  /** 关联技能目录名（~/.devpilot/skills/{skillDirName}），有值表示已生成技能 */
-  skillDirName?: string;
+  updatedAt?: string;
 };

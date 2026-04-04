@@ -1,5 +1,16 @@
+/** 从 DSL 解析 ruleChain.name，供列表/下拉展示 */
+export function getRuleChainNameFromDefinition(definition: string): string {
+  if (!definition?.trim()) return "";
+  try {
+    const parsed = JSON.parse(definition) as { ruleChain?: { name?: string } };
+    return String(parsed?.ruleChain?.name ?? "").trim();
+  } catch {
+    return "";
+  }
+}
+
 /**
- * 从 DSL definition JSON 中解析 ruleChain 的启用状态（以 definition 为准，表中已无 enabled 字段）。
+ * 从 DSL definition JSON 中解析 ruleChain 的启用状态（以 definition 为准）。
  * DSL 中 ruleChain.disabled === true 为停用，false 或未设置为启用。
  */
 export function getEnabledFromDefinition(definition: string): boolean {
@@ -91,6 +102,22 @@ export function setDisabledInDefinition(definition: string, disabled: boolean): 
     }
   } catch {
     // ignore
+  }
+  return definition;
+}
+
+/** 将 ruleChain.name 写回 definition JSON */
+export function mergeRuleChainName(definition: string, name: string): string {
+  if (!definition?.trim()) return definition;
+  try {
+    const parsed = JSON.parse(definition) as { ruleChain?: Record<string, unknown> };
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+      if (!parsed.ruleChain) parsed.ruleChain = {};
+      parsed.ruleChain.name = name.trim();
+      return JSON.stringify(parsed, null, 2);
+    }
+  } catch {
+    /* ignore */
   }
   return definition;
 }

@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { extractNodesFromRuleDefinition, getEnabledFromDefinition, getRuleChainRootKind } from "./dslUtils";
+import {
+  extractNodesFromRuleDefinition,
+  getEnabledFromDefinition,
+  getRuleChainNameFromDefinition,
+  getRuleChainRootKind,
+} from "./dslUtils";
+import { parseDevPilotFromDefinition } from "./devpilotDsl";
 import type { RuleChainParamNode } from "./ruleChainRequestParams";
 import {
   buildDataObjectFromParamTree,
@@ -178,9 +184,10 @@ export default function RuleGoExecuteRulePage() {
     }
     const rule = rules.find((r) => r.id === selectedId);
     if (!rule) return;
+    const dp = parseDevPilotFromDefinition(rule.definition);
     const { metaNodes: mn, bodyNodes: bn } = parseMetadataAndBodyParamTrees(
-      rule.requestMetadataParamsJson,
-      rule.requestMessageBodyParamsJson
+      dp?.requestMetadataParamsJson ?? "[]",
+      dp?.requestMessageBodyParamsJson ?? "[]"
     );
     setMetaNodes(mn);
     setBodyNodes(bn);
@@ -345,7 +352,7 @@ export default function RuleGoExecuteRulePage() {
                     >
                       {mainEnabledRules.map((r) => (
                         <option key={r.id} value={r.id}>
-                          {r.name}
+                          {getRuleChainNameFromDefinition(r.definition) || r.id}
                         </option>
                       ))}
                     </select>

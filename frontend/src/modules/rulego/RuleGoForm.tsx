@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { getEnabledFromDefinition } from "./dslUtils";
+import { mergeDevPilotIntoDefinitionString, parseDevPilotFromDefinition } from "./devpilotDsl";
+import { getEnabledFromDefinition, getRuleChainNameFromDefinition, mergeRuleChainName } from "./dslUtils";
 import RuleChainRequestParamsEditor from "./RuleChainRequestParamsEditor";
 import { emptyRuleChainParamsJson } from "./ruleChainRequestParams";
 import type { RuleGoRule } from "./types";
@@ -57,7 +58,7 @@ type RuleGoFormProps = {
   mode: "create" | "edit";
   initial?: RuleGoRule | null;
   onCancel: () => void;
-  onSubmit: (values: FormValues) => Promise<void>;
+  onSubmit: (payload: { definition: string }) => Promise<void>;
   /** 是否展示编辑器 JSON 字段 */
   showEditorJson?: boolean;
   /** 是否展示规则定义（DSL）字段，表单编辑时可设为 false，仅改名称/描述/启用状态 */
@@ -72,38 +73,27 @@ export default function RuleGoForm({
   showEditorJson = true,
   showDefinition = true,
 }: RuleGoFormProps) {
-  const [values, setValues] = useState<FormValues>(() => {
-    const def = initial?.definition ?? "";
+  const hydrateFromDefinition = (def: string): FormValues => {
     const flags = def ? parseRuleChainFlags(def) : { debugMode: false, root: true };
+    const dp = parseDevPilotFromDefinition(def);
     return {
-      name: initial?.name ?? "",
-      description: initial?.description ?? "",
+      name: getRuleChainNameFromDefinition(def),
+      description: dp?.description ?? "",
       enabled: def ? getEnabledFromDefinition(def) : true,
-      definition: initial?.definition ?? "",
-      editorJson: initial?.editorJson ?? "",
-      requestMetadataParamsJson: initial?.requestMetadataParamsJson?.trim() || emptyRuleChainParamsJson(),
-      requestMessageBodyParamsJson: initial?.requestMessageBodyParamsJson?.trim() || emptyRuleChainParamsJson(),
-      responseMessageBodyParamsJson: initial?.responseMessageBodyParamsJson?.trim() || emptyRuleChainParamsJson(),
+      definition: def,
+      editorJson: dp?.editorJson ?? "",
+      requestMetadataParamsJson: dp?.requestMetadataParamsJson?.trim() || emptyRuleChainParamsJson(),
+      requestMessageBodyParamsJson: dp?.requestMessageBodyParamsJson?.trim() || emptyRuleChainParamsJson(),
+      responseMessageBodyParamsJson: dp?.responseMessageBodyParamsJson?.trim() || emptyRuleChainParamsJson(),
       debugMode: flags.debugMode,
       root: flags.root,
     };
-  });
+  };
+
+  const [values, setValues] = useState<FormValues>(() => hydrateFromDefinition(initial?.definition ?? ""));
 
   useEffect(() => {
-    const def = initial?.definition ?? "";
-    const flags = def ? parseRuleChainFlags(def) : { debugMode: false, root: true };
-    setValues({
-      name: initial?.name ?? "",
-      description: initial?.description ?? "",
-      enabled: def ? getEnabledFromDefinition(def) : true,
-      definition: initial?.definition ?? "",
-      editorJson: initial?.editorJson ?? "",
-      requestMetadataParamsJson: initial?.requestMetadataParamsJson?.trim() || emptyRuleChainParamsJson(),
-      requestMessageBodyParamsJson: initial?.requestMessageBodyParamsJson?.trim() || emptyRuleChainParamsJson(),
-      responseMessageBodyParamsJson: initial?.responseMessageBodyParamsJson?.trim() || emptyRuleChainParamsJson(),
-      debugMode: flags.debugMode,
-      root: flags.root,
-    });
+    setValues(hydrateFromDefinition(initial?.definition ?? ""));
   }, [initial]);
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -143,21 +133,23 @@ export default function RuleGoForm({
         values.root,
         values.enabled
       );
+      definitionOut = mergeRuleChainName(definitionOut, values.name);
+      const editorForDevPilot = showEditorJson
+        ? values.editorJson.trim()
+        : parseDevPilotFromDefinition(initial?.definition ?? "")?.editorJson?.trim() ?? "";
+      const skillKeep =
+        parseDevPilotFromDefinition(initial?.definition ?? "")?.skillDirName?.trim() ?? "";
+      definitionOut = mergeDevPilotIntoDefinitionString(definitionOut, {
+        description: values.description.trim(),
+        requestMetadataParamsJson: values.requestMetadataParamsJson.trim(),
+        requestMessageBodyParamsJson: values.requestMessageBodyParamsJson.trim(),
+        responseMessageBodyParamsJson: values.responseMessageBodyParamsJson.trim(),
+        editorScratchJson: editorForDevPilot,
+        skillDirName: skillKeep,
+      });
     }
-    const payload: FormValues = {
-      name: values.name.trim(),
-      description: values.description.trim(),
-      enabled: values.enabled,
-      definition: definitionOut,
-      editorJson: showEditorJson ? values.editorJson.trim() : (initial?.editorJson ?? ""),
-      requestMetadataParamsJson: values.requestMetadataParamsJson.trim(),
-      requestMessageBodyParamsJson: values.requestMessageBodyParamsJson.trim(),
-      responseMessageBodyParamsJson: values.responseMessageBodyParamsJson.trim(),
-      debugMode: values.debugMode,
-      root: values.root,
-    };
     try {
-      await onSubmit(payload);
+      await onSubmit({ definition: definitionOut });
     } catch (err) {
       setError((err as Error).message || "提交失败");
     } finally {

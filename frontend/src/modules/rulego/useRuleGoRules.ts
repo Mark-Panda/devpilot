@@ -25,14 +25,19 @@ function ruleIdFromWailsModel(rule: unknown): string {
   return typeof v === "string" && v.trim() !== "" ? v.trim() : "";
 }
 
-type RuleGoInput = {
-  name: string;
-  description: string;
+function mapWailsRuleToStore(rule: unknown): RuleGoRule {
+  const id = ruleIdFromWailsModel(rule) || (rule as { id?: string }).id || "";
+  const r = rule as Record<string, unknown>;
+  const definition = typeof r.definition === "string" ? r.definition : "";
+  return {
+    id,
+    definition,
+    updatedAt: pickOptionalStringField(rule, "updated_at"),
+  };
+}
+
+export type RuleGoInput = {
   definition: string;
-  editorJson: string;
-  requestMetadataParamsJson: string;
-  requestMessageBodyParamsJson: string;
-  responseMessageBodyParamsJson: string;
 };
 
 export function useRuleGoRules() {
@@ -46,19 +51,7 @@ export function useRuleGoRules() {
     try {
       const data = await listRuleGoRules();
       const list = Array.isArray(data) ? data : [];
-      setRules(
-        list.map((rule) => ({
-          id: ruleIdFromWailsModel(rule) || rule.id,
-          name: rule.name,
-          description: rule.description,
-          definition: rule.definition,
-          editorJson: rule.editor_json,
-          requestMetadataParamsJson: pickOptionalStringField(rule, "request_metadata_params_json"),
-          requestMessageBodyParamsJson: pickOptionalStringField(rule, "request_message_body_params_json"),
-          responseMessageBodyParamsJson: pickOptionalStringField(rule, "response_message_body_params_json"),
-          skillDirName: rule.skill_dir_name || undefined,
-        }))
-      );
+      setRules(list.map((rule) => mapWailsRuleToStore(rule)));
     } catch (err) {
       setError((err as Error).message || "加载失败");
     } finally {
@@ -68,61 +61,27 @@ export function useRuleGoRules() {
 
   const create = async (input: RuleGoInput): Promise<RuleGoRule> => {
     const result = await createRuleGoRule({
-      name: input.name,
-      description: input.description,
       definition: input.definition,
-      editor_json: input.editorJson,
-      request_metadata_params_json: input.requestMetadataParamsJson,
-      request_message_body_params_json: input.requestMessageBodyParamsJson,
-      response_message_body_params_json: input.responseMessageBodyParamsJson,
     });
     let id = ruleIdFromWailsModel(result);
     if (!id) {
       await refresh();
       const { rules: fresh } = useRuleGoStore.getState();
-      const match = fresh.find(
-        (r) =>
-          r.name.trim() === input.name.trim() && r.definition.trim() === input.definition.trim()
-      );
+      const match = fresh.find((r) => r.definition.trim() === input.definition.trim());
       if (match) return match;
       console.error("[rulego] CreateRuleGoRule 返回无 id，且列表中未匹配到新建项", result);
       throw new Error("服务端未返回规则 ID，请到规则列表查看是否已创建");
     }
-    const rule: RuleGoRule = {
-      id,
-      name: result.name,
-      description: result.description,
-      definition: result.definition,
-      editorJson: result.editor_json,
-      requestMetadataParamsJson: pickOptionalStringField(result, "request_metadata_params_json"),
-      requestMessageBodyParamsJson: pickOptionalStringField(result, "request_message_body_params_json"),
-      responseMessageBodyParamsJson: pickOptionalStringField(result, "response_message_body_params_json"),
-      skillDirName: result.skill_dir_name || undefined,
-    };
+    const rule = mapWailsRuleToStore(result);
     addRule(rule);
     return rule;
   };
 
   const update = async (id: string, input: RuleGoInput) => {
     const result = await updateRuleGoRule(id, {
-      name: input.name,
-      description: input.description,
       definition: input.definition,
-      editor_json: input.editorJson,
-      request_metadata_params_json: input.requestMetadataParamsJson,
-      request_message_body_params_json: input.requestMessageBodyParamsJson,
-      response_message_body_params_json: input.responseMessageBodyParamsJson,
     });
-    updateRule(id, {
-      name: input.name,
-      description: result.description,
-      definition: result.definition,
-      editorJson: result.editor_json,
-      requestMetadataParamsJson: pickOptionalStringField(result, "request_metadata_params_json"),
-      requestMessageBodyParamsJson: pickOptionalStringField(result, "request_message_body_params_json"),
-      responseMessageBodyParamsJson: pickOptionalStringField(result, "response_message_body_params_json"),
-      skillDirName: result.skill_dir_name || undefined,
-    });
+    updateRule(id, mapWailsRuleToStore(result));
   };
 
   const remove = async (id: string) => {
@@ -138,7 +97,6 @@ export function useRuleGoRules() {
     await unloadRuleChain(id);
   };
 
-  /** 使用大模型为规则链生成技能（需已配置模型），返回生成的技能目录名 */
   const generateSkill = async (
     ruleId: string,
     baseURL: string,

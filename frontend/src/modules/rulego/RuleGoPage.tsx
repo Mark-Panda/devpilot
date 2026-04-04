@@ -1,7 +1,13 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ListModelConfigs } from "../../../wailsjs/go/model_management/Service";
-import { getEnabledFromDefinition, getRuleChainRootKind, setDisabledInDefinition } from "./dslUtils";
+import {
+  getEnabledFromDefinition,
+  getRuleChainNameFromDefinition,
+  getRuleChainRootKind,
+  setDisabledInDefinition,
+} from "./dslUtils";
+import { getSkillDirNameFromDefinition, parseDevPilotFromDefinition } from "./devpilotDsl";
 import RuleGoForm from "./RuleGoForm";
 import type { RuleGoRule } from "./types";
 import { useRuleGoRules } from "./useRuleGoRules";
@@ -129,19 +135,14 @@ export default function RuleGoPage() {
               const hasDefinition = Boolean(rule.definition);
               const rootKind = getRuleChainRootKind(rule.definition);
               const rootKindLabel = rootKind === "sub" ? "子" : rootKind === "root" ? "主" : "—";
-              const basePayload = {
-                name: rule.name,
-                description: rule.description,
-                definition: rule.definition,
-                editorJson: rule.editorJson,
-                requestMetadataParamsJson: rule.requestMetadataParamsJson ?? "[]",
-                requestMessageBodyParamsJson: rule.requestMessageBodyParamsJson ?? "[]",
-                responseMessageBodyParamsJson: rule.responseMessageBodyParamsJson ?? "[]",
-              };
+              const displayName = getRuleChainNameFromDefinition(rule.definition) || rule.id;
+              const skillDirName = getSkillDirNameFromDefinition(rule.definition);
               return (
               <div className="table-row" key={rule.id}>
-                <div className="table-cell">{rule.name}</div>
-                <div className="table-cell">{rule.description || "-"}</div>
+                <div className="table-cell">{displayName}</div>
+                <div className="table-cell">
+                  {parseDevPilotFromDefinition(rule.definition)?.description?.trim() || "-"}
+                </div>
                 <div className="table-cell">{rootKindLabel}</div>
                 <div className="table-cell">
                   {hasDefinition
@@ -184,7 +185,6 @@ export default function RuleGoPage() {
                               setTogglingRuleId(rule.id);
                               try {
                                 await update(rule.id, {
-                                  ...basePayload,
                                   definition: setDisabledInDefinition(rule.definition, true),
                                 });
                                 await unloadChain(rule.id);
@@ -196,7 +196,6 @@ export default function RuleGoPage() {
                               setTogglingRuleId(rule.id);
                               try {
                                 await update(rule.id, {
-                                  ...basePayload,
                                   definition: setDisabledInDefinition(rule.definition, false),
                                 });
                                 await loadChain(rule.id);
@@ -241,12 +240,12 @@ export default function RuleGoPage() {
                           } finally {
                             setGeneratingSkillRuleId(null);
                           }
-                        }, rule.skillDirName ? "技能已更新" : "技能已创建")
+                        }, skillDirName ? "技能已更新" : "技能已创建")
                       }
                     >
                       {generatingSkillRuleId === rule.id
                         ? "生成中…"
-                        : rule.skillDirName
+                        : skillDirName
                           ? "更新技能"
                           : "创建技能"}
                     </button>
@@ -347,7 +346,9 @@ export default function RuleGoPage() {
             </div>
             <div className="modal-body">
               <p className="confirm-text">
-                确定要删除规则 <strong>{confirmingRule.name}</strong> 吗？
+                确定要删除规则{" "}
+                <strong>{getRuleChainNameFromDefinition(confirmingRule.definition) || confirmingRule.id}</strong>{" "}
+                吗？
               </p>
             </div>
             <div className="modal-actions">

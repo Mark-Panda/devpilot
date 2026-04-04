@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log"
+	"os"
 	"sort"
 
 	"github.com/rulego/rulego"
@@ -43,7 +44,7 @@ func (s *Service) LoadRuleChain(ruleID string) error {
 	ctx := context.Background()
 	rule, err := s.store.GetByID(ctx, ruleID)
 	if err != nil {
-		if errors.Is(err, pebble.ErrNotFound) {
+		if errors.Is(err, pebble.ErrNotFound) || errors.Is(err, os.ErrNotExist) {
 			return errors.New("规则不存在")
 		}
 		return err
@@ -67,7 +68,7 @@ func (s *Service) LoadRuleChain(ruleID string) error {
 		if err := eng.ReloadSelf(def, ruleEngineOpts(&LogAspect{})...); err != nil {
 			return err
 		}
-		log.Printf("[rulego] 规则链已重载: id=%s name=%s", ruleID, rule.Name)
+		log.Printf("[rulego] 规则链已重载: id=%s name=%s", ruleID, RuleChainNameFromDefinition(rule.Definition))
 		return nil
 	}
 	engine, err := rulego.New(ruleID, def, ruleEngineOpts(&LogAspect{})...)
@@ -75,7 +76,7 @@ func (s *Service) LoadRuleChain(ruleID string) error {
 		return err
 	}
 	_ = engine
-	log.Printf("[rulego] 规则链已加载: id=%s name=%s", ruleID, rule.Name)
+	log.Printf("[rulego] 规则链已加载: id=%s name=%s", ruleID, RuleChainNameFromDefinition(rule.Definition))
 	return nil
 }
 
@@ -114,7 +115,7 @@ func (s *Service) LoadAllEnabledRuleChains() (loaded int, err error) {
 		defStr = AlignDefinitionRuleChainID(defStr, rule.ID)
 		engine, createErr := rulego.New(rule.ID, []byte(defStr), ruleEngineOpts(&LogAspect{})...)
 		if createErr != nil {
-			log.Printf("[rulego] 启动加载规则链失败 id=%s name=%s: %v", rule.ID, rule.Name, createErr)
+			log.Printf("[rulego] 启动加载规则链失败 id=%s name=%s: %v", rule.ID, RuleChainNameFromDefinition(rule.Definition), createErr)
 			if err == nil {
 				err = createErr
 			}

@@ -6,22 +6,23 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"os"
 	"strings"
-	"time"
 
 	"devpilot/backend/internal/llm"
 	"devpilot/backend/internal/store/models"
 	"devpilot/backend/internal/store/pebble"
+	"devpilot/backend/internal/store/rulegofile"
 )
 
 type Service struct {
-	store           *Store
+	store           RuleStore
 	execLogStore    *ExecutionLogStore
 	llmConfigLister LLMConfigLister // 可选：用于执行时用模型管理中的 API Key 覆盖 ai/llm 节点 key
 }
 
 // NewService 创建 RuleGo 服务。llmConfigLister 可选，非 nil 时执行/加载规则链前会用模型管理中的配置覆盖 ai/llm 的 key。
-func NewService(store *Store, execLogStore *ExecutionLogStore, llmConfigLister LLMConfigLister) *Service {
+func NewService(store RuleStore, execLogStore *ExecutionLogStore, llmConfigLister LLMConfigLister) *Service {
 	s := &Service{store: store, execLogStore: execLogStore, llmConfigLister: llmConfigLister}
 	if execLogStore != nil {
 		SetGlobalExecutionLogStore(execLogStore)
@@ -29,24 +30,13 @@ func NewService(store *Store, execLogStore *ExecutionLogStore, llmConfigLister L
 	return s
 }
 
+// CreateRuleGoRuleInput / UpdateRuleGoRuleInput 仅接受完整 DSL JSON（含 ruleChain.configuration.devpilot 等）。
 type CreateRuleGoRuleInput struct {
-	Name                          string `json:"name"`
-	Description                   string `json:"description"`
-	Definition                    string `json:"definition"`
-	EditorJSON                    string `json:"editor_json"`
-	RequestMetadataParamsJSON     string `json:"request_metadata_params_json"`
-	RequestMessageBodyParamsJSON  string `json:"request_message_body_params_json"`
-	ResponseMessageBodyParamsJSON string `json:"response_message_body_params_json"`
+	Definition string `json:"definition"`
 }
 
 type UpdateRuleGoRuleInput struct {
-	Name                          string `json:"name"`
-	Description                   string `json:"description"`
-	Definition                    string `json:"definition"`
-	EditorJSON                    string `json:"editor_json"`
-	RequestMetadataParamsJSON     string `json:"request_metadata_params_json"`
-	RequestMessageBodyParamsJSON  string `json:"request_message_body_params_json"`
-	ResponseMessageBodyParamsJSON string `json:"response_message_body_params_json"`
+	Definition string `json:"definition"`
 }
 
 func (s *Service) ListRuleGoRules() ([]models.RuleGoRule, error) {
@@ -55,27 +45,18 @@ func (s *Service) ListRuleGoRules() ([]models.RuleGoRule, error) {
 
 func (s *Service) CreateRuleGoRule(input CreateRuleGoRuleInput) (models.RuleGoRule, error) {
 	ctx := context.Background()
-	rule := models.RuleGoRule{
-		Name:                          strings.TrimSpace(input.Name),
-		Description:                   strings.TrimSpace(input.Description),
-		Definition:                    strings.TrimSpace(input.Definition),
-		EditorJSON:                    strings.TrimSpace(input.EditorJSON),
-		RequestMetadataParamsJSON:     strings.TrimSpace(input.RequestMetadataParamsJSON),
-		RequestMessageBodyParamsJSON:  strings.TrimSpace(input.RequestMessageBodyParamsJSON),
-		ResponseMessageBodyParamsJSON: strings.TrimSpace(input.ResponseMessageBodyParamsJSON),
-	}
-	if err := validateRule(rule); err != nil {
+	id := rulegofile.NewRuleID()
+	def := strings.TrimSpace(input.Definition)
+	def = AlignDefinitionRuleChainID(def, id)
+	var err error
+	def, err = NormalizeRuleGoDefinitionString(def, id, nil)
+	if err != nil {
 		return models.RuleGoRule{}, err
 	}
-	if err := validateRuleChainParamsJSON(rule.RequestMetadataParamsJSON); err != nil {
+	if err := validateRuleChainDefinition(def); err != nil {
 		return models.RuleGoRule{}, err
 	}
-	if err := validateRuleChainParamsJSON(rule.RequestMessageBodyParamsJSON); err != nil {
-		return models.RuleGoRule{}, err
-	}
-	if err := validateRuleChainParamsJSON(rule.ResponseMessageBodyParamsJSON); err != nil {
-		return models.RuleGoRule{}, err
-	}
+	rule := models.RuleGoRule{ID: id, Definition: def}
 
 	result, err := s.store.Create(ctx, rule)
 	if err != nil {
@@ -85,7 +66,7 @@ func (s *Service) CreateRuleGoRule(input CreateRuleGoRuleInput) (models.RuleGoRu
 		if err := s.LoadRuleChain(result.ID); err != nil {
 			// 存储已成功；LoadRuleChain 仅影响运行池。失败时仍返回 nil error，避免前端误判「保存失败」。
 			log.Printf(
-				"[rulego] CreateRuleGoRule: 持久化已成功 id=%s（数据已落库）；运行引擎未加载本链（与保存是否成功无关，测试/执行前需修复 DSL 或节点配置，例如补齐凭证）: %v",
+				"[rulego] CreateRuleGoRule: 持久化已成功 id=%s（已写入规则文件）；运行引擎未加载本链（与保存是否成功无关，测试/执行前需修复 DSL 或节点配置，例如补齐凭证）: %v",
 				result.ID, err,
 			)
 		}
@@ -95,43 +76,28 @@ func (s *Service) CreateRuleGoRule(input CreateRuleGoRuleInput) (models.RuleGoRu
 
 func (s *Service) UpdateRuleGoRule(id string, input UpdateRuleGoRuleInput) (models.RuleGoRule, error) {
 	ctx := context.Background()
-	existing, err := s.store.GetByID(ctx, id)
+	_, err := s.store.GetByID(ctx, id)
 	if err != nil {
 		return models.RuleGoRule{}, err
 	}
 
-	rule := models.RuleGoRule{
-		ID:                            id,
-		Name:                          strings.TrimSpace(input.Name),
-		Description:                   strings.TrimSpace(input.Description),
-		Definition:                    strings.TrimSpace(input.Definition),
-		EditorJSON:                    strings.TrimSpace(input.EditorJSON),
-		RequestMetadataParamsJSON:     strings.TrimSpace(input.RequestMetadataParamsJSON),
-		RequestMessageBodyParamsJSON:  strings.TrimSpace(input.RequestMessageBodyParamsJSON),
-		ResponseMessageBodyParamsJSON: strings.TrimSpace(input.ResponseMessageBodyParamsJSON),
-		SkillDirName:                  existing.SkillDirName, // 保留关联技能目录，仅通过 GenerateSkillFromRuleChain / DeleteSkillForRuleChain 变更
-		CreatedAt:                     existing.CreatedAt,
-		UpdatedAt:                     time.Now().UTC().Format(time.RFC3339),
-	}
-	if err := validateRule(rule); err != nil {
+	def := strings.TrimSpace(input.Definition)
+	def = AlignDefinitionRuleChainID(def, id)
+	def, err = NormalizeRuleGoDefinitionString(def, id, nil)
+	if err != nil {
 		return models.RuleGoRule{}, err
 	}
-	if err := validateRuleChainParamsJSON(rule.RequestMetadataParamsJSON); err != nil {
+	if err := validateRuleChainDefinition(def); err != nil {
 		return models.RuleGoRule{}, err
 	}
-	if err := validateRuleChainParamsJSON(rule.RequestMessageBodyParamsJSON); err != nil {
-		return models.RuleGoRule{}, err
-	}
-	if err := validateRuleChainParamsJSON(rule.ResponseMessageBodyParamsJSON); err != nil {
-		return models.RuleGoRule{}, err
-	}
+	rule := models.RuleGoRule{ID: id, Definition: def}
 
 	result, err := s.store.Update(ctx, id, rule)
 	if err != nil {
 		return models.RuleGoRule{}, err
 	}
-	// 子规则链不保留「创建技能」产物；从主链改为子链时需清理目录与 skill_dir_name
-	if SubRuleChainFromDefinition(result.Definition) && strings.TrimSpace(result.SkillDirName) != "" {
+	// 子规则链不保留「创建技能」产物；从主链改为子链时需清理目录与 devpilot.skill
+	if SubRuleChainFromDefinition(result.Definition) && SkillDirNameFromDefinition(result.Definition) != "" {
 		if err := s.DeleteSkillForRuleChain(id); err != nil {
 			return models.RuleGoRule{}, fmt.Errorf("规则已更新但清理子链不应保留的技能失败: %w", err)
 		}
@@ -145,7 +111,7 @@ func (s *Service) UpdateRuleGoRule(id string, input UpdateRuleGoRuleInput) (mode
 	if enabled && result.Definition != "" {
 		if err := s.LoadRuleChain(id); err != nil {
 			log.Printf(
-				"[rulego] UpdateRuleGoRule: 持久化已成功 id=%s（数据已落库）；运行引擎未加载本链（与保存是否成功无关）: %v",
+				"[rulego] UpdateRuleGoRule: 持久化已成功 id=%s（已写入规则文件）；运行引擎未加载本链（与保存是否成功无关）: %v",
 				id, err,
 			)
 		}
@@ -153,7 +119,7 @@ func (s *Service) UpdateRuleGoRule(id string, input UpdateRuleGoRuleInput) (mode
 		if err := s.UnloadRuleChain(id); err != nil {
 			return result, err
 		}
-		if result.SkillDirName != "" {
+		if SkillDirNameFromDefinition(result.Definition) != "" {
 			if err := s.DeleteSkillForRuleChain(id); err != nil {
 				return result, fmt.Errorf("规则已更新但清理关联技能失败: %w", err)
 			}
@@ -181,16 +147,6 @@ func (s *Service) GetRuleGoRule(id string) (models.RuleGoRule, error) {
 	return s.store.GetByID(context.Background(), id)
 }
 
-func validateRule(rule models.RuleGoRule) error {
-	if rule.Name == "" {
-		return errors.New("name is required")
-	}
-	if rule.Definition == "" {
-		return errors.New("definition is required")
-	}
-	return nil
-}
-
 func validateRuleChainParamsJSON(raw string) error {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
@@ -204,7 +160,7 @@ func validateRuleChainParamsJSON(raw string) error {
 }
 
 func IsNotFound(err error) bool {
-	return errors.Is(err, pebble.ErrNotFound)
+	return errors.Is(err, pebble.ErrNotFound) || errors.Is(err, os.ErrNotExist)
 }
 
 // ListExecutionLogsResult 执行日志分页结果

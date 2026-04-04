@@ -5,9 +5,16 @@ import type { WorkspaceSvg, Block, BlockSvg } from "blockly/core";
 import {
   extractNodesFromRuleDefinition,
   getEnabledFromDefinition,
+  getRuleChainNameFromDefinition,
   isSubRuleChain,
   summarizeRuleNodesForAgent,
 } from "./dslUtils";
+import {
+  buildRuleChainConfigurationWithDevPilot,
+  getSkillDirNameFromDefinition,
+  parseDevPilotFromDefinition,
+} from "./devpilotDsl";
+import { emptyRuleChainParamsJson } from "./ruleChainRequestParams";
 import type { RuleGoRule } from "./types";
 import { isRuleGoTriggerBlockType, validateRuleGoTriggerLayout } from "./rulegoWorkspaceValidation";
 import { useRuleGoRules } from "./useRuleGoRules";
@@ -495,7 +502,7 @@ function BlockConfigModal({
       for (const n of nodes) {
         remote.push({
           value: `${r.id}:${n.id}`,
-          label: `${r.name} / ${n.name || n.id} (${n.id})`,
+          label: `${getRuleChainNameFromDefinition(r.definition ?? "") || r.id} / ${n.name || n.id} (${n.id})`,
         });
       }
     }
@@ -4643,7 +4650,26 @@ export default function RuleGoScratchEditorPage() {
     enabledRef.current = enabled;
   }, [name, debugMode, root, enabled]);
 
+  const descriptionRef = useRef(description);
+  useEffect(() => {
+    descriptionRef.current = description;
+  }, [description]);
+
   const editingRule = useMemo(() => rules.find((rule) => rule.id === id), [rules, id]);
+
+  const requestMetadataParamsJsonRef = useRef(emptyRuleChainParamsJson());
+  const requestMessageBodyParamsJsonRef = useRef(emptyRuleChainParamsJson());
+  const responseMessageBodyParamsJsonRef = useRef(emptyRuleChainParamsJson());
+  useEffect(() => {
+    const r = editingRule;
+    const dp = r?.definition ? parseDevPilotFromDefinition(r.definition) : null;
+    requestMetadataParamsJsonRef.current =
+      (dp?.requestMetadataParamsJson ?? "").trim() || emptyRuleChainParamsJson();
+    requestMessageBodyParamsJsonRef.current =
+      (dp?.requestMessageBodyParamsJson ?? "").trim() || emptyRuleChainParamsJson();
+    responseMessageBodyParamsJsonRef.current =
+      (dp?.responseMessageBodyParamsJson ?? "").trim() || emptyRuleChainParamsJson();
+  }, [editingRule]);
   const agentSelectedConfig = useMemo(
     () => agentModelConfigs.find((cfg) => cfg.id === agentModelConfigId) ?? null,
     [agentModelConfigs, agentModelConfigId]
@@ -4676,7 +4702,10 @@ export default function RuleGoScratchEditorPage() {
 
   /** 规则管理中 root 为 false 的子规则链，供 flow 块 targetId 下拉选择 */
   const subRuleChains = useMemo(
-    () => rules.filter((r) => isSubRuleChain(r.definition ?? "")).map((r) => ({ id: r.id, name: r.name })),
+    () =>
+      rules
+        .filter((r) => isSubRuleChain(r.definition ?? ""))
+        .map((r) => ({ id: r.id, name: getRuleChainNameFromDefinition(r.definition) || r.id })),
     [rules]
   );
 
@@ -4688,8 +4717,8 @@ export default function RuleGoScratchEditorPage() {
         .filter((r) => r.id !== id)
         .map((r) => ({
           id: r.id,
-          name: r.name,
-          description: String(r.description ?? "").trim(),
+          name: getRuleChainNameFromDefinition(r.definition) || r.id,
+          description: String(parseDevPilotFromDefinition(r.definition ?? "")?.description ?? "").trim(),
           node_summary: summarizeRuleNodesForAgent(r.definition ?? ""),
         })),
     [rules, id]
@@ -4881,9 +4910,11 @@ export default function RuleGoScratchEditorPage() {
     let syncRoot = true;
     let syncEnabled = true;
     if (editingRule) {
-      setName(editingRule.name);
-      setDescription(editingRule.description);
-      syncName = editingRule.name;
+      const chainName = getRuleChainNameFromDefinition(editingRule.definition);
+      const dp = parseDevPilotFromDefinition(editingRule.definition);
+      setName(chainName);
+      setDescription(dp?.description ?? "");
+      syncName = chainName;
       try {
         const parsed = JSON.parse(editingRule.definition);
         const chain = parsed?.ruleChain;
@@ -4918,10 +4949,14 @@ export default function RuleGoScratchEditorPage() {
     rootRef.current = syncRoot;
     enabledRef.current = syncEnabled;
 
-    if (editingRule?.editorJson) {
+    const scratchFromDef =
+      editingRule?.definition != null
+        ? parseDevPilotFromDefinition(editingRule.definition)?.editorJson?.trim() ?? ""
+        : "";
+    if (editingRule && scratchFromDef) {
       suppressWorkspaceDslSyncRef.current = true;
       try {
-        const state = JSON.parse(editingRule.editorJson);
+        const state = JSON.parse(scratchFromDef);
         ScratchBlocks.serialization.workspaces.load(state, workspaceRef.current, { recordUndo: false });
         ensureRuleGoNodeIdsAreUuid(workspaceRef.current);
         const parsed = (() => {
@@ -4935,7 +4970,7 @@ export default function RuleGoScratchEditorPage() {
         const dslEnabledForLoad = getEnabledFromDefinition(editingRule.definition);
         const loadedDsl = buildRuleGoDsl(
           workspaceRef.current,
-          editingRule.name,
+          getRuleChainNameFromDefinition(editingRule.definition),
           Boolean(chain?.debugMode),
           chain?.root !== false,
           dslEnabledForLoad
@@ -4967,7 +5002,7 @@ export default function RuleGoScratchEditorPage() {
         const dslEnabledForLoad = getEnabledFromDefinition(editingRule.definition);
         const loadedDsl = buildRuleGoDsl(
           workspaceRef.current,
-          editingRule.name,
+          getRuleChainNameFromDefinition(editingRule.definition),
           Boolean(chain?.debugMode),
           chain?.root !== false,
           dslEnabledForLoad
@@ -5046,23 +5081,11 @@ export default function RuleGoScratchEditorPage() {
     try {
       if (editingRule) {
         await update(editingRule.id, {
-          name: trimmedName,
-          description: String(useDescription).trim(),
           definition: nextDsl.trim(),
-          editorJson: editorJsonPayload.trim(),
-          requestMetadataParamsJson: editingRule.requestMetadataParamsJson ?? "[]",
-          requestMessageBodyParamsJson: editingRule.requestMessageBodyParamsJson ?? "[]",
-          responseMessageBodyParamsJson: editingRule.responseMessageBodyParamsJson ?? "[]",
         });
       } else {
         const created = await create({
-          name: trimmedName,
-          description: String(useDescription).trim(),
           definition: nextDsl.trim(),
-          editorJson: editorJsonPayload.trim(),
-          requestMetadataParamsJson: "[]",
-          requestMessageBodyParamsJson: "[]",
-          responseMessageBodyParamsJson: "[]",
         });
         const newId = (created.id ?? "").trim();
         if (!newId) {
@@ -5688,6 +5711,36 @@ export default function RuleGoScratchEditorPage() {
     };
     if (endpoints.length > 0) metadata.endpoints = endpoints;
 
+    let existingChainConfiguration: Record<string, unknown> | undefined;
+    try {
+      const defStr = editingRule?.definition?.trim();
+      if (defStr) {
+        const parsed = JSON.parse(defStr) as { ruleChain?: { configuration?: unknown } };
+        const cfg = parsed?.ruleChain?.configuration;
+        if (cfg && typeof cfg === "object" && !Array.isArray(cfg)) {
+          existingChainConfiguration = { ...(cfg as Record<string, unknown>) };
+        }
+      }
+    } catch {
+      existingChainConfiguration = undefined;
+    }
+
+    let scratchJson = "";
+    try {
+      scratchJson = JSON.stringify(ScratchBlocks.serialization.workspaces.save(workspace), null, 2);
+    } catch {
+      scratchJson = "";
+    }
+
+    const chainConfiguration = buildRuleChainConfigurationWithDevPilot(existingChainConfiguration, {
+      description: (descriptionRef.current ?? "").trim(),
+      requestMetadataParamsJson: requestMetadataParamsJsonRef.current ?? emptyRuleChainParamsJson(),
+      requestMessageBodyParamsJson: requestMessageBodyParamsJsonRef.current ?? emptyRuleChainParamsJson(),
+      responseMessageBodyParamsJson: responseMessageBodyParamsJsonRef.current ?? emptyRuleChainParamsJson(),
+      editorScratchJson: scratchJson,
+      skillDirName: editingRule ? getSkillDirNameFromDefinition(editingRule.definition) : undefined,
+    });
+
     return JSON.stringify(
       {
         ruleChain: {
@@ -5696,7 +5749,7 @@ export default function RuleGoScratchEditorPage() {
           debugMode: ruleChainDebugMode,
           root: ruleChainRoot,
           disabled: !ruleChainEnabled,
-          configuration: {},
+          configuration: chainConfiguration,
           additionalInfo: {},
         },
         metadata,
@@ -5754,6 +5807,13 @@ export default function RuleGoScratchEditorPage() {
       setDebugMode(nextDebug);
       setRoot(nextRoot);
       setEnabled(nextEnabled);
+      const dp = parseDevPilotFromDefinition(dslStr);
+      if (dp) {
+        if (dp.description) setDescription(dp.description);
+        requestMetadataParamsJsonRef.current = dp.requestMetadataParamsJson;
+        requestMessageBodyParamsJsonRef.current = dp.requestMessageBodyParamsJson;
+        responseMessageBodyParamsJsonRef.current = dp.responseMessageBodyParamsJson;
+      }
       const loadedDsl = buildRuleGoDsl(ws, nextName, nextDebug, nextRoot, nextEnabled);
       setDsl(loadedDsl);
       setSavedDsl(loadedDsl);
