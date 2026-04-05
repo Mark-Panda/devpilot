@@ -297,7 +297,6 @@ func (n *apiRouteTracerGitPrepareNode) OnMsg(ctx types.RuleContext, msg types.Ru
 	}
 
 	gitEnv := append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
-	fmt.Println("servicePath", servicePath)
 	gitURL = fmt.Sprintf(`https://%s.git`, gitURL)
 	st, err := os.Stat(servicePath)
 	if err == nil {
@@ -314,10 +313,6 @@ func (n *apiRouteTracerGitPrepareNode) OnMsg(ctx types.RuleContext, msg types.Ru
 			return
 		}
 	} else if os.IsNotExist(err) {
-		fmt.Println("gitEnv", gitEnv)
-		fmt.Println("workDir", workDir)
-		fmt.Println("gitURL", gitURL)
-		fmt.Println("name", name)
 		if err := runGit(gitEnv, workDir, "clone", gitURL); err != nil {
 			ctx.TellFailure(msg, fmt.Errorf("gitPrepare: git clone: %w", err))
 			return
