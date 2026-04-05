@@ -8,8 +8,14 @@ import {
 } from "./dslUtils";
 import { getSkillDirNameFromDefinition, parseDevPilotFromDefinition } from "./devpilotDsl";
 import RuleGoForm from "./RuleGoForm";
+import RuleGoImportJsonModal from "./RuleGoImportJsonModal";
 import type { RuleGoRule } from "./types";
 import type { RuleGoListLocationState } from "./rulegoListNavigation";
+import {
+  exportRuleGoDslToFile,
+  formatRuleDefinitionForExport,
+  ruleGoDslExportFilename,
+} from "./rulegoExportDsl";
 import { humanizeRuleGoLoadFailure } from "./rulegoLoadErrors";
 import { useRuleGoRules } from "./useRuleGoRules";
 
@@ -57,6 +63,7 @@ export default function RuleGoPage() {
     summary: string;
     technicalDetail?: string;
   } | null>(null);
+  const [importJsonOpen, setImportJsonOpen] = useState(false);
 
   const withFeedback = async (fn: () => Promise<void>, successMsg: string) => {
     try {
@@ -135,6 +142,9 @@ export default function RuleGoPage() {
           >
             新增规则
           </button>
+          <button className="text-button" type="button" onClick={() => setImportJsonOpen(true)}>
+            导入规则链
+          </button>
           <button className="text-button" type="button" onClick={refresh}>
             刷新
           </button>
@@ -198,6 +208,35 @@ export default function RuleGoPage() {
                   >
                     编辑
                   </button>
+                  {hasDefinition ? (
+                    <button
+                      className="text-button"
+                      type="button"
+                      title="导出规则链 DSL 为 JSON 文件（桌面端为「另存为」）"
+                      onClick={() => {
+                        void (async () => {
+                          const body = formatRuleDefinitionForExport(rule.definition);
+                          if (!body.trim()) return;
+                          const res = await exportRuleGoDslToFile(
+                            ruleGoDslExportFilename(displayName, rule.id),
+                            body
+                          );
+                          if (res.status === "saved") {
+                            setActionFeedback({ msg: `已导出：${res.path}` });
+                            setTimeout(() => setActionFeedback(null), 4000);
+                          } else if (res.status === "browser_download") {
+                            setActionFeedback({ msg: "已触发浏览器下载" });
+                            setTimeout(() => setActionFeedback(null), 2500);
+                          } else if (res.status === "error") {
+                            setActionFeedback({ msg: res.message, isError: true });
+                            setTimeout(() => setActionFeedback(null), 5000);
+                          }
+                        })();
+                      }}
+                    >
+                      导出
+                    </button>
+                  ) : null}
                   {hasDefinition ? (
                     <button
                       type="button"
@@ -341,6 +380,21 @@ export default function RuleGoPage() {
           </div>
         ) : null}
       </div>
+
+      <RuleGoImportJsonModal
+        open={importJsonOpen}
+        onClose={() => setImportJsonOpen(false)}
+        navigateToEditor={(ruleId) => navigate(`/rulego/editor/${ruleId}`)}
+        onNotify={(msg) => {
+          setActionFeedback({ msg });
+          setTimeout(() => setActionFeedback(null), 2500);
+        }}
+        onCreate={async (definition) => {
+          const rule = await create({ definition });
+          await refresh({ silent: true });
+          return { id: rule.id };
+        }}
+      />
 
       {modalOpen ? (
         <div

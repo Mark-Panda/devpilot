@@ -1,7 +1,8 @@
 /**
  * 火山引擎 TLS 日志检索：调用 SearchLogs / SearchLogsV2。
  * 消息 data：可为检索语句字符串，或 JSON：
- * {"query":"*","startTime":毫秒,"endTime":毫秒,"topicId":"可选","context":"","sort":"desc","highLight":false}
+ * {"query":"*","tlsQuery":"与 query 等价","startTime":毫秒,"endTime":毫秒,"topicId":"可选",...}
+ * 块配置 defaultQuery 支持 RuleGo 模板，如 ${msg.tlsQuery}、${metadata.xxx}（由后端 el 渲染）。
  */
 import type { Block } from "blockly/core";
 import type { BlockTypeDef, BlockHelpers } from "../types";

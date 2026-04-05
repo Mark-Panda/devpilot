@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"os"
 	"strings"
 
 	"devpilot/backend"
@@ -36,6 +37,34 @@ func (a *App) OpenSkillZipDialog() (string, error) {
 			{DisplayName: "所有文件", Pattern: "*"},
 		},
 	})
+}
+
+// SaveExportedTextFileDialog 弹出系统「另存为」对话框，将 content 以 UTF-8 写入所选路径。
+// 用户取消时返回 ("", nil)；失败返回错误。
+func (a *App) SaveExportedTextFileDialog(defaultFilename string, content string) (string, error) {
+	name := strings.TrimSpace(defaultFilename)
+	if name == "" {
+		name = "export.json"
+	}
+	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
+		Title:           "导出规则链 DSL",
+		DefaultFilename: name,
+		Filters: []runtime.FileFilter{
+			{DisplayName: "JSON 文件", Pattern: "*.json"},
+			{DisplayName: "所有文件", Pattern: "*"},
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return "", nil
+	}
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		return "", err
+	}
+	return path, nil
 }
 
 // OpenAgentWorkspaceDialog 选择 Agent 工作区目录（内置读/写文件工具相对此根路径）。

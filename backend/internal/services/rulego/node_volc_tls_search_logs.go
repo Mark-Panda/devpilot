@@ -1,23 +1,31 @@
 package rulego
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log"
+	"net"
+	"net/http"
 	"strings"
 	"time"
 
 	"github.com/rulego/rulego"
 	"github.com/rulego/rulego/api/types"
+	"github.com/rulego/rulego/components/base"
+	"github.com/rulego/rulego/utils/el"
 	"github.com/volcengine/volc-sdk-golang/service/tls"
 )
 
 // VolcTlsSearchLogsNode 调用火山引擎日志服务 TLS SearchLogs / SearchLogsV2 检索日志。
 // 文档：https://www.volcengine.com/docs/6470/112195
 type VolcTlsSearchLogsNode struct {
-	cfg volcTlsSearchLogsConfig
+	cfg               volcTlsSearchLogsConfig
+	defaultQueryTmpl  el.Template
 }
 
 type volcTlsSearchLogsConfig struct {
@@ -82,11 +90,17 @@ func (n *VolcTlsSearchLogsNode) Init(_ types.Config, configuration types.Configu
 	if n.cfg.TopicID == "" {
 		return errors.New("volcTls/searchLogs: topicId 不能为空")
 	}
+	var err error
+	n.defaultQueryTmpl, err = el.NewTemplate(n.cfg.DefaultQuery)
+	if err != nil {
+		return fmt.Errorf("volcTls/searchLogs: defaultQuery 模板: %w", err)
+	}
 	return nil
 }
 
 type volcTlsSearchMsg struct {
 	Query     string `json:"query"`
+	TLSQuery  string `json:"tlsQuery"` // 与 query 等价，便于与上游 api 追踪等字段名对齐
 	StartTime int64  `json:"startTime"`
 	EndTime   int64  `json:"endTime"`
 	TopicID   string `json:"topicId"`
@@ -160,8 +174,10 @@ func resolveVolcTlsSearch(msgData string, topicDefault, queryDefault string, cfg
 		out.Query = msgData
 		return out, nil
 	}
-	if strings.TrimSpace(raw.Query) != "" {
-		out.Query = strings.TrimSpace(raw.Query)
+	if q := strings.TrimSpace(raw.Query); q != "" {
+		out.Query = q
+	} else if q := strings.TrimSpace(raw.TLSQuery); q != "" {
+		out.Query = q
 	}
 	if raw.StartTime > 0 {
 		out.StartTime = raw.StartTime
@@ -203,8 +219,70 @@ func tlsEndpointFor(cfg *volcTlsSearchLogsConfig) string {
 	return fmt.Sprintf("https://tls.%s.volces.com", cfg.Region)
 }
 
+// newVolcTLSHTTPClient 与 volc-sdk-golang/service/tls 默认 Client 类似，但允许对响应做 gzip 解压。
+// SDK 默认 Transport.DisableCompression=true，TLS 在 4xx 时仍可能返回 Content-Encoding: gzip，
+// realRequest 内 json.Unmarshal 失败后会变成 BadResponseError，日志里 RespBody 呈乱码。
+func newVolcTLSHTTPClient(timeout time.Duration) *http.Client {
+	return &http.Client{
+		Timeout: timeout,
+		Transport: &http.Transport{
+			MaxIdleConns:        1000,
+			MaxIdleConnsPerHost: 50,
+			IdleConnTimeout:     10 * time.Second,
+			DisableCompression:  false,
+			DialContext: (&net.Dialer{
+				Timeout:   10 * time.Second,
+				KeepAlive: 10 * time.Second,
+			}).DialContext,
+		},
+	}
+}
+
+// decodeVolcTLSBadResponseError：SDK 在非 200 时于 realRequest 内直接 Unmarshal 响应体，不经过 search 里的 gzip 分支；
+// 且默认 Transport 曾禁用自动解压，故常得到 BadResponseError + gzip 二进制 RespBody。此处解压并解析为标准 Error 文案。
+func decodeVolcTLSBadResponseError(err error) error {
+	var bre *tls.BadResponseError
+	if err == nil || !errors.As(err, &bre) {
+		return err
+	}
+	body := []byte(bre.RespBody)
+	if len(body) >= 2 && body[0] == 0x1f && body[1] == 0x8b {
+		gr, e := gzip.NewReader(bytes.NewReader(body))
+		if e == nil {
+			defer gr.Close()
+			if dec, e := io.ReadAll(gr); e == nil {
+				body = dec
+			}
+		}
+	}
+	var api tls.Error
+	if json.Unmarshal(body, &api) == nil && (api.Message != "" || api.Code != "") {
+		httpC := api.HTTPCode
+		if httpC == 0 {
+			httpC = int32(bre.HTTPCode)
+		}
+		rid := api.RequestID
+		if rid == "" && bre.RespHeader != nil {
+			if vv := bre.RespHeader["X-Tls-Requestid"]; len(vv) > 0 {
+				rid = vv[0]
+			}
+		}
+		return fmt.Errorf("volcTls/searchLogs: HTTP %d [%s] %s (requestID=%s)", httpC, api.Code, api.Message, rid)
+	}
+	s := strings.TrimSpace(string(body))
+	if s != "" && len(s) < 4096 {
+		return fmt.Errorf("volcTls/searchLogs: HTTP %d %s", bre.HTTPCode, s)
+	}
+	return err
+}
+
 func (n *VolcTlsSearchLogsNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) {
-	params, err := resolveVolcTlsSearch(msg.GetData(), n.cfg.TopicID, n.cfg.DefaultQuery, &n.cfg)
+	env := base.NodeUtils.GetEvnAndMetadata(ctx, msg)
+	queryDefault := strings.TrimSpace(n.defaultQueryTmpl.ExecuteAsString(env))
+	if queryDefault == "" {
+		queryDefault = "*"
+	}
+	params, err := resolveVolcTlsSearch(msg.GetData(), n.cfg.TopicID, queryDefault, &n.cfg)
 	if err != nil {
 		ctx.TellFailure(msg, err)
 		return
@@ -217,7 +295,12 @@ func (n *VolcTlsSearchLogsNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) 
 		n.cfg.SessionToken,
 		n.cfg.Region,
 	)
-	client.SetTimeout(time.Duration(n.cfg.TimeoutSec) * time.Second)
+	to := time.Duration(n.cfg.TimeoutSec) * time.Second
+	if err := client.SetHttpClient(newVolcTLSHTTPClient(to)); err != nil {
+		ctx.TellFailure(msg, err)
+		return
+	}
+	client.SetTimeout(to)
 
 	req := &tls.SearchLogsRequest{
 		TopicID:   params.TopicID,
@@ -261,6 +344,7 @@ func (n *VolcTlsSearchLogsNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) 
 		resp, err = r.resp, r.err
 	}
 	if err != nil {
+		err = decodeVolcTLSBadResponseError(err)
 		log.Printf("[rulego] volcTls/searchLogs 失败: %v", err)
 		ctx.TellFailure(msg, err)
 		return
@@ -282,7 +366,10 @@ func (n *VolcTlsSearchLogsNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) 
 	ctx.TellSuccess(out)
 }
 
-func (n *VolcTlsSearchLogsNode) Destroy() { n.cfg = volcTlsSearchLogsConfig{} }
+func (n *VolcTlsSearchLogsNode) Destroy() {
+	n.cfg = volcTlsSearchLogsConfig{}
+	n.defaultQueryTmpl = nil
+}
 
 func init() {
 	rulego.Registry.Register(&VolcTlsSearchLogsNode{})

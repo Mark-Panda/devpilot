@@ -2843,11 +2843,11 @@ function BlockConfigModal({
             />
           </label>
           <label className="form-field" style={{ gridColumn: "1 / -1" }}>
-            <span>默认检索语句 (defaultQuery)</span>
+            <span>默认检索语句 (defaultQuery)，支持 {"${msg.tlsQuery}"}、{"${metadata.xxx}"} 等模板</span>
             <input
               value={String(form.TLS_DEFAULT_QUERY ?? "*")}
               onChange={(e) => setForm((f) => ({ ...f, TLS_DEFAULT_QUERY: e.target.value }))}
-              placeholder="* 或 TLS 检索语法"
+              placeholder="* 或 ${msg.tlsQuery} 等"
               autoCapitalize="off"
               autoCorrect="off"
               autoComplete="off"
@@ -4585,12 +4585,6 @@ export default function RuleGoScratchEditorPage() {
   const [enabledDraftInModal, setEnabledDraftInModal] = useState(true);
   const [debugDraftInModal, setDebugDraftInModal] = useState(false);
   const [nameModalError, setNameModalError] = useState<string | null>(null);
-  const [viewDslOpen, setViewDslOpen] = useState(false);
-  const [dslCopyFeedback, setDslCopyFeedback] = useState<string | null>(null);
-  const [importDslOpen, setImportDslOpen] = useState(false);
-  const [importDslText, setImportDslText] = useState("");
-  const [importDslError, setImportDslError] = useState<string | null>(null);
-  const importDslFileRef = useRef<HTMLInputElement>(null);
   const [testModalOpen, setTestModalOpen] = useState(false);
   const [testMessageType, setTestMessageType] = useState("default");
   const [testMetadataJson, setTestMetadataJson] = useState("{}");
@@ -4907,6 +4901,8 @@ export default function RuleGoScratchEditorPage() {
     if (!workspaceRef.current) return;
 
     let syncName = "";
+    /** 须与 setDescription 同步写入 ref：buildRuleGoDsl 读 descriptionRef，若仅 setState 则下一帧才更新 ref，loadedDsl 会与后续 handleChange 不一致，误报未保存 */
+    let syncDescription = "";
     let syncDebug = false;
     let syncRoot = true;
     let syncEnabled = true;
@@ -4915,6 +4911,7 @@ export default function RuleGoScratchEditorPage() {
       const dp = parseDevPilotFromDefinition(editingRule.definition);
       setName(chainName);
       setDescription(dp?.description ?? "");
+      syncDescription = String(dp?.description ?? "").trim();
       syncName = chainName;
       try {
         const parsed = JSON.parse(editingRule.definition);
@@ -4939,6 +4936,7 @@ export default function RuleGoScratchEditorPage() {
       setDebugMode(false);
       setRoot(true);
       syncName = "";
+      syncDescription = "";
       syncDebug = false;
       syncRoot = true;
       syncEnabled = true;
@@ -4946,6 +4944,7 @@ export default function RuleGoScratchEditorPage() {
 
     // Blockly 的 change 会同步触发 handleChange；refs 若晚于 state 的 useEffect 更新，会用旧 name/root 生成 DSL，导致 dsl 与 savedDsl 不一致（表现为「已保存仍显示未保存」）。
     nameRef.current = syncName;
+    descriptionRef.current = syncDescription;
     debugModeRef.current = syncDebug;
     rootRef.current = syncRoot;
     enabledRef.current = syncEnabled;
@@ -5039,7 +5038,10 @@ export default function RuleGoScratchEditorPage() {
       setSaveFeedback({ type: "error", message: msg });
       return;
     }
-    const useDescription = overrides?.description ?? description;
+    // buildRuleGoDsl 读 descriptionRef；弹窗确认后 setState 尚未提交时 description 仍为旧值，须与 overrides 同步
+    const resolvedDescription =
+      overrides?.description !== undefined ? String(overrides.description) : description;
+    descriptionRef.current = resolvedDescription;
     // 状态以 DSL 为准：有 overrides 时用弹框选择，否则用当前编辑器状态（加载时已从 DSL 解析）
     const useEnabled = overrides?.enabled ?? enabled;
     const useDebugMode = overrides?.debugMode ?? debugMode;
@@ -5133,8 +5135,47 @@ export default function RuleGoScratchEditorPage() {
    * 未操作时仍可能「脏」的原因：
    * - metadata.nodes[].additionalInfo.position（积木坐标）
    * - metadata.endpoints[].additionalInfo.position（端点块同样用 getRelativeToSurfaceXY）
+   * - metadata.nodes / connections / endpoints 数组遍历顺序与构建时不一致
    * - JSON 键插入顺序不一致
    */
+  /** 比较前将图相关数组按稳定键排序，避免已保存仍显示「未保存」 */
+  const sortMetadataGraphArraysForCompare = (parsed: unknown): unknown => {
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return parsed;
+    const root = parsed as Record<string, unknown>;
+    const metadata = root.metadata;
+    if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) return parsed;
+    const m = metadata as Record<string, unknown>;
+    const nextMeta = { ...m };
+    if (Array.isArray(nextMeta.nodes)) {
+      nextMeta.nodes = [...nextMeta.nodes].sort((a, b) => {
+        const ida =
+          a && typeof a === "object" && !Array.isArray(a) ? String((a as Record<string, unknown>).id ?? "") : "";
+        const idb =
+          b && typeof b === "object" && !Array.isArray(b) ? String((b as Record<string, unknown>).id ?? "") : "";
+        return ida.localeCompare(idb);
+      });
+    }
+    if (Array.isArray(nextMeta.connections)) {
+      nextMeta.connections = [...nextMeta.connections].sort((a, b) => {
+        const ca = a && typeof a === "object" && !Array.isArray(a) ? (a as Record<string, unknown>) : {};
+        const cb = b && typeof b === "object" && !Array.isArray(b) ? (b as Record<string, unknown>) : {};
+        const ka = `${ca.fromId}\0${ca.toId}\0${ca.type}\0${ca.label ?? ""}`;
+        const kb = `${cb.fromId}\0${cb.toId}\0${cb.type}\0${cb.label ?? ""}`;
+        return ka.localeCompare(kb);
+      });
+    }
+    if (Array.isArray(nextMeta.endpoints)) {
+      nextMeta.endpoints = [...nextMeta.endpoints].sort((a, b) => {
+        const ida =
+          a && typeof a === "object" && !Array.isArray(a) ? String((a as Record<string, unknown>).id ?? "") : "";
+        const idb =
+          b && typeof b === "object" && !Array.isArray(b) ? String((b as Record<string, unknown>).id ?? "") : "";
+        return ida.localeCompare(idb);
+      });
+    }
+    return { ...root, metadata: nextMeta };
+  };
+
   const stripRuleGoNoiseForCompare = (parsed: unknown): unknown => {
     const walk = (v: unknown): unknown => {
       if (Array.isArray(v)) return v.map(walk);
@@ -5176,7 +5217,10 @@ export default function RuleGoScratchEditorPage() {
     const t = (s ?? "").trim();
     if (!t) return "";
     try {
-      return JSON.stringify(stableSortedDeep(stripRuleGoNoiseForCompare(JSON.parse(t))));
+      const parsed = JSON.parse(t);
+      return JSON.stringify(
+        stableSortedDeep(stripRuleGoNoiseForCompare(sortMetadataGraphArraysForCompare(parsed)))
+      );
     } catch {
       return t;
     }
@@ -5187,7 +5231,7 @@ export default function RuleGoScratchEditorPage() {
   );
 
   const handleSave = async () => {
-    if (!name.trim() || !description.trim()) {
+    if (!name.trim()) {
       setNameDraft(name);
       setDescriptionDraft(description);
       setEnabledDraftInModal(enabled);
@@ -5204,10 +5248,6 @@ export default function RuleGoScratchEditorPage() {
     const trimmedDesc = descriptionDraft.trim();
     if (!trimmedName) {
       setNameModalError("规则名称不能为空");
-      return;
-    }
-    if (!trimmedDesc) {
-      setNameModalError("规则描述不能为空");
       return;
     }
     setNameModalError(null);
@@ -5761,77 +5801,6 @@ export default function RuleGoScratchEditorPage() {
   };
   buildRuleGoDslRef.current = buildRuleGoDsl;
 
-  const handleApplyImportDsl = () => {
-    setImportDslError(null);
-    const ws = workspaceRef.current;
-    if (!ws) {
-      setImportDslError("工作区未就绪");
-      return;
-    }
-    const raw = importDslText.trim();
-    if (!raw) {
-      setImportDslError("请粘贴或选择包含规则链 DSL 的 JSON");
-      return;
-    }
-    let parsed: unknown;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      setImportDslError("JSON 解析失败，请检查格式");
-      return;
-    }
-    if (!parsed || typeof parsed !== "object" || !(parsed as { metadata?: unknown }).metadata) {
-      setImportDslError("DSL 无效：缺少 metadata");
-      return;
-    }
-    const ruleDsl = parsed as {
-      ruleChain?: { name?: string; debugMode?: boolean; root?: boolean };
-      metadata: unknown;
-    };
-    const chain = ruleDsl.ruleChain;
-    const importedName =
-      typeof chain?.name === "string" && chain.name.trim() ? chain.name.trim() : "";
-    const nextName = importedName || name;
-    const nextDebug = Boolean(chain?.debugMode);
-    const nextRoot = chain?.root !== false;
-    const dslStr = JSON.stringify(parsed);
-    const nextEnabled = getEnabledFromDefinition(dslStr);
-    nameRef.current = nextName;
-    debugModeRef.current = nextDebug;
-    rootRef.current = nextRoot;
-    enabledRef.current = nextEnabled;
-    suppressWorkspaceDslSyncRef.current = true;
-    try {
-      loadWorkspaceFromRuleGoDsl(ruleDsl, ws);
-      ensureRuleGoNodeIdsAreUuid(ws);
-      if (importedName) setName(importedName);
-      setDebugMode(nextDebug);
-      setRoot(nextRoot);
-      setEnabled(nextEnabled);
-      const dp = parseDevPilotFromDefinition(dslStr);
-      if (dp) {
-        if (dp.description) setDescription(dp.description);
-        requestMetadataParamsJsonRef.current = dp.requestMetadataParamsJson;
-        requestMessageBodyParamsJsonRef.current = dp.requestMessageBodyParamsJson;
-        responseMessageBodyParamsJsonRef.current = dp.responseMessageBodyParamsJson;
-      }
-      const loadedDsl = buildRuleGoDsl(ws, nextName, nextDebug, nextRoot, nextEnabled);
-      setDsl(loadedDsl);
-      setSavedDsl(loadedDsl);
-      setJson(JSON.stringify(ScratchBlocks.serialization.workspaces.save(ws), null, 2));
-      setSelectedBlockId(null);
-      setError(null);
-      setTriggerLayoutError(validateRuleGoTriggerLayout(ws));
-      setBlockCount(ws.getTopBlocks(true).length);
-      setImportDslOpen(false);
-      setImportDslText("");
-    } catch (err) {
-      setImportDslError((err as Error).message || "加载 DSL 到画布失败");
-    } finally {
-      suppressWorkspaceDslSyncRef.current = false;
-    }
-  };
-
   const getSupportedAgentNodeTypes = useCallback((): string[] => {
     const contents = rulegoToolbox.contents;
     if (!Array.isArray(contents)) return [];
@@ -6249,55 +6218,6 @@ export default function RuleGoScratchEditorPage() {
           <button className="rulego-toolbar-btn text" type="button" onClick={() => navigate("/rulego", { state: rulegoListLinkState })}>
             返回列表
           </button>
-          <input
-            ref={importDslFileRef}
-            type="file"
-            accept=".json,application/json"
-            style={{ display: "none" }}
-            aria-hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (!f) return;
-              const reader = new FileReader();
-              reader.onload = () => {
-                setImportDslText(String(reader.result ?? ""));
-                setImportDslError(null);
-              };
-              reader.onerror = () => setImportDslError("读取文件失败");
-              reader.readAsText(f, "UTF-8");
-              e.target.value = "";
-            }}
-          />
-          <button
-            className="rulego-toolbar-btn text"
-            type="button"
-            title="从 JSON 导入规则链到画布（将替换当前画布内容）"
-            onClick={() => {
-              setImportDslError(null);
-              setImportDslOpen(true);
-            }}
-          >
-            导入
-          </button>
-          <button
-            className="rulego-toolbar-btn text"
-            type="button"
-            title="查看规则链 DSL"
-            onClick={() => {
-              if (workspaceRef.current) {
-                const te = validateRuleGoTriggerLayout(workspaceRef.current);
-                if (te) {
-                  setError(te);
-                  return;
-                }
-                ensureRuleGoNodeIdsAreUuid(workspaceRef.current);
-                setDsl(buildRuleGoDsl(workspaceRef.current, name, debugMode, root));
-              }
-              setViewDslOpen(true);
-            }}
-          >
-            导出
-          </button>
         </div>
       </header>
 
@@ -6366,132 +6286,6 @@ export default function RuleGoScratchEditorPage() {
           </div>
         ) : null}
       </div>
-
-      {importDslOpen && (
-        <div
-          className="modal-overlay"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => {
-            setImportDslOpen(false);
-            setImportDslError(null);
-          }}
-        >
-          <div className="modal" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>导入规则链 DSL</h3>
-              <button
-                type="button"
-                className="text-button"
-                onClick={() => {
-                  setImportDslOpen(false);
-                  setImportDslError(null);
-                }}
-                aria-label="关闭"
-              >
-                ×
-              </button>
-            </div>
-            <div className="modal-body">
-              <p className="form-hint" style={{ marginBottom: 10 }}>
-                粘贴完整的规则链 JSON（含 ruleChain 与 metadata）。导入后将替换当前画布内容；若 DSL 中含 ruleChain.name，将同步为当前规则名称。
-              </p>
-              {importDslError ? <div className="form-error" style={{ marginBottom: 8 }}>{importDslError}</div> : null}
-              <textarea
-                value={importDslText}
-                onChange={(e) => {
-                  setImportDslText(e.target.value);
-                  if (importDslError) setImportDslError(null);
-                }}
-                rows={18}
-                style={{ width: "100%", fontFamily: "monospace", fontSize: 13 }}
-                placeholder='{"ruleChain":{...},"metadata":{...}}'
-                spellCheck={false}
-              />
-              <div className="modal-actions" style={{ marginTop: 12 }}>
-                <button type="button" className="text-button" onClick={() => importDslFileRef.current?.click()}>
-                  选择文件
-                </button>
-                <button
-                  type="button"
-                  className="text-button"
-                  onClick={() => {
-                    setImportDslOpen(false);
-                    setImportDslError(null);
-                  }}
-                >
-                  取消
-                </button>
-                <button type="button" className="primary-button" onClick={handleApplyImportDsl}>
-                  导入到画布
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {viewDslOpen && (
-        <div
-          className="modal-overlay"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => {
-            setDslCopyFeedback(null);
-            setViewDslOpen(false);
-          }}
-        >
-          <div className="modal" style={{ maxWidth: 720 }} onClick={(e) => e.stopPropagation()}>
-            <div className="modal-header">
-              <h3>规则链 DSL</h3>
-              <button
-                type="button"
-                className="text-button"
-                onClick={() => {
-                  setDslCopyFeedback(null);
-                  setViewDslOpen(false);
-                }}
-                aria-label="关闭"
-              >
-                ×
-              </button>
-            </div>
-            <div className="modal-body">
-              {dslCopyFeedback ? (
-                <p className="form-hint" style={{ marginBottom: 8 }} role="status">
-                  {dslCopyFeedback}
-                </p>
-              ) : null}
-              <textarea readOnly value={dsl} rows={20} style={{ width: "100%", fontFamily: "monospace", fontSize: 13 }} />
-              <div className="modal-actions" style={{ marginTop: 12 }}>
-                <button
-                  type="button"
-                  className="primary-button"
-                  onClick={() => {
-                    const text = dsl.trim();
-                    if (!text) {
-                      setDslCopyFeedback("当前 DSL 为空");
-                      window.setTimeout(() => setDslCopyFeedback(null), 2000);
-                      return;
-                    }
-                    void (async () => {
-                      try {
-                        await navigator.clipboard.writeText(dsl);
-                        setDslCopyFeedback("已复制到剪贴板");
-                      } catch {
-                        setDslCopyFeedback("复制失败，请手动选择文本复制");
-                      }
-                      window.setTimeout(() => setDslCopyFeedback(null), 2000);
-                    })();
-                  }}
-                >
-                  复制
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       {agentModalOpen && (
         <div className="modal-overlay" role="dialog" aria-modal="true" onClick={() => setAgentModalOpen(false)}>
@@ -7001,14 +6795,14 @@ export default function RuleGoScratchEditorPage() {
                 />
               </label>
               <label className="form-field">
-                <span>规则描述（必填）</span>
+                <span>规则描述（可选）</span>
                 <input
                   value={descriptionDraft}
                   onChange={(event) => {
                     setDescriptionDraft(event.target.value);
                     if (nameModalError) setNameModalError(null);
                   }}
-                  placeholder="请输入规则描述"
+                  placeholder="可留空；填写后写入规则元数据，供列表与生成技能说明使用"
                   autoCapitalize="off"
                   autoCorrect="off"
                   autoComplete="off"
