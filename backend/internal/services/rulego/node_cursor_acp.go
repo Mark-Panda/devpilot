@@ -140,6 +140,13 @@ func expandUserPath(s string) string {
 	if s == "" {
 		return s
 	}
+	if s == "~" {
+		h, err := os.UserHomeDir()
+		if err == nil && h != "" {
+			return h
+		}
+		return s
+	}
 	if strings.HasPrefix(s, "~/") {
 		h, err := os.UserHomeDir()
 		if err == nil && h != "" {

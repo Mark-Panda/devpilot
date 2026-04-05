@@ -30,8 +30,8 @@ import (
 type SourcegraphSearchNode struct {
 	cfg sourcegraphSearchConfig
 
-	endpointTmpl    el.Template
-	accessTokenTmpl el.Template
+	endpointTmpl     el.Template
+	accessTokenTmpl  el.Template
 	defaultQueryTmpl el.Template
 }
 
@@ -266,7 +266,9 @@ func (n *apiRouteTracerGitPrepareNode) OnMsg(ctx types.RuleContext, msg types.Ru
 		ctx.TellFailure(msg, errors.New("gitPrepare: 渲染后 gitlabUrl 为空"))
 		return
 	}
-	workDir := filepath.Clean(strings.TrimSpace(n.workDirTmpl.ExecuteAsString(env)))
+	workDir := strings.TrimSpace(n.workDirTmpl.ExecuteAsString(env))
+	workDir = expandUserPath(workDir)
+	workDir = filepath.Clean(workDir)
 	if workDir == "" || workDir == "." {
 		ctx.TellFailure(msg, errors.New("gitPrepare: 渲染后 workDir 为空"))
 		return
@@ -295,7 +297,8 @@ func (n *apiRouteTracerGitPrepareNode) OnMsg(ctx types.RuleContext, msg types.Ru
 	}
 
 	gitEnv := append(os.Environ(), "GIT_TERMINAL_PROMPT=0")
-
+	fmt.Println("servicePath", servicePath)
+	gitURL = fmt.Sprintf(`https://%s.git`, gitURL)
 	st, err := os.Stat(servicePath)
 	if err == nil {
 		if !st.IsDir() {
@@ -311,7 +314,11 @@ func (n *apiRouteTracerGitPrepareNode) OnMsg(ctx types.RuleContext, msg types.Ru
 			return
 		}
 	} else if os.IsNotExist(err) {
-		if err := runGit(gitEnv, workDir, "clone", gitURL, name); err != nil {
+		fmt.Println("gitEnv", gitEnv)
+		fmt.Println("workDir", workDir)
+		fmt.Println("gitURL", gitURL)
+		fmt.Println("name", name)
+		if err := runGit(gitEnv, workDir, "clone", gitURL); err != nil {
 			ctx.TellFailure(msg, fmt.Errorf("gitPrepare: git clone: %w", err))
 			return
 		}

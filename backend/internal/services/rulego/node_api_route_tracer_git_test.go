@@ -1,6 +1,10 @@
 package rulego
 
-import "testing"
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
 
 func TestGitRepoDirNameFromURL(t *testing.T) {
 	tests := []struct {
@@ -30,5 +34,28 @@ func TestGitRepoDirNameFromURL_errors(t *testing.T) {
 		if _, err := gitRepoDirNameFromURL(raw); err == nil {
 			t.Fatalf("expected error for %q", raw)
 		}
+	}
+}
+
+func TestExpandUserPath_gitPrepareWorkDir(t *testing.T) {
+	home, err := os.UserHomeDir()
+	if err != nil || home == "" {
+		t.Skip("UserHomeDir unavailable")
+	}
+	if got := expandUserPath("~"); got != home {
+		t.Fatalf("expandUserPath(~) = %q, want %q", got, home)
+	}
+	if got := expandUserPath("  ~  "); got != home {
+		t.Fatalf("expandUserPath(  ~  ) = %q, want %q", got, home)
+	}
+	wantSub := filepath.Join(home, "devpilot", "repos")
+	if got := expandUserPath("~/devpilot/repos"); got != wantSub {
+		t.Fatalf("expandUserPath(~/devpilot/repos) = %q, want %q", got, wantSub)
+	}
+	if got := expandUserPath("/abs/no/tilde"); got != "/abs/no/tilde" {
+		t.Fatalf("expandUserPath(/abs/no/tilde) = %q", got)
+	}
+	if got := expandUserPath(""); got != "" {
+		t.Fatalf("expandUserPath(\"\") = %q", got)
 	}
 }
