@@ -7,16 +7,17 @@ import { toolbox as rulegoToolbox } from "./rulego-blocks";
 
 export const DRAG_TYPE_BLOCK = "application/x-rulego-block-type";
 
+/** 与浅色侧栏搭配：纯色浅底 + 饱和描边，避免半透明叠在灰底上发污、字不清晰 */
 const CATEGORY_STYLES: Record<string, { bg: string; border: string }> = {
-  rulego_trigger: { bg: "rgba(239, 68, 68, 0.2)", border: "#ef4444" },
-  rulego_action: { bg: "rgba(59, 130, 246, 0.2)", border: "#3b82f6" },
-  rulego_condition: { bg: "rgba(20, 184, 166, 0.2)", border: "#14b8a6" },
-  rulego_data: { bg: "rgba(245, 158, 11, 0.2)", border: "#f59e0b" },
-  rulego_flow: { bg: "rgba(139, 92, 246, 0.2)", border: "#8b5cf6" },
-  rulego_db: { bg: "rgba(13, 148, 136, 0.2)", border: "#0d9488" },
-  rulego_file: { bg: "rgba(180, 83, 9, 0.2)", border: "#b45309" },
-  rulego_tracer: { bg: "rgba(8, 145, 178, 0.2)", border: "#0891b2" },
-  rulego_rpa: { bg: "rgba(99, 102, 241, 0.2)", border: "#6366f1" },
+  rulego_trigger: { bg: "#fee2e2", border: "#dc2626" },
+  rulego_action: { bg: "#dbeafe", border: "#2563eb" },
+  rulego_condition: { bg: "#ccfbf1", border: "#0d9488" },
+  rulego_data: { bg: "#fef3c7", border: "#d97706" },
+  rulego_flow: { bg: "#ede9fe", border: "#7c3aed" },
+  rulego_db: { bg: "#ccfbf1", border: "#0f766e" },
+  rulego_file: { bg: "#ffedd5", border: "#c2410c" },
+  rulego_tracer: { bg: "#cffafe", border: "#0891b2" },
+  rulego_rpa: { bg: "#e0e7ff", border: "#4f46e5" },
 };
 
 const BLOCK_LABELS: Record<string, string> = {

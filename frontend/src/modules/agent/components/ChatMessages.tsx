@@ -156,7 +156,7 @@ export function ChatMessages({
                     className={
                       pixelMode
                         ? 'flex h-8 w-8 flex-shrink-0 items-center justify-center border-2 border-black bg-[var(--sp-accent)] text-white shadow-[var(--sp-pixel-shadow-sm)]'
-                        : 'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-[#e11d48] text-white shadow-sm'
+                        : 'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-studio-hot text-white shadow-sm'
                     }
                   >
                     <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24" aria-hidden>
@@ -169,7 +169,7 @@ export function ChatMessages({
                     className={
                       pixelMode
                         ? 'border-2 border-black bg-[var(--sp-accent)] px-4 py-3 text-sm leading-relaxed text-white shadow-[var(--sp-pixel-shadow)]'
-                        : 'rounded-2xl bg-[#e11d48] px-4 py-3 text-sm leading-relaxed text-white shadow-md'
+                        : 'rounded-2xl bg-studio-hot px-4 py-3 text-sm leading-relaxed text-white shadow-md'
                     }
                   >
                     <div className="whitespace-pre-wrap break-words">{msg.content}</div>

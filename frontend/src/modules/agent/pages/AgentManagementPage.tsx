@@ -238,7 +238,7 @@ export const AgentManagementPage: React.FC = () => {
               type="button"
               onClick={openCreate}
               disabled={modelOptions.length === 0}
-              className="rounded-xl bg-[#e11d48] px-4 py-2 text-sm font-medium text-white hover:bg-[#be123c] disabled:opacity-50"
+              className="rounded-xl bg-studio-hot px-4 py-2 text-sm font-medium text-white hover:bg-studio-hot-hover disabled:opacity-50"
             >
               新建 Agent
             </button>
@@ -246,9 +246,9 @@ export const AgentManagementPage: React.FC = () => {
         </div>
 
         {modelOptions.length === 0 && (
-          <div className="mb-4 rounded-xl border border-amber-500/35 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+          <div className="mb-4 rounded-xl border border-amber-400/40 bg-amber-50 px-4 py-3 text-sm text-amber-900">
             请先在
-            <Link to="/settings/models" className="mx-1 font-medium text-studio-hot underline hover:text-[#ffb3c6]">
+            <Link to="/settings/models" className="mx-1 font-medium text-studio-hot underline hover:text-rose-700">
               模型管理
             </Link>
             添加至少一个模型，再创建 Agent。
@@ -261,7 +261,7 @@ export const AgentManagementPage: React.FC = () => {
 
         {loading ? (
           <div
-            className="flex items-center gap-3 rounded-xl border border-studio-border bg-studio-panel px-6 py-10 shadow-[0_8px_24px_rgba(0,0,0,0.25)]"
+            className="flex items-center gap-3 rounded-xl border border-studio-border bg-studio-panel px-6 py-10 shadow-[0_8px_24px_rgba(15,23,42,0.08)]"
             role="status"
             aria-live="polite"
           >
@@ -607,7 +607,7 @@ export const AgentManagementPage: React.FC = () => {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="rounded-xl bg-[#e11d48] px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+                  className="rounded-xl bg-studio-hot px-4 py-2 text-sm font-medium text-white hover:bg-studio-hot-hover disabled:opacity-50"
                 >
                   {saving ? '保存中…' : '保存'}
                 </button>

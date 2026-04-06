@@ -83,7 +83,7 @@ const OPENSEARCH_RECENT_ENDPOINTS_LIMIT = 5;
 const OPENSEARCH_RECENT_INDEXES_KEY = "rulego.opensearch.recent_indexes";
 const OPENSEARCH_RECENT_INDEXES_LIMIT = 10;
 
-/** 深色画布上略压深 primary，提高与白字对比；secondary/tertiary 保持层次 */
+/** 浅色画布上的积木配色；primary/secondary/tertiary 保持层次与可读性 */
 const scratchTheme = new ScratchBlocks.Theme(
   "scratch",
   {

@@ -50,17 +50,21 @@
 }
 
 :root {
-  color-scheme: dark;
-  /* 应用全局主题（与工作室 .studio-pixel 一致） */
-  --studio-deep: #08080e;
-  --studio-bg: #0f0f18;
-  --studio-panel: #18182a;
-  --studio-panel-2: #222236;
-  --studio-border: #4a4d6a;
-  --studio-hot: #e94560;
-  --studio-text: #e8e8f0;
-  --studio-muted: #8b8ba4;
-  --studio-code: #12121c;
+  color-scheme: light;
+  /* 应用全局浅色主题：主区淡灰、面板白、正文深色保证可读 */
+  --studio-deep: #f1f5f9;
+  --studio-bg: #f8fafc;
+  --studio-panel: #ffffff;
+  --studio-panel-2: #f1f5f9;
+  --studio-border: #e2e8f0;
+  /* 品牌主色：全站 CTA、强调、描边统一用同一套，勿混用旧 #e94560 / rgb(233,69,96) */
+  --studio-hot: #e11d48;
+  --studio-hot-hover: #be123c;
+  --studio-hot-rgb: 225, 29, 72;
+  --studio-hot-soft: rgba(225, 29, 72, 0.1);
+  --studio-text: #0f172a;
+  --studio-muted: #64748b;
+  --studio-code: #f1f5f9;
 }
 
 * {
@@ -113,8 +117,9 @@ body {
 .app-sidebar {
   width: 220px;
   flex-shrink: 0;
-  background: #0f172a;
-  color: #e2e8f0;
+  background: #ffffff;
+  color: var(--studio-text);
+  border-right: 1px solid var(--studio-border);
   display: flex;
   flex-direction: column;
   padding: 20px 12px;
@@ -218,22 +223,22 @@ body {
 
 /* ---------- 工作室 · 像素风（列表 + 工作区根节点挂 .studio-pixel） ---------- */
 .studio-pixel {
-  --sp-bg-deep: #08080e;
-  --sp-bg: #0f0f18;
-  --sp-panel: #18182a;
-  --sp-panel-2: #222236;
-  --sp-border: #4a4d6a;
-  --sp-border-hot: #e94560;
-  --sp-accent: #ff3d6e;
-  --sp-accent-dim: #b83255;
-  --sp-text: #e8e8f0;
-  --sp-muted: #8b8ba4;
-  --sp-code: #12121c;
-  --sp-error-bg: #2a1520;
-  --sp-error-border: #c94b6b;
-  --sp-error-text: #ffb3c6;
-  --sp-pixel-shadow: 3px 3px 0 #000;
-  --sp-pixel-shadow-sm: 2px 2px 0 #000;
+  --sp-bg-deep: #f1f5f9;
+  --sp-bg: #f8fafc;
+  --sp-panel: #ffffff;
+  --sp-panel-2: #f1f5f9;
+  --sp-border: #e2e8f0;
+  --sp-border-hot: #e11d48;
+  --sp-accent: #e11d48;
+  --sp-accent-dim: #be123c;
+  --sp-text: #0f172a;
+  --sp-muted: #64748b;
+  --sp-code: #f1f5f9;
+  --sp-error-bg: #fef2f2;
+  --sp-error-border: #f87171;
+  --sp-error-text: #b91c1c;
+  --sp-pixel-shadow: 2px 2px 0 rgba(15, 23, 42, 0.12);
+  --sp-pixel-shadow-sm: 1px 1px 0 rgba(15, 23, 42, 0.1);
   /* 与 body 一致：可读 UI 字体；像素风仅保留边框/阴影，不用 VT323 */
   font-family: "Inter", system-ui, -apple-system, "Segoe UI", "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
     sans-serif;
@@ -244,8 +249,8 @@ body {
 }
 
 .studio-pixel ::selection {
-  background: var(--sp-border-hot);
-  color: #fff;
+  background: rgba(225, 29, 72, 0.22);
+  color: var(--sp-text);
 }
 
 .studio-pixel kbd {
@@ -276,15 +281,16 @@ body {
 
 /* ---------- Star-Office-UI 式工作室布局（上场景 + 下 HUD，无第三方美术素材） ---------- */
 .studio-pixel.studio-office-layout {
-  --so-red: #e63946;
-  --so-red-glow: rgba(230, 57, 70, 0.35);
-  --so-charcoal: #121212;
-  --so-dashboard: #1a1a1a;
-  --so-paper: #ede0c8;
-  --so-paper-ink: #3d2914;
+  --so-red: #e11d48;
+  --so-red-glow: rgba(225, 29, 72, 0.22);
+  /* 与全站浅色一致：HUD / 卡片用淡底，不再用纯黑面板 */
+  --so-charcoal: #f8fafc;
+  --so-dashboard: #f1f5f9;
+  --so-paper: #fffbeb;
+  --so-paper-ink: #422006;
   /* 与原有像素变量对齐，便于对话区继承 */
   --sp-border-hot: var(--so-red);
-  --sp-accent: #ff4757;
+  --sp-accent: #e11d48;
 }
 
 .studio-office-scene {
@@ -341,11 +347,11 @@ body {
 
 .studio-office-floor {
   background:
-    linear-gradient(135deg, rgba(107, 79, 58, 0.35) 25%, transparent 25%) 0 0 / 24px 24px,
-    linear-gradient(225deg, rgba(107, 79, 58, 0.28) 25%, transparent 25%) 0 0 / 24px 24px,
-    linear-gradient(315deg, rgba(90, 67, 48, 0.4) 25%, transparent 25%) 12px 12px / 24px 24px,
-    linear-gradient(45deg, rgba(90, 67, 48, 0.32) 25%, transparent 25%) 12px 12px / 24px 24px,
-    radial-gradient(ellipse 120% 80% at 50% 100%, #4a3728 0%, #2a2218 55%, #1a1510 100%);
+    linear-gradient(135deg, rgba(180, 165, 140, 0.22) 25%, transparent 25%) 0 0 / 24px 24px,
+    linear-gradient(225deg, rgba(180, 165, 140, 0.18) 25%, transparent 25%) 0 0 / 24px 24px,
+    linear-gradient(315deg, rgba(170, 155, 130, 0.2) 25%, transparent 25%) 12px 12px / 24px 24px,
+    linear-gradient(45deg, rgba(170, 155, 130, 0.16) 25%, transparent 25%) 12px 12px / 24px 24px,
+    radial-gradient(ellipse 120% 80% at 50% 100%, #e8dfd4 0%, #ddd4c8 52%, #cfc4b6 100%);
   transform: perspective(420px) rotateX(12deg);
   transform-origin: 50% 100%;
 }
@@ -356,25 +362,25 @@ body {
       90deg,
       transparent,
       transparent 10px,
-      rgba(42, 32, 24, 0.45) 10px,
-      rgba(42, 32, 24, 0.45) 11px
+      rgba(120, 113, 108, 0.22) 10px,
+      rgba(120, 113, 108, 0.22) 11px
     ),
     repeating-linear-gradient(
       0deg,
-      #3d2e26 0px,
-      #3d2e26 7px,
-      #4a3a30 7px,
-      #4a3a30 15px
+      #efe8e1 0px,
+      #efe8e1 7px,
+      #f5efe8 7px,
+      #f5efe8 15px
     );
-  border-bottom: 2px solid rgba(26, 18, 12, 0.6);
+  border-bottom: 2px solid rgba(148, 136, 122, 0.45);
 }
 
 .studio-office-rug {
   background:
-    radial-gradient(ellipse at 50% 40%, rgba(120, 53, 15, 0.35), transparent 65%),
-    repeating-linear-gradient(90deg, #5c4033 0px, #5c4033 3px, #6b4f3e 3px, #6b4f3e 6px);
-  border: 2px solid #3d2818;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.06), 2px 3px 0 rgba(0, 0, 0, 0.35);
+    radial-gradient(ellipse at 50% 40%, rgba(190, 140, 100, 0.18), transparent 65%),
+    repeating-linear-gradient(90deg, #d6c4b4 0px, #d6c4b4 3px, #e2d5cb 3px, #e2d5cb 6px);
+  border: 2px solid #b8a090;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.45), 2px 3px 0 rgba(15, 23, 42, 0.08);
   transform: perspective(320px) rotateX(8deg);
   transform-origin: 50% 100%;
 }
@@ -396,11 +402,18 @@ body {
 .studio-office-rack-vents {
   background: repeating-linear-gradient(
     0deg,
-    #0f172a 0px,
-    #0f172a 2px,
-    #334155 2px,
-    #334155 3px
+    #cbd5e1 0px,
+    #cbd5e1 2px,
+    #e2e8f0 2px,
+    #e2e8f0 3px
   );
+}
+
+/* 浅色工作室场景：机柜改为浅灰金属感，避免大块纯黑与页面冲突 */
+.studio-pixel.studio-office-layout .studio-office-rack {
+  border-color: #cbd5e1 !important;
+  background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%) !important;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08) !important;
 }
 
 .studio-office-led {
@@ -614,7 +627,7 @@ body {
 }
 
 .app-nav-item {
-  color: #cbd5f5;
+  color: #334155;
   text-decoration: none;
   padding: 10px 12px;
   border-radius: 8px;
@@ -628,17 +641,17 @@ body {
 }
 
 .app-nav-item:hover {
-  background: rgba(148, 163, 184, 0.2);
-  color: #ffffff;
+  background: #f1f5f9;
+  color: #0f172a;
 }
 
 .app-nav-item.is-active {
-  background: rgba(59, 130, 246, 0.25);
-  color: #ffffff;
+  background: #dbeafe;
+  color: #1d4ed8;
 }
 
 .app-nav-item:focus-visible {
-  outline: 2px solid rgba(96, 165, 250, 0.65);
+  outline: 2px solid rgba(59, 130, 246, 0.55);
   outline-offset: 2px;
 }
 
@@ -648,10 +661,10 @@ body {
 }
 
 .app-sidebar.app-sidebar--openclaw {
-  background: linear-gradient(180deg, var(--studio-panel) 0%, #15152a 100%);
-  border-right: 2px solid var(--studio-border);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border-right: 1px solid var(--studio-border);
   color: var(--studio-text);
-  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.04);
+  box-shadow: 2px 0 12px rgba(15, 23, 42, 0.04);
 }
 
 .app-sidebar--openclaw .app-nav-group-label {
@@ -659,25 +672,25 @@ body {
 }
 
 .app-sidebar--openclaw .app-nav-item {
-  color: var(--studio-muted);
+  color: #475569;
 }
 
 .app-sidebar--openclaw .app-nav-item:hover {
-  background: rgba(233, 69, 96, 0.12);
+  background: rgba(225, 29, 72, 0.06);
   color: var(--studio-text);
 }
 
 .app-sidebar--openclaw .app-nav-item.is-active {
-  background: rgba(233, 69, 96, 0.22);
-  color: #ffb3c6;
+  background: rgba(225, 29, 72, 0.1);
+  color: #be123c;
   border-left: 3px solid var(--studio-hot);
   padding-left: 9px;
   border-radius: 0 10px 10px 0;
-  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
 }
 
 .app-sidebar--openclaw .app-nav-item:focus-visible {
-  outline-color: rgba(255, 143, 171, 0.75);
+  outline-color: rgba(225, 29, 72, 0.45);
 }
 
 .app-sidebar--openclaw .app-version {
@@ -744,8 +757,8 @@ body {
   padding: 6px 10px;
   border: 1px solid var(--studio-border);
   border-radius: 12px;
-  background: rgba(24, 24, 42, 0.7);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  background: var(--studio-panel);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.06);
 }
 
 .dp-filter-field {
@@ -767,7 +780,7 @@ body {
 .dp-select {
   appearance: none;
   border: 1px solid var(--studio-border);
-  background: rgba(15, 15, 24, 0.85);
+  background: var(--studio-panel, #ffffff);
   color: var(--studio-text);
   border-radius: 10px;
   padding: 7px 28px 7px 10px;
@@ -775,18 +788,26 @@ body {
   line-height: 1.1;
   outline: none;
   cursor: pointer;
-  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 1px 2px rgba(15, 23, 42, 0.06);
 }
 
 .dp-select:hover {
-  border-color: rgba(233, 69, 96, 0.7);
+  border-color: rgba(225, 29, 72, 0.45);
+  background: var(--studio-panel-2, #f1f5f9);
 }
 
 .dp-select:focus {
   border-color: var(--studio-hot);
   box-shadow:
-    0 0 0 3px rgba(233, 69, 96, 0.18),
-    inset 0 0 0 1px rgba(0, 0, 0, 0.08);
+    0 0 0 3px rgba(225, 29, 72, 0.18),
+    inset 0 0 0 1px rgba(15, 23, 42, 0.06);
+}
+
+.dp-select option {
+  background: var(--studio-panel, #ffffff);
+  color: var(--studio-text);
 }
 
 .dp-filter-field {
@@ -876,7 +897,7 @@ body {
 
 .skill-repo-dropzone.is-dragover {
   border-color: var(--studio-hot);
-  background: rgba(233, 69, 96, 0.12);
+  background: rgba(var(--studio-hot-rgb), 0.12);
 }
 
 .skill-repo-dropzone-text {
@@ -1014,8 +1035,10 @@ body {
   border-radius: 10px;
   font-size: 14px;
   font-weight: 600;
+  letter-spacing: 0.01em;
   cursor: pointer;
-  box-shadow: 0 4px 14px rgba(233, 69, 96, 0.35);
+  -webkit-font-smoothing: antialiased;
+  box-shadow: 0 4px 14px rgba(var(--studio-hot-rgb), 0.35);
   transition:
     background 0.15s ease,
     box-shadow 0.15s ease,
@@ -1024,16 +1047,16 @@ body {
 
 .primary-button:hover:not(:disabled) {
   filter: brightness(1.06);
-  box-shadow: 0 6px 20px rgba(233, 69, 96, 0.42);
+  box-shadow: 0 6px 20px rgba(var(--studio-hot-rgb), 0.42);
 }
 
 .primary-button:active:not(:disabled) {
   transform: translateY(1px);
-  box-shadow: 0 2px 10px rgba(233, 69, 96, 0.3);
+  box-shadow: 0 2px 10px rgba(var(--studio-hot-rgb), 0.3);
 }
 
 .primary-button:focus-visible {
-  outline: 2px solid rgba(255, 143, 171, 0.85);
+  outline: 2px solid rgba(var(--studio-hot-rgb), 0.45);
   outline-offset: 2px;
 }
 
@@ -1232,7 +1255,7 @@ body {
 .rulego-request-params-view-toggle button {
   border: none;
   background: transparent;
-  color: var(--studio-muted);
+  color: #475569;
   font-size: 12px;
   font-weight: 600;
   padding: 6px 12px;
@@ -1241,12 +1264,13 @@ body {
 }
 
 .rulego-request-params-view-toggle button:hover {
-  color: var(--studio-text);
+  color: #0f172a;
 }
 
 .rulego-request-params-view-toggle button[aria-pressed="true"] {
-  background: rgba(233, 69, 96, 0.22);
-  color: #ffb3c6;
+  background: rgba(225, 29, 72, 0.12);
+  color: #be123c;
+  font-weight: 700;
 }
 
 .rulego-request-params-json-panel {
@@ -1272,7 +1296,7 @@ body {
 }
 
 .rulego-request-params-json-textarea:focus {
-  outline: 2px solid rgba(233, 69, 96, 0.35);
+  outline: 2px solid rgba(var(--studio-hot-rgb), 0.35);
   border-color: var(--studio-hot);
 }
 
@@ -1394,7 +1418,7 @@ body {
 }
 
 .rulego-request-params-type:focus {
-  outline: 2px solid rgba(233, 69, 96, 0.35);
+  outline: 2px solid rgba(var(--studio-hot-rgb), 0.35);
   border-color: var(--studio-hot);
 }
 
@@ -1456,14 +1480,15 @@ body {
   align-self: flex-start;
   border: none;
   background: transparent;
-  color: var(--studio-muted);
+  color: #475569;
   cursor: pointer;
   font-size: 13px;
+  font-weight: 600;
   padding: 4px 0;
 }
 
 .rulego-request-params-add:hover {
-  color: #ff8fab;
+  color: var(--studio-hot);
 }
 
 .rulego-request-params-import-textarea {
@@ -1476,10 +1501,12 @@ body {
 .text-button {
   border: none;
   background: transparent;
-  color: #ff8fab;
+  color: var(--studio-hot);
   cursor: pointer;
   font-size: 13px;
+  font-weight: 600;
   padding: 0;
+  -webkit-font-smoothing: antialiased;
 }
 
 .text-button.danger {
@@ -1492,7 +1519,7 @@ body {
 }
 
 .text-button:focus-visible {
-  outline: 2px solid rgba(233, 69, 96, 0.45);
+  outline: 2px solid rgba(var(--studio-hot-rgb), 0.45);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -1503,10 +1530,10 @@ body {
   justify-content: center;
   padding: 4px 8px;
   border-radius: 999px;
-  background: rgba(233, 69, 96, 0.2);
-  color: #ffb3c6;
+  background: rgba(225, 29, 72, 0.1);
+  color: #be123c;
   font-size: 12px;
-  font-weight: 600;
+  font-weight: 700;
 }
 
 .table-empty {
@@ -1666,7 +1693,7 @@ body {
 }
 
 .form-row-with-action input:focus {
-  outline: 2px solid rgba(233, 69, 96, 0.35);
+  outline: 2px solid rgba(var(--studio-hot-rgb), 0.35);
   border-color: var(--studio-hot);
 }
 
@@ -1684,7 +1711,7 @@ body {
 .form-field input:focus,
 .form-field select:focus,
 .form-field textarea:focus {
-  outline: 2px solid rgba(233, 69, 96, 0.35);
+  outline: 2px solid rgba(var(--studio-hot-rgb), 0.35);
   border-color: var(--studio-hot);
 }
 
@@ -1755,7 +1782,7 @@ body {
   color: var(--studio-text);
 }
 .system-prompt-editor-textarea:focus {
-  outline: 2px solid rgba(233, 69, 96, 0.35);
+  outline: 2px solid rgba(var(--studio-hot-rgb), 0.35);
   border-color: var(--studio-hot);
 }
 
@@ -1879,10 +1906,11 @@ body {
 }
 
 .rulego-editor-canvas {
-  background: #1e293b;
+  background: #f1f5f9;
   border-radius: 12px;
   overflow: hidden;
   min-height: 640px;
+  border: 1px solid #e2e8f0;
 }
 
 .rulego-editor-side textarea {
@@ -1897,12 +1925,13 @@ body {
 }
 
 .rulego-editor-canvas .blocklyToolboxDiv {
-  background: #1e293b;
-  color: #e5e7eb;
+  background: #ffffff;
+  color: #0f172a;
   padding: 8px 6px;
   width: auto;
   min-width: 0;
   max-width: 132px !important;
+  border-right: 1px solid #e2e8f0;
 }
 
 /* 组件列表（飞出栏）：收窄总宽，使滚动条紧贴内容右侧 */
@@ -1924,30 +1953,30 @@ body {
 }
 
 .rulego-editor-canvas .blocklyFlyoutBackground {
-  fill: #1e293b;
+  fill: #ffffff;
 }
 
 /* 画布工作区：SVG 底色；勿对 .blocklyMainBackground 使用 fill !important，否则会盖住 Blockly 的 var(--blocklyGridPattern) 网格 */
 .rulego-editor-canvas .blocklySvg {
-  background-color: #1e293b !important;
+  background-color: #f1f5f9 !important;
 }
 
 .rulego-editor-canvas .blocklyMainBackground {
-  stroke: #334155 !important;
+  stroke: #cbd5e1 !important;
 }
 
 /* Blockly 工作区网格：与 inject grid 选项一致，略淡以免抢积木视觉 */
 .rulego-editor-canvas defs pattern[id^="blocklyGridPattern"] line {
-  stroke: rgba(148, 163, 184, 0.28) !important;
+  stroke: rgba(15, 23, 42, 0.12) !important;
   stroke-width: 1px;
 }
 
 .rulego-editor-canvas .injectionDiv {
-  background-color: #1e293b !important;
+  background-color: #f1f5f9 !important;
 }
 
 .rulego-editor-canvas .blocklyScrollbarHandle {
-  fill: #334155;
+  fill: #94a3b8;
 }
 
 .rulego-editor-canvas .blocklyTreeRow {
@@ -1970,29 +1999,36 @@ body {
   height: 20px;
   border-radius: 6px;
   padding: 2px;
-  background: rgba(255, 255, 255, 0.1);
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  box-sizing: border-box;
+}
+
+/* Blockly 原生工具箱分类文字（SVG）；浅色底上需深色填充 */
+.rulego-editor-canvas .blocklyToolboxDiv .blocklyTreeLabel {
+  fill: #0f172a !important;
 }
 
 .rulego-editor-canvas .blocklyTreeSelected {
-  background: rgba(148, 163, 184, 0.25) !important;
+  background: rgba(59, 130, 246, 0.12) !important;
 }
 
-/* 规则编辑器 - 图中类似布局（三栏 + 顶部工具栏），统一深色背景 */
+/* 规则编辑器 - 浅色壳 + Blockly 浅灰画布 */
 .rulego-editor-visual {
   min-height: 100%;
   display: flex;
   flex-direction: column;
   gap: 0;
-  background: #1e293b;
+  background: #f1f5f9;
 }
 
 .rulego-editor-layout-constraint.form-error {
   margin: 0 16px 10px;
   padding: 10px 14px;
   border-radius: 10px;
-  background: rgba(220, 38, 38, 0.12);
-  border: 1px solid rgba(248, 113, 113, 0.35);
-  color: #fecaca;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
   font-size: 13px;
   line-height: 1.45;
 }
@@ -2002,12 +2038,12 @@ body {
   align-items: center;
   gap: 14px 18px;
   padding: 12px 18px 14px;
-  background: linear-gradient(180deg, #243047 0%, #1e293b 100%);
-  color: #e2e8f0;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  color: #0f172a;
   border-radius: 12px 12px 0 0;
   flex-wrap: wrap;
-  border-bottom: 1px solid #334155;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
 }
 
 .rulego-editor-title-cluster {
@@ -2034,25 +2070,25 @@ body {
   font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  color: #e2e8f0;
-  border: 1px solid rgba(100, 116, 139, 0.55);
+  color: #334155;
+  border: 1px solid #cbd5e1;
   border-radius: 8px;
-  background: linear-gradient(180deg, rgba(71, 85, 105, 0.85) 0%, rgba(51, 65, 85, 0.95) 100%);
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.9) inset;
 }
 
 .rulego-toolbar-btn.text.rulego-editor-back-to-list:hover:not(:disabled) {
-  color: #f8fafc;
-  border-color: rgba(148, 163, 184, 0.55);
-  background: linear-gradient(180deg, rgba(100, 116, 139, 0.9) 0%, rgba(71, 85, 105, 0.98) 100%);
+  color: #0f172a;
+  border-color: #94a3b8;
+  background: linear-gradient(180deg, #f8fafc 0%, #e2e8f0 100%);
 }
 
 .rulego-toolbar-btn.text.rulego-editor-back-to-list:focus-visible {
   outline: none;
   box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.06) inset,
-    0 0 0 2px #1e293b,
-    0 0 0 4px rgba(148, 163, 184, 0.55);
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 0 0 2px #ffffff,
+    0 0 0 4px rgba(59, 130, 246, 0.45);
 }
 
 /* 规则编辑器主工具：Agent / 测试 / 保存 — 高对比色块 */
@@ -2078,7 +2114,7 @@ body {
 .rulego-toolbar-btn.rulego-toolbar-btn--agent:focus-visible {
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.2) inset,
-    0 0 0 2px #1e293b,
+    0 0 0 2px #ffffff,
     0 0 0 4px rgba(56, 189, 248, 0.75);
 }
 
@@ -2101,7 +2137,7 @@ body {
 .rulego-toolbar-btn.rulego-toolbar-btn--test:focus-visible {
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.2) inset,
-    0 0 0 2px #1e293b,
+    0 0 0 2px #ffffff,
     0 0 0 4px rgba(251, 191, 36, 0.85);
 }
 
@@ -2131,29 +2167,29 @@ body {
 .rulego-toolbar-btn.rulego-toolbar-btn--save.rulego-toolbar-btn--save-active:focus-visible {
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.2) inset,
-    0 0 0 2px #1e293b,
+    0 0 0 2px #ffffff,
     0 0 0 4px rgba(52, 211, 153, 0.8);
 }
 
 .rulego-toolbar-btn.rulego-toolbar-btn--save.rulego-toolbar-btn--save-idle {
   font-weight: 600;
-  border-color: #475569;
-  background: #475569;
-  color: #94a3b8;
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+  color: #334155;
   cursor: not-allowed;
-  opacity: 0.95;
+  opacity: 1;
   box-shadow: none;
 }
 
 .rulego-toolbar-btn.rulego-toolbar-btn--save.rulego-toolbar-btn--save-idle:hover {
-  background: #475569;
-  border-color: #475569;
-  color: #94a3b8;
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #334155;
   cursor: not-allowed;
 }
 
 .rulego-toolbar-btn.rulego-toolbar-btn--save.rulego-toolbar-btn--save-idle:focus-visible {
-  box-shadow: 0 0 0 2px #1e293b, 0 0 0 4px rgba(148, 163, 184, 0.45);
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px rgba(148, 163, 184, 0.45);
 }
 
 .rulego-editor-title {
@@ -2168,7 +2204,7 @@ body {
   margin: 0;
   font-size: 13px;
   font-weight: 500;
-  color: #94a3b8;
+  color: #475569;
   line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -2189,9 +2225,9 @@ body {
   font-size: 11px;
   font-weight: 600;
   letter-spacing: 0.02em;
-  background: rgba(245, 158, 11, 0.2);
-  color: #fcd34d;
-  border: 1px solid rgba(245, 158, 11, 0.35);
+  background: #fef3c7;
+  color: #b45309;
+  border: 1px solid #fcd34d;
   flex-shrink: 0;
 }
 
@@ -2229,8 +2265,9 @@ body {
   gap: 8px;
   padding: 8px 12px;
   margin-top: 8px;
-  background: rgba(239, 68, 68, 0.15);
-  color: #fca5a5;
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
   border-radius: 8px;
   font-size: 13px;
 }
@@ -2242,9 +2279,9 @@ body {
 .rulego-toolbar-btn {
   padding: 8px 14px;
   border-radius: 8px;
-  border: 1px solid #334155;
-  background: #334155;
-  color: #e2e8f0;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #334155;
   font-size: 13px;
   font-weight: 500;
   cursor: pointer;
@@ -2256,13 +2293,14 @@ body {
 }
 
 .rulego-toolbar-btn:hover:not(:disabled) {
-  background: #475569;
-  border-color: #475569;
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
 }
 
 .rulego-toolbar-btn:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px #1e293b, 0 0 0 4px rgba(129, 140, 248, 0.65);
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px rgba(var(--studio-hot-rgb), 0.45);
 }
 
 .rulego-toolbar-btn:disabled {
@@ -2274,35 +2312,39 @@ body {
 }
 
 .rulego-toolbar-btn.primary {
-  background: #6366f1;
-  border-color: #6366f1;
+  background: var(--studio-hot);
+  border-color: var(--studio-hot);
+  color: #ffffff;
+  font-weight: 600;
 }
 
 .rulego-toolbar-btn.primary:hover:not(:disabled) {
-  background: #4f46e5;
-  border-color: #4f46e5;
+  background: var(--studio-hot-hover);
+  border-color: var(--studio-hot-hover);
+  color: #ffffff;
 }
 
 .rulego-toolbar-btn.primary:focus-visible {
-  box-shadow: 0 0 0 2px #1e293b, 0 0 0 4px rgba(165, 180, 252, 0.75);
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px rgba(var(--studio-hot-rgb), 0.75);
 }
 
-/* 保存按钮在无变更时：灰色且不可点击 */
+/* 保存按钮在无变更时：灰色且不可点击（字色加深保证可读） */
 .rulego-toolbar-btn.save-unchanged {
-  background: #475569;
-  border-color: #475569;
-  color: #94a3b8;
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  color: #334155;
+  font-weight: 600;
   cursor: not-allowed;
 }
 
 .rulego-toolbar-btn.save-unchanged:hover {
-  background: #475569;
-  border-color: #475569;
-  color: #94a3b8;
+  background: #e2e8f0;
+  border-color: #cbd5e1;
+  color: #334155;
 }
 
 .rulego-toolbar-btn.save-unchanged:focus-visible {
-  box-shadow: 0 0 0 2px #1e293b, 0 0 0 4px rgba(148, 163, 184, 0.45);
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px rgba(148, 163, 184, 0.45);
 }
 
 .rulego-toolbar-btn.icon {
@@ -2315,16 +2357,16 @@ body {
 .rulego-toolbar-btn.text {
   background: transparent;
   border-color: transparent;
-  color: #cbd5e1;
+  color: #475569;
 }
 
 .rulego-toolbar-btn.text:hover:not(:disabled) {
-  background: rgba(255, 255, 255, 0.08);
-  color: #f1f5f9;
+  background: rgba(15, 23, 42, 0.06);
+  color: #0f172a;
 }
 
 .rulego-toolbar-btn.text:focus-visible {
-  box-shadow: 0 0 0 2px #1e293b, 0 0 0 4px rgba(129, 140, 248, 0.55);
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px rgba(var(--studio-hot-rgb), 0.45);
 }
 
 .rulego-agent-modal.modal {
@@ -2377,7 +2419,7 @@ body {
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.06em;
-  color: #94a3b8;
+  color: #64748b;
   margin: 0;
 }
 
@@ -2445,10 +2487,10 @@ body {
   min-height: 120px;
   max-height: min(38vh, 360px);
   overflow-y: auto;
-  border: 1px solid #334155;
+  border: 1px solid #e2e8f0;
   border-radius: 10px;
   padding: 10px;
-  background: #111827;
+  background: #f8fafc;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -2462,46 +2504,51 @@ body {
 
 .rulego-agent-chat-bubble.user {
   align-self: flex-end;
-  background: #312e81;
+  background: rgba(var(--studio-hot-rgb), 0.12);
+  border: 1px solid rgba(var(--studio-hot-rgb), 0.32);
+}
+
+.rulego-agent-chat-bubble.user .rulego-agent-chat-content {
+  color: #881337;
 }
 
 .rulego-agent-chat-bubble.assistant {
   align-self: flex-start;
-  background: #1f2937;
-  border: 1px solid #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
 }
 
 .rulego-agent-chat-role {
   font-size: 11px;
-  color: #94a3b8;
+  color: #64748b;
   margin-bottom: 4px;
 }
 
 .rulego-agent-chat-content {
   font-size: 13px;
-  color: #e2e8f0;
+  color: #0f172a;
   white-space: pre-wrap;
 }
 
 .rulego-agent-thought,
 .rulego-agent-questions {
-  border: 1px solid #334155;
+  border: 1px solid #e2e8f0;
   border-radius: 10px;
   padding: 10px;
-  background: #1f2937;
+  background: #f8fafc;
 }
 
 .rulego-agent-thought-title {
   font-size: 13px;
   font-weight: 600;
-  color: #e2e8f0;
+  color: #0f172a;
   margin-bottom: 6px;
 }
 
 .rulego-agent-question-progress {
   margin-left: 10px;
   font-size: 12px;
-  color: #93c5fd;
+  color: #2563eb;
   font-weight: 500;
 }
 
@@ -2534,10 +2581,10 @@ body {
 }
 
 .rulego-agent-question-item {
-  border: 1px solid #334155;
+  border: 1px solid #e2e8f0;
   border-radius: 10px;
   padding: 10px;
-  background: #111827;
+  background: #ffffff;
 }
 
 .rulego-agent-question-head {
@@ -2550,10 +2597,10 @@ body {
 .rulego-agent-primary-actions {
   position: sticky;
   bottom: 0;
-  background: linear-gradient(to top, #111827 72%, rgba(17, 24, 39, 0.2));
+  background: linear-gradient(to top, #ffffff 72%, rgba(248, 250, 252, 0));
   padding-top: 10px;
   margin-top: 2px;
-  border-top: 1px solid rgba(51, 65, 85, 0.85);
+  border-top: 1px solid #e2e8f0;
   z-index: 1;
   justify-content: space-between;
   align-items: center;
@@ -2573,9 +2620,9 @@ body {
 }
 
 .rulego-agent-candidate-option {
-  border: 1px solid #475569;
-  background: #0f172a;
-  color: #cbd5e1;
+  border: 1px solid #cbd5e1;
+  background: #f1f5f9;
+  color: #334155;
   border-radius: 999px;
   padding: 4px 10px;
   font-size: 12px;
@@ -2583,9 +2630,9 @@ body {
 }
 
 .rulego-agent-candidate-option.active {
-  border-color: #6366f1;
-  background: #312e81;
-  color: #e0e7ff;
+  border-color: var(--studio-hot);
+  background: rgba(var(--studio-hot-rgb), 0.12);
+  color: #881337;
 }
 
 .rulego-agent-preview-list {
@@ -2596,10 +2643,10 @@ body {
   min-height: 160px;
   overflow-x: hidden;
   overflow-y: auto;
-  border: 1px solid #334155;
+  border: 1px solid #e2e8f0;
   border-radius: 10px;
   padding: 10px;
-  background: #1f2937;
+  background: #f8fafc;
 }
 
 .rulego-agent-preview-item {
@@ -2608,7 +2655,8 @@ body {
   align-items: flex-start;
   padding: 8px;
   border-radius: 8px;
-  background: #334155;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
 }
 
 .rulego-agent-preview-item-checkbox {
@@ -2635,9 +2683,9 @@ body {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
   line-height: 1.45;
-  color: #e2e8f0;
-  background: #0f172a;
-  border: 1px solid #475569;
+  color: #0f172a;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
   border-radius: 8px;
   white-space: pre-wrap;
   word-break: break-word;
@@ -2673,9 +2721,9 @@ body {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
   line-height: 1.45;
-  color: #e2e8f0;
-  background: #0f172a;
-  border: 1px solid #475569;
+  color: #0f172a;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
   border-radius: 8px;
   resize: vertical;
 }
@@ -2692,7 +2740,7 @@ body {
 
 .rulego-agent-preview-item-title {
   font-size: 13px;
-  color: #e2e8f0;
+  color: #0f172a;
   font-weight: 600;
 }
 
@@ -2734,13 +2782,13 @@ body {
   font-size: 12px;
   font-weight: 600;
   font-variant-numeric: tabular-nums;
-  color: #cbd5e1;
+  color: #475569;
   min-width: 44px;
   text-align: center;
   padding: 4px 6px;
   border-radius: 6px;
-  background: rgba(15, 23, 42, 0.45);
-  border: 1px solid #334155;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
 }
 
 /* 三栏布局：左侧积木库+工作区区域，右侧属性 */
@@ -2763,7 +2811,7 @@ body {
   grid-template-columns: auto 1fr;
   grid-template-rows: auto auto 1fr;
   gap: 0;
-  background: #1e293b;
+  background: #f8fafc;
   min-height: 0;
   overflow: hidden;
 }
@@ -2780,16 +2828,16 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  border-right: 1px solid #334155;
-  background: linear-gradient(180deg, #1a2332 0%, #1e293b 48%);
-  box-shadow: inset -1px 0 0 rgba(255, 255, 255, 0.03);
+  border-right: 1px solid #e2e8f0;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow: inset -1px 0 0 rgba(15, 23, 42, 0.04);
 }
 
 .rulego-editor-single-col-library .rulego-editor-library-col .rulego-library-title {
   flex-shrink: 0;
   padding: 12px 14px;
   margin: 0;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .rulego-editor-single-col-library .rulego-editor-library-col .rulego-library-search {
@@ -2797,9 +2845,9 @@ body {
   margin: 8px 10px;
   padding: 9px 11px;
   border-radius: 8px;
-  border: 1px solid #475569;
-  background: #0f172a;
-  color: #e2e8f0;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
   font-size: 13px;
   transition:
     border-color 0.15s ease,
@@ -2816,8 +2864,8 @@ body {
 
 .rulego-editor-single-col-library .rulego-editor-library-col .rulego-library-search:focus {
   outline: none;
-  border-color: #818cf8;
-  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.22);
+  border-color: var(--studio-hot);
+  box-shadow: 0 0 0 3px rgba(var(--studio-hot-rgb), 0.22);
 }
 
 .rulego-editor-single-col-library .rulego-editor-workspace-col {
@@ -2826,21 +2874,21 @@ body {
   display: flex;
   flex-direction: column;
   min-height: 0;
-  background: #1a2332;
+  background: #f1f5f9;
 }
 
 .rulego-editor-single-col-library .rulego-editor-workspace-col .rulego-workspace-title {
   flex-shrink: 0;
   padding: 12px 14px;
   margin: 0;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .rulego-editor-single-col-library .rulego-editor-workspace-col .rulego-editor-canvas {
   flex: 1;
   min-height: 400px;
   min-width: 300px;
-  box-shadow: inset 0 0 0 1px rgba(51, 65, 85, 0.65);
+  box-shadow: inset 0 0 0 1px #e2e8f0;
   border-radius: 0 0 8px 0;
 }
 
@@ -2856,8 +2904,8 @@ body {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #e2e8f0;
-  border-bottom: 1px solid #1e293b;
+  color: #0f172a;
+  border-bottom: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2869,9 +2917,9 @@ body {
   margin: 8px 10px;
   padding: 8px 10px;
   border-radius: 8px;
-  border: 1px solid #334155;
-  background: #334155;
-  color: #e2e8f0;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
   font-size: 13px;
 }
 
@@ -2886,9 +2934,9 @@ body {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #e2e8f0;
-  border-bottom: 1px solid #1e293b;
-  border-left: 1px solid #1e293b;
+  color: #0f172a;
+  border-bottom: 1px solid #e2e8f0;
+  border-left: 1px solid #e2e8f0;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -2930,11 +2978,11 @@ body {
   padding: 14px 12px;
   font-size: 12px;
   line-height: 1.5;
-  color: #94a3b8;
+  color: #64748b;
   text-align: center;
   border-radius: 8px;
-  border: 1px dashed #475569;
-  background: rgba(15, 23, 42, 0.35);
+  border: 1px dashed #cbd5e1;
+  background: #f8fafc;
 }
 
 .rulego-block-library-category {
@@ -2951,26 +2999,29 @@ body {
   border-radius: 0 8px 8px 0;
   border-left: 3px solid;
   background: transparent;
-  color: #e2e8f0;
+  color: #0f172a;
   font-size: 13px;
-  font-weight: 600;
+  font-weight: 700;
   text-align: left;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition:
+    background 0.15s ease,
+    filter 0.15s ease;
 }
 
 .rulego-block-library-category-header:hover {
-  background: rgba(255, 255, 255, 0.06);
+  filter: brightness(0.97);
 }
 
 .rulego-block-library-category-header:focus-visible {
   outline: none;
-  box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.45);
+  box-shadow: 0 0 0 2px rgba(var(--studio-hot-rgb), 0.45);
 }
 
 .rulego-block-library-category-chevron {
   font-size: 10px;
-  opacity: 0.8;
+  opacity: 0.75;
+  color: #475569;
 }
 
 .rulego-block-library-category-name {
@@ -2979,8 +3030,8 @@ body {
 
 .rulego-block-library-category-count {
   font-size: 12px;
-  font-weight: 400;
-  color: #94a3b8;
+  font-weight: 600;
+  color: #64748b;
 }
 
 .rulego-block-library-blocks {
@@ -2996,11 +3047,12 @@ body {
   justify-content: space-between;
   width: 100%;
   padding: 8px 12px;
-  border: none;
+  border: 1px solid #e2e8f0;
   border-left: 3px solid;
-  background: rgba(255, 255, 255, 0.04);
-  color: #e2e8f0;
+  background: #ffffff;
+  color: #0f172a;
   font-size: 13px;
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
   border-radius: 0 6px 6px 0;
@@ -3008,7 +3060,7 @@ body {
 }
 
 .rulego-block-library-block-item:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: #f8fafc;
 }
 
 .rulego-block-library-block-item:focus {
@@ -3016,8 +3068,8 @@ body {
 }
 
 .rulego-block-library-block-item:focus-visible {
-  background: rgba(129, 140, 248, 0.12);
-  box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.35);
+  background: rgba(var(--studio-hot-rgb), 0.08);
+  box-shadow: inset 0 0 0 1px rgba(var(--studio-hot-rgb), 0.35);
 }
 
 .rulego-block-library-block-item-draggable {
@@ -3034,19 +3086,19 @@ body {
 
 .rulego-block-library-block-arrow {
   font-size: 12px;
-  opacity: 0.6;
+  color: #94a3b8;
 }
 
 .rulego-block-library-block-drag-hint {
   font-size: 12px;
-  opacity: 0.5;
+  color: #94a3b8;
   user-select: none;
 }
 
 .rulego-panel-title {
   font-size: 14px;
   font-weight: 600;
-  color: #e2e8f0;
+  color: #0f172a;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -3069,13 +3121,13 @@ body {
 .rulego-block-count {
   font-size: 12px;
   font-weight: 400;
-  color: #94a3b8;
+  color: #64748b;
 }
 
 .rulego-editor-visual .rulego-editor-side .rulego-panel-title {
-  color: #e2e8f0;
+  color: #0f172a;
   padding-bottom: 8px;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid #e2e8f0;
   margin-bottom: 8px;
 }
 
@@ -3086,13 +3138,13 @@ body {
   align-items: center;
   justify-content: center;
   gap: 12px;
-  color: #94a3b8;
+  color: #64748b;
   font-size: 14px;
   padding: 24px;
   margin: 8px 0;
   border-radius: 12px;
-  border: 1px dashed #475569;
-  background: rgba(15, 23, 42, 0.35);
+  border: 1px dashed #cbd5e1;
+  background: #f8fafc;
 }
 
 .rulego-props-placeholder-icon {
@@ -3101,19 +3153,19 @@ body {
 }
 
 .rulego-editor-visual .rulego-editor-side {
-  background: linear-gradient(180deg, #1f2a3d 0%, #1e293b 40%);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
   border-radius: 0 0 12px 0;
-  border-left: 1px solid #334155;
+  border-left: 1px solid #e2e8f0;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
   box-shadow:
-    -6px 0 20px rgba(0, 0, 0, 0.25),
-    inset 3px 0 0 rgba(129, 140, 248, 0.35);
+    -4px 0 16px rgba(15, 23, 42, 0.06),
+    inset 3px 0 0 rgba(var(--studio-hot-rgb), 0.22);
   overflow: auto;
   scrollbar-width: thin;
-  scrollbar-color: rgba(100, 116, 139, 0.5) transparent;
+  scrollbar-color: rgba(100, 116, 139, 0.45) transparent;
 }
 
 .rulego-editor-visual .rulego-editor-side::-webkit-scrollbar {
@@ -3142,7 +3194,7 @@ body {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #e2e8f0;
+  color: #0f172a;
 }
 
 .block-config-inline-form {
@@ -3165,7 +3217,7 @@ body {
   justify-content: flex-end;
   margin-top: 8px;
   padding-top: 8px;
-  border-top: 1px solid #334155;
+  border-top: 1px solid #e2e8f0;
 }
 
 /* 属性侧栏：顶栏「属性设置」+ 右上角确定（与表单通过 form 属性关联） */
@@ -3180,16 +3232,16 @@ body {
   z-index: 6;
   margin: -4px 0 10px;
   padding: 4px 0 12px;
-  border-bottom: 1px solid #334155;
-  background: linear-gradient(180deg, #1f2a3d 0%, #1e293b 55%, #1e293b 100%);
-  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.45);
+  border-bottom: 1px solid #e2e8f0;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  box-shadow: 0 6px 12px rgba(15, 23, 42, 0.06);
 }
 
 .rulego-props-sticky-top-title {
   margin: 0;
   font-size: 14px;
   font-weight: 600;
-  color: #f1f5f9;
+  color: #0f172a;
   letter-spacing: -0.01em;
 }
 
@@ -3198,21 +3250,21 @@ body {
   flex-shrink: 0;
 }
 
-/* 属性面板内表单统一深色主题（仅可视化编辑器侧栏） */
+/* 属性面板内表单（可视化编辑器侧栏，浅色） */
 .rulego-editor-visual .rulego-editor-side .form-grid,
 .rulego-editor-visual .rulego-editor-side .form-field,
 .rulego-editor-visual .rulego-editor-side .form-label,
 .rulego-editor-visual .rulego-editor-side .form-hint,
 .rulego-editor-visual .rulego-editor-side label span {
-  color: #e2e8f0;
+  color: #334155;
 }
 
 .rulego-editor-visual .rulego-editor-side .form-field input,
 .rulego-editor-visual .rulego-editor-side .form-field textarea,
 .rulego-editor-visual .rulego-editor-side .form-field select {
-  background: #334155;
-  border-color: #475569;
-  color: #e2e8f0;
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #0f172a;
   transition:
     border-color 0.15s ease,
     box-shadow 0.15s ease;
@@ -3224,32 +3276,32 @@ body {
 }
 
 .rulego-editor-visual .rulego-editor-side .form-field input.readonly-input {
-  background: #1e293b;
-  color: #94a3b8;
+  background: #f1f5f9;
+  color: #64748b;
 }
 
 .rulego-editor-visual .rulego-editor-side .form-field input:focus,
 .rulego-editor-visual .rulego-editor-side .form-field select:focus,
 .rulego-editor-visual .rulego-editor-side .form-field textarea:focus {
   outline: none;
-  border-color: #818cf8;
-  box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.22);
+  border-color: var(--studio-hot);
+  box-shadow: 0 0 0 3px rgba(var(--studio-hot-rgb), 0.22);
 }
 
 .rulego-editor-visual .rulego-editor-side .form-hint,
 .rulego-editor-visual .rulego-editor-side small.form-hint {
-  color: #94a3b8;
+  color: #64748b;
 }
 
 .rulego-editor-visual .rulego-editor-side .form-hint a {
-  color: #a5b4fc;
+  color: var(--studio-hot);
 }
 
 .rulego-editor-visual .rulego-editor-side .form-hint a:hover {
-  color: #c7d2fe;
+  color: var(--studio-hot-hover);
 }
 
-/* Sourcegraph 查询构建：示例查询预览（深色侧栏与浅色弹窗均需高对比） */
+/* Sourcegraph 查询构建：示例查询预览 */
 .rulego-sourcegraph-query-preview {
   margin: 6px 0 0;
   padding: 10px 12px;
@@ -3260,34 +3312,34 @@ body {
   overflow: auto;
   white-space: pre-wrap;
   word-break: break-word;
-  background: #0f172a;
-  color: #e2e8f0;
-  border: 1px solid #334155;
+  background: #f1f5f9;
+  color: #0f172a;
+  border: 1px solid #cbd5e1;
 }
 
-/* 深色侧栏：仓库范围下拉与画布区一致 */
+/* 侧栏：仓库范围下拉 */
 .rulego-editor-visual .rulego-editor-side .rulego-sourcegraph-scope-select {
-  border: 1px solid #475569;
-  background: rgba(15, 23, 42, 0.55);
-  color: #e2e8f0;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #0f172a;
 }
 
 .rulego-editor-visual .rulego-editor-side .rulego-sourcegraph-scope-select option {
-  background: #0f172a;
-  color: #e2e8f0;
+  background: #ffffff;
+  color: #0f172a;
 }
 
 .rulego-editor-visual .rulego-editor-side .form-error {
-  background: rgba(239, 68, 68, 0.15);
-  color: #fca5a5;
-  border-color: #ef4444;
+  background: #fef2f2;
+  color: #b91c1c;
+  border-color: #fecaca;
 }
 
 .rulego-editor-visual .rulego-editor-side .confirm-text {
-  color: #94a3b8;
+  color: #64748b;
 }
 
-/* 侧栏块配置：标题与 LLM 等浅色分区在深色下的统一 */
+/* 侧栏块配置：标题与分区 */
 .rulego-editor-visual .rulego-editor-side .block-config-inline-header {
   display: flex;
   flex-wrap: wrap;
@@ -3295,14 +3347,14 @@ body {
   gap: 8px 12px;
   padding-bottom: 10px;
   margin-bottom: 4px;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .rulego-editor-visual .rulego-editor-side .block-config-inline-header h3 {
   margin: 0;
   font-size: 15px;
   font-weight: 600;
-  color: #f1f5f9;
+  color: #0f172a;
   letter-spacing: -0.02em;
 }
 
@@ -3313,9 +3365,9 @@ body {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   font-size: 11px;
   font-weight: 500;
-  color: #c7d2fe;
-  background: rgba(99, 102, 241, 0.2);
-  border: 1px solid rgba(129, 140, 248, 0.35);
+  color: #881337;
+  background: rgba(var(--studio-hot-rgb), 0.08);
+  border: 1px solid rgba(var(--studio-hot-rgb), 0.28);
   border-radius: 6px;
   word-break: break-all;
 }
@@ -3340,17 +3392,17 @@ body {
   padding: 8px 16px;
   font-size: 13px;
   font-weight: 600;
-  background: #6366f1;
-  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.35);
+  background: var(--studio-hot);
+  box-shadow: 0 4px 14px rgba(var(--studio-hot-rgb), 0.35);
 }
 
 .rulego-editor-visual .rulego-editor-side .rulego-props-submit-btn:hover:not(:disabled) {
   filter: brightness(1.06);
-  box-shadow: 0 6px 18px rgba(99, 102, 241, 0.42);
+  box-shadow: 0 6px 18px rgba(var(--studio-hot-rgb), 0.42);
 }
 
 .rulego-editor-visual .rulego-editor-side .rulego-props-submit-btn:focus-visible {
-  outline: 2px solid rgba(165, 180, 252, 0.85);
+  outline: 2px solid rgba(var(--studio-hot-rgb), 0.45);
   outline-offset: 2px;
 }
 
@@ -3359,7 +3411,7 @@ body {
   opacity: 0.45;
   filter: grayscale(0.25);
   box-shadow: none;
-  background: #475569;
+  background: #94a3b8;
 }
 
 .rulego-props-submit-feedback {
@@ -3371,24 +3423,24 @@ body {
 }
 
 .rulego-editor-visual .rulego-editor-side .rulego-props-submit-feedback.is-success {
-  color: #86efac;
-  background: rgba(34, 197, 94, 0.14);
-  border: 1px solid rgba(74, 222, 128, 0.35);
+  color: #166534;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
 }
 
 .rulego-editor-visual .rulego-editor-side .rulego-props-submit-feedback.is-error {
-  color: #fca5a5;
-  background: rgba(239, 68, 68, 0.12);
-  border: 1px solid rgba(248, 113, 113, 0.4);
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
 }
 
 .rulego-editor-visual .rulego-editor-side .block-config-llm-section,
 .rulego-editor-visual .rulego-editor-side .block-config-llm-section-collapsible {
-  border-bottom-color: #475569;
+  border-bottom-color: #e2e8f0;
 }
 
 .rulego-editor-visual .rulego-editor-side .block-config-llm-section-title {
-  color: #94a3b8;
+  color: #64748b;
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -3396,11 +3448,11 @@ body {
 }
 
 .rulego-editor-visual .rulego-editor-side .block-config-llm-section-toggle {
-  color: #e2e8f0;
+  color: #334155;
 }
 
 .rulego-editor-visual .rulego-editor-side .block-config-llm-section-toggle:hover {
-  color: #f8fafc;
+  color: #0f172a;
 }
 
 .rulego-editor-visual .rulego-editor-side .block-config-llm-section-chevron {
@@ -3408,19 +3460,19 @@ body {
 }
 
 .rulego-editor-visual .rulego-editor-side .llm-config-section-title {
-  color: #94a3b8;
-  border-bottom-color: #475569;
+  color: #64748b;
+  border-bottom-color: #e2e8f0;
 }
 
 .rulego-editor-visual .rulego-editor-side .llm-config-section-card {
-  background: rgba(15, 23, 42, 0.55);
-  border-color: #475569;
+  background: #f8fafc;
+  border-color: #e2e8f0;
 }
 
 .rulego-editor-visual .rulego-editor-side .block-config-llm-section-toggle:focus-visible {
   outline: none;
   border-radius: 6px;
-  box-shadow: 0 0 0 2px rgba(129, 140, 248, 0.45);
+  box-shadow: 0 0 0 2px rgba(var(--studio-hot-rgb), 0.45);
 }
 
 /* JS 脚本编辑器：强制文字深色、白底，避免被 rulego-editor-side 等父级浅色覆盖 */
@@ -3495,7 +3547,7 @@ body {
 .rulego-logs-auto-refresh input {
   width: 15px;
   height: 15px;
-  accent-color: #6366f1;
+  accent-color: var(--studio-hot);
 }
 
 .rulego-logs-table .table-head.rulego-logs-head,
@@ -3584,8 +3636,8 @@ body {
   padding: 4px 10px;
   border-radius: 999px;
   font-size: 12px;
-  background: #e0e7ff;
-  color: #4338ca;
+  background: rgba(var(--studio-hot-rgb), 0.12);
+  color: #881337;
 }
 
 .rulego-log-status {
@@ -3903,8 +3955,8 @@ body {
 }
 
 .rulego-exec-chain-card.is-selected {
-  border-color: #6366f1;
-  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.25);
+  border-color: var(--studio-hot);
+  box-shadow: 0 0 0 2px rgba(var(--studio-hot-rgb), 0.25);
 }
 
 .rulego-exec-chain-card--idle {
@@ -4054,7 +4106,7 @@ body {
 }
 
 .rulego-exec-timeline-item.is-selected {
-  background: #eef2ff;
+  background: rgba(var(--studio-hot-rgb), 0.08);
 }
 
 .rulego-exec-timeline-item::before {
@@ -4141,8 +4193,8 @@ body {
   display: inline-block;
   padding: 1px 6px;
   border-radius: 4px;
-  background: #e0e7ff;
-  color: #4338ca;
+  background: rgba(var(--studio-hot-rgb), 0.12);
+  color: #881337;
   font-weight: 600;
 }
 
@@ -4341,7 +4393,7 @@ body {
 
 .rulego-log-node-index {
   font-weight: 600;
-  color: #6366f1;
+  color: var(--studio-hot);
   min-width: 28px;
 }
 
@@ -4361,8 +4413,8 @@ body {
   padding: 2px 8px;
   border-radius: 6px;
   font-size: 11px;
-  background: #e0e7ff;
-  color: #4338ca;
+  background: rgba(var(--studio-hot-rgb), 0.12);
+  color: #881337;
 }
 
 .rulego-log-node-error-badge {
@@ -4769,23 +4821,29 @@ body {
   min-width: 56px;
   padding: 0 16px;
   border-radius: 999px;
-  border: 1px solid var(--studio-border, rgba(255, 255, 255, 0.14));
-  background: rgba(18, 19, 32, 0.92);
-  color: var(--studio-text, #e8e8f0);
+  border: 1px solid var(--studio-border, #e2e8f0);
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  color: var(--studio-text, #0f172a);
   font-weight: 700;
   letter-spacing: 0.02em;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.9) inset,
+    0 10px 28px rgba(15, 23, 42, 0.12);
   cursor: pointer;
   user-select: none;
 }
 
 .cursor-acp-fab:hover {
   transform: translateY(-1px);
-  border-color: rgba(129, 140, 248, 0.5);
+  border-color: rgba(var(--studio-hot-rgb), 0.45);
+  background: linear-gradient(180deg, #ffffff 0%, #f1f5f9 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.95) inset,
+    0 12px 32px rgba(15, 23, 42, 0.14);
 }
 
 .cursor-acp-fab:focus-visible {
-  outline: 2px solid rgba(129, 140, 248, 0.9);
+  outline: 2px solid rgba(var(--studio-hot-rgb), 0.55);
   outline-offset: 3px;
 }
 
@@ -4819,8 +4877,8 @@ body {
   line-height: 18px;
   font-weight: 800;
   text-align: center;
-  border: 2px solid rgba(18, 19, 32, 0.92);
-  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.35);
+  border: 2px solid var(--studio-panel, #ffffff);
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.15);
   pointer-events: none;
 }
 
@@ -4847,14 +4905,14 @@ body {
   gap: 12px;
   padding: 14px 16px 10px;
   border-bottom: 1px solid var(--studio-border, rgba(255, 255, 255, 0.08));
-  background: linear-gradient(180deg, rgba(99, 102, 241, 0.12) 0%, transparent 100%);
+  background: linear-gradient(180deg, rgba(var(--studio-hot-rgb), 0.12) 0%, transparent 100%);
 }
 
 .cursor-acp-drawer-title {
   margin: 0;
   font-size: 16px;
   font-weight: 800;
-  color: var(--studio-text, #e8e8f0);
+  color: var(--studio-text, #0f172a);
 }
 
 .cursor-acp-drawer-actions {
@@ -4871,9 +4929,10 @@ body {
 .cursor-acp-drawer-hint {
   padding: 10px 16px;
   font-size: 12px;
-  color: var(--studio-text, #e8e8f0);
-  background: rgba(59, 130, 246, 0.14);
-  border-bottom: 1px solid rgba(125, 180, 255, 0.25);
+  color: #0f172a;
+  font-weight: 500;
+  background: #eff6ff;
+  border-bottom: 1px solid #bfdbfe;
 }
 
 .cursor-acp-drawer-controls {
@@ -4899,7 +4958,7 @@ body {
   flex-shrink: 0;
   padding: 18px 22px 10px !important;
   border-bottom: 1px solid var(--studio-border, rgba(255, 255, 255, 0.08));
-  background: linear-gradient(180deg, rgba(99, 102, 241, 0.12) 0%, transparent 100%);
+  background: linear-gradient(180deg, rgba(var(--studio-hot-rgb), 0.12) 0%, transparent 100%);
 }
 
 .cursor-acp-modal-controls {
@@ -4916,18 +4975,19 @@ body {
   gap: 8px;
   padding: 6px;
   border-radius: 12px;
-  border: 1px solid var(--studio-border, rgba(255, 255, 255, 0.12));
-  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid var(--studio-border, #e2e8f0);
+  background: #f1f5f9;
 }
 
 .cursor-acp-tab {
   appearance: none;
   border: 1px solid transparent;
   background: transparent;
-  color: var(--studio-muted, #a8a8c0);
+  color: #475569;
   border-radius: 10px;
   padding: 6px 10px;
   font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
@@ -4935,23 +4995,25 @@ body {
 }
 
 .cursor-acp-tab:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: var(--studio-border, rgba(255, 255, 255, 0.12));
+  background: #ffffff;
+  border-color: #cbd5e1;
+  color: #0f172a;
 }
 
 .cursor-acp-tab.is-active {
-  color: var(--studio-text, #e8e8f0);
-  background: rgba(129, 140, 248, 0.16);
-  border-color: rgba(129, 140, 248, 0.35);
+  color: #881337;
+  background: rgba(var(--studio-hot-rgb), 0.12);
+  border-color: rgba(var(--studio-hot-rgb), 0.38);
 }
 
 .cursor-acp-tab-count {
   font-size: 12px;
   padding: 2px 6px;
   border-radius: 999px;
-  border: 1px solid var(--studio-border, rgba(255, 255, 255, 0.12));
-  color: var(--studio-text, #e8e8f0);
-  background: rgba(0, 0, 0, 0.18);
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  font-weight: 700;
+  background: #ffffff;
 }
 
 .cursor-acp-filter {
@@ -4959,24 +5021,25 @@ body {
   align-items: center;
   gap: 8px;
   font-size: 12px;
-  color: var(--studio-muted, #a8a8c0);
+  color: #475569;
 }
 
 .cursor-acp-filter-label {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  color: var(--studio-muted, #a8a8c0);
+  color: #334155;
 }
 
 .cursor-acp-filter-select {
   height: 30px;
   padding: 0 10px;
   border-radius: 10px;
-  border: 1px solid var(--studio-border, #4a4d6a);
-  background: var(--studio-deep, #08080e);
-  color: var(--studio-text, #e8e8f0);
+  border: 1px solid var(--studio-border, #e2e8f0);
+  background: #ffffff;
+  color: #0f172a;
   font-size: 12px;
+  font-weight: 500;
   outline: none;
 }
 
@@ -4984,7 +5047,7 @@ body {
   margin: 0 !important;
   font-size: 18px !important;
   font-weight: 700;
-  color: var(--studio-text, #e8e8f0) !important;
+  color: var(--studio-text, #0f172a) !important;
   letter-spacing: 0.02em;
 }
 
@@ -4992,7 +5055,7 @@ body {
   margin: 0 20px 10px;
   font-size: 12px;
   line-height: 1.55;
-  color: var(--studio-muted, #a8a8c0);
+  color: #475569;
 }
 
 .cursor-acp-modal-body {
@@ -5006,11 +5069,11 @@ body {
 }
 
 .cursor-acp-card {
-  border: 1px solid var(--studio-border, #4a4d6a);
+  border: 1px solid var(--studio-border, #e2e8f0);
   border-radius: 12px;
   padding: 16px;
-  background: var(--studio-panel-2, #222236);
-  color: var(--studio-text, #e8e8f0);
+  background: var(--studio-panel-2, #f8fafc);
+  color: var(--studio-text, #0f172a);
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -5027,12 +5090,12 @@ body {
 .cursor-acp-card-title {
   font-weight: 700;
   font-size: 15px;
-  color: var(--studio-text, #e8e8f0);
+  color: var(--studio-text, #0f172a);
 }
 
 .cursor-acp-req-id {
   font-size: 12px;
-  color: var(--studio-muted, #a8a8c0);
+  color: #64748b;
   font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
 }
 
@@ -5042,29 +5105,30 @@ body {
   height: 22px;
   padding: 0 8px;
   border-radius: 999px;
-  border: 1px solid rgba(129, 140, 248, 0.35);
-  background: rgba(129, 140, 248, 0.14);
-  color: #c4d4ff;
+  border: 1px solid rgba(var(--studio-hot-rgb), 0.38);
+  background: rgba(var(--studio-hot-rgb), 0.1);
+  color: #881337;
   font-size: 12px;
+  font-weight: 600;
   font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
 }
 
 .cursor-acp-meta-line {
   margin: 0;
   font-size: 12px;
-  color: var(--studio-muted, #a8a8c0);
+  color: #475569;
   line-height: 1.55;
 }
 
 .cursor-acp-code {
   font-size: 12px;
-  color: #c4d4ff;
+  color: #881337;
   font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
 }
 
 .cursor-acp-code-sm {
   font-size: 11px;
-  color: #c4d4ff;
+  color: #881337;
   font-family: ui-monospace, Menlo, Monaco, Consolas, monospace;
 }
 
@@ -5072,7 +5136,7 @@ body {
   display: block;
   font-size: 12px;
   font-weight: 700;
-  color: var(--studio-text, #e8e8f0);
+  color: #0f172a;
   margin-bottom: 4px;
 }
 
@@ -5080,7 +5144,7 @@ body {
   margin: 0 0 6px;
   font-size: 11px;
   line-height: 1.45;
-  color: var(--studio-muted, #a8a8c0);
+  color: #64748b;
 }
 
 .cursor-acp-stream-scroll {
@@ -5088,8 +5152,8 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   border-radius: 8px;
-  border: 1px solid var(--studio-border, #4a4d6a);
-  background: var(--studio-code, #12121c);
+  border: 1px solid var(--studio-border, #e2e8f0);
+  background: #ffffff;
   scroll-behavior: smooth;
 }
 
@@ -5104,7 +5168,7 @@ body {
   padding: 12px !important;
   background: transparent !important;
   border: none !important;
-  color: var(--studio-text, #e8e8f0);
+  color: #0f172a;
 }
 
 .cursor-acp-ask-md {
@@ -5119,12 +5183,13 @@ body {
 .cursor-acp-muted-only {
   margin: 0;
   font-size: 13px;
-  color: var(--studio-muted, #a8a8c0);
+  color: #475569;
 }
 
 .cursor-acp-field-label {
   font-size: 12px !important;
-  color: var(--studio-muted, #a8a8c0) !important;
+  color: #334155 !important;
+  font-weight: 600 !important;
 }
 
 .cursor-acp-textarea {
@@ -5132,9 +5197,9 @@ body {
   font-family: ui-sans-serif, system-ui, sans-serif;
   font-size: 13px;
   line-height: 1.5;
-  background: var(--studio-deep, #08080e);
-  color: var(--studio-text, #e8e8f0);
-  border: 1px solid var(--studio-border, #4a4d6a);
+  background: #ffffff;
+  color: #0f172a;
+  border: 1px solid var(--studio-border, #e2e8f0);
   border-radius: 8px;
   padding: 10px 12px;
   resize: vertical;
@@ -5145,7 +5210,7 @@ body {
   margin: 0;
   font-size: 11px;
   line-height: 1.55;
-  color: var(--studio-muted, #a8a8c0);
+  color: #64748b;
 }
 
 .cursor-acp-actions {
@@ -5167,7 +5232,8 @@ body {
   gap: 10px;
   cursor: pointer;
   font-size: 13px;
-  color: var(--studio-text, #e8e8f0);
+  font-weight: 500;
+  color: #0f172a;
   padding: 10px 12px;
   border-radius: 8px;
   border: 1px solid transparent;
@@ -5175,13 +5241,13 @@ body {
 }
 
 .cursor-acp-option:hover {
-  background: rgba(255, 255, 255, 0.04);
-  border-color: var(--studio-border, #4a4d6a);
+  background: #f8fafc;
+  border-color: #e2e8f0;
 }
 
 .cursor-acp-radio {
   margin-top: 3px;
-  accent-color: #818cf8;
+  accent-color: var(--studio-hot);
 }
 
 .cursor-acp-option-text {
@@ -5217,8 +5283,8 @@ body {
   padding: 10px 12px;
   margin: 0 0 10px;
   border-radius: 10px;
-  border: 1px solid var(--studio-border, rgba(255, 255, 255, 0.12));
-  background: var(--studio-panel-2, rgba(0, 0, 0, 0.3));
+  border: 1px solid var(--studio-border, #e2e8f0);
+  background: var(--studio-panel-2, #f1f5f9);
 }
 
 .cursor-acp-toolbar-group {
@@ -5237,7 +5303,7 @@ body {
   font-size: 12px;
   font-weight: 700;
   letter-spacing: 0.02em;
-  color: var(--studio-muted, #a8a8c0);
+  color: #334155;
 }
 
 .cursor-acp-toolbar-btn {
@@ -5251,10 +5317,11 @@ body {
   height: 30px;
   padding: 0 10px;
   border-radius: 8px;
-  border: 1px solid var(--studio-border, #4a4d6a);
-  background: var(--studio-deep, #08080e);
-  color: var(--studio-text, #e8e8f0);
+  border: 1px solid var(--studio-border, #e2e8f0);
+  background: #ffffff;
+  color: #0f172a;
   font-size: 12px;
+  font-weight: 500;
   outline: none;
 }
 
@@ -5264,14 +5331,16 @@ body {
 
 .cursor-acp-find-meta {
   font-size: 11px;
-  color: var(--studio-muted, #a8a8c0);
+  color: #64748b;
+  font-weight: 600;
   min-width: 56px;
   text-align: right;
 }
 
 .cursor-acp-copy-hint {
   font-size: 11px;
-  color: var(--studio-muted, #a8a8c0);
+  color: #64748b;
+  font-weight: 500;
   min-width: 72px;
 }
 
@@ -5279,14 +5348,14 @@ body {
   margin: 0 0 10px;
   padding: 10px 12px;
   border-radius: 10px;
-  border: 1px solid var(--studio-border, rgba(255, 255, 255, 0.12));
-  background: var(--studio-code, #12121c);
+  border: 1px solid var(--studio-border, #e2e8f0);
+  background: #f8fafc;
 }
 
 .cursor-acp-find-preview-title {
   font-size: 11px;
   font-weight: 700;
-  color: var(--studio-muted, #a8a8c0);
+  color: #334155;
   margin-bottom: 6px;
 }
 
@@ -5296,15 +5365,15 @@ body {
   word-break: break-word;
   font-size: 12px;
   line-height: 1.55;
-  color: var(--studio-text, #e8e8f0);
+  color: #0f172a;
 }
 
 .cursor-acp-side-card {
   padding: 12px;
   border-radius: 12px;
-  border: 1px solid var(--studio-border, #4a4d6a);
-  background: var(--studio-panel-2, #222236);
-  color: var(--studio-text, #e8e8f0);
+  border: 1px solid var(--studio-border, #e2e8f0);
+  background: var(--studio-panel-2, #f8fafc);
+  color: var(--studio-text, #0f172a);
 }
 
 .cursor-acp-side-title-row {
@@ -5350,8 +5419,8 @@ body {
 }
 
 .cursor-acp-side-badge--hot {
-  border-color: rgba(233, 69, 96, 0.55);
-  background: rgba(233, 69, 96, 0.12);
+  border-color: rgba(var(--studio-hot-rgb), 0.55);
+  background: rgba(var(--studio-hot-rgb), 0.12);
 }
 
 .cursor-acp-side-actions {
@@ -5483,7 +5552,7 @@ body {
 .curl-compare-field textarea:focus {
   outline: none;
   border-color: var(--studio-hot);
-  box-shadow: 0 0 0 3px rgba(233, 69, 96, 0.2);
+  box-shadow: 0 0 0 3px rgba(var(--studio-hot-rgb), 0.2);
 }
 
 .curl-compare-field input:disabled,
@@ -5546,7 +5615,7 @@ body {
 }
 
 .curl-compare-fullscreen-btn:focus-visible {
-  outline: 2px solid rgba(233, 69, 96, 0.45);
+  outline: 2px solid rgba(var(--studio-hot-rgb), 0.45);
   outline-offset: 2px;
 }
 
@@ -5596,7 +5665,7 @@ body {
 }
 
 .curl-compare-fullscreen-close:focus-visible {
-  outline: 2px solid rgba(233, 69, 96, 0.45);
+  outline: 2px solid rgba(var(--studio-hot-rgb), 0.45);
   outline-offset: 2px;
 }
 
@@ -5748,8 +5817,8 @@ body {
 }
 
 .curl-compare-diff-badge.type-diff {
-  background: #e0e7ff;
-  color: #3730a3;
+  background: rgba(var(--studio-hot-rgb), 0.12);
+  color: #881337;
 }
 
 .curl-compare-diff-badge.different {
@@ -5800,17 +5869,18 @@ body {
 }
 
 .curl-compare-diff-toggle:focus-visible {
-  outline: 2px solid rgba(233, 69, 96, 0.45);
+  outline: 2px solid rgba(var(--studio-hot-rgb), 0.45);
   outline-offset: 2px;
 }
 
 .curl-compare-diff-json {
   margin-top: 10px;
   padding: 10px 12px;
-  background: #1e293b;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
   font-size: 12px;
-  color: #e2e8f0;
+  color: #0f172a;
 }
 
 .curl-compare-diff-json pre {
@@ -5824,7 +5894,7 @@ body {
 }
 
 .curl-compare-diff-json .curl-compare-diff-label {
-  color: #94a3b8;
+  color: #64748b;
 }
 
 /* 请求与响应日志：可折叠 */
@@ -5848,7 +5918,7 @@ body {
 }
 
 .curl-compare-log-toggle:focus-visible {
-  outline: 2px solid rgba(233, 69, 96, 0.45);
+  outline: 2px solid rgba(var(--studio-hot-rgb), 0.45);
   outline-offset: 2px;
 }
 
@@ -5912,8 +5982,9 @@ body {
 .curl-compare-log-pre {
   margin: 4px 0 0;
   padding: 8px;
-  background: #1e293b;
-  color: #e2e8f0;
+  background: #f1f5f9;
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
   border-radius: 6px;
   font-size: 11px;
   line-height: 1.45;

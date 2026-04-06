@@ -47,9 +47,9 @@ export function StudioOfficeDashboard({
   onExpandMembers,
 }: StudioOfficeDashboardProps) {
   return (
-    <div className="studio-office-dashboard grid shrink-0 grid-cols-1 gap-3 border-b-2 border-[var(--so-red)] bg-[var(--so-dashboard)] px-3 py-3 sm:grid-cols-3 sm:gap-4 sm:px-4">
+    <div className="studio-office-dashboard grid shrink-0 grid-cols-1 gap-3 border-b-2 border-[var(--sp-border)] bg-[var(--so-dashboard)] px-3 py-3 sm:grid-cols-3 sm:gap-4 sm:px-4">
       {/* 昨日小记风格 */}
-      <div className="studio-office-card studio-office-card--paper flex min-h-[140px] flex-col border border-[var(--so-red)] p-3">
+      <div className="studio-office-card studio-office-card--paper flex min-h-[140px] flex-col border border-[var(--sp-border)] p-3 shadow-[var(--sp-pixel-shadow-sm)]">
         <div className="mb-2 flex items-center justify-between gap-2 border-b border-[#c4b49a] pb-1">
           <h3 className="text-sm font-bold text-[var(--so-paper-ink)]">工作室小记</h3>
           {onExpandMemo ? (
@@ -78,7 +78,7 @@ export function StudioOfficeDashboard({
       </div>
 
       {/* Star 状态风格 */}
-      <div className="studio-office-card flex min-h-[140px] flex-col border border-[var(--so-red)] bg-[var(--so-charcoal)] p-3">
+      <div className="studio-office-card flex min-h-[140px] flex-col border border-[var(--sp-border)] bg-[var(--so-charcoal)] p-3 shadow-[var(--sp-pixel-shadow-sm)]">
         <h3 className="mb-2 text-sm font-bold text-[var(--sp-text)]">协作状态</h3>
         <p className="mb-2 text-xs text-[var(--sp-muted)]">根据发送与进度推断；点击可固定展示（再点同一项取消固定）</p>
         <div className="grid flex-1 grid-cols-2 gap-2">
@@ -92,7 +92,7 @@ export function StudioOfficeDashboard({
                 className={`border px-2 py-2 text-center text-sm font-semibold transition-colors ${
                   active
                     ? 'border-[var(--so-red)] bg-[var(--so-red)] text-white'
-                    : 'border-[#444] bg-[#252525] text-[var(--sp-text)] hover:border-[var(--so-red)] hover:text-white'
+                    : 'border-[var(--sp-border)] bg-[var(--sp-panel)] text-[var(--sp-text)] hover:border-[var(--so-red)] hover:bg-[var(--sp-panel-2)]'
                 }`}
               >
                 {MOOD_META[m].label}
@@ -104,14 +104,14 @@ export function StudioOfficeDashboard({
       </div>
 
       {/* 访客列表风格 */}
-      <div className="studio-office-card flex min-h-[140px] flex-col border border-[var(--so-red)] bg-[var(--so-charcoal)] p-3">
+      <div className="studio-office-card flex min-h-[140px] flex-col border border-[var(--sp-border)] bg-[var(--so-charcoal)] p-3 shadow-[var(--sp-pixel-shadow-sm)]">
         <div className="mb-2 flex items-center justify-between gap-2">
           <h3 className="text-sm font-bold text-[var(--sp-text)]">成员一览</h3>
           {onExpandMembers ? (
             <button
               type="button"
               onClick={onExpandMembers}
-              className="shrink-0 border border-[#555] bg-[#333] px-2 py-0.5 text-xs text-[var(--sp-text)] hover:border-[var(--so-red)]"
+              className="shrink-0 rounded border border-[var(--sp-border)] bg-[var(--sp-panel)] px-2 py-0.5 text-xs font-medium text-[var(--sp-text)] hover:border-[var(--so-red)]"
             >
               弹窗查看
             </button>
@@ -123,7 +123,7 @@ export function StudioOfficeDashboard({
             return (
               <li
                 key={a.config.id}
-                className="flex flex-wrap items-center justify-between gap-1 border-b border-[#333] py-1 last:border-0"
+                className="flex flex-wrap items-center justify-between gap-1 border-b border-[var(--sp-border)] py-1 last:border-0"
               >
                 <div>
                   <span className="font-semibold text-[var(--sp-text)]">{a.config.name}</span>
@@ -137,7 +137,7 @@ export function StudioOfficeDashboard({
                     onClick={() =>
                       onMentionMember(/\s/.test(a.config.name) ? a.config.id : a.config.name)
                     }
-                    className="border border-[#555] px-2 py-0.5 text-xs text-[var(--sp-text)] hover:border-[var(--so-red)] hover:text-[var(--so-red)]"
+                    className="rounded border border-[var(--sp-border)] bg-[var(--sp-panel)] px-2 py-0.5 text-xs font-medium text-[var(--sp-text)] hover:border-[var(--so-red)] hover:text-[var(--so-red)]"
                   >
                     @ 定向
                   </button>
@@ -191,9 +191,9 @@ export function StudioOfficeTicker({ text }: { text: string }) {
   const safe = text.trim() || 'DevPilot 工作室'
   const chunk = `${safe} · `
   return (
-    <div className="studio-office-ticker shrink-0 border-b-2 border-[var(--so-red)] bg-[#0a0a0a] py-1.5">
+    <div className="studio-office-ticker shrink-0 border-b-2 border-[var(--sp-border)] bg-[var(--sp-bg-deep)] py-1.5">
       <div className="overflow-hidden">
-        <div className="studio-office-marquee-inner flex w-max text-sm text-[var(--sp-muted)]">
+        <div className="studio-office-marquee-inner flex w-max text-sm font-medium text-[var(--sp-text)]">
           <span className="whitespace-nowrap px-3">{chunk}</span>
           <span className="whitespace-nowrap px-3">{chunk}</span>
         </div>

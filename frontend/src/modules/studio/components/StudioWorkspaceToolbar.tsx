@@ -1,7 +1,7 @@
 import React from 'react'
 
 const officeFocus =
-  'outline-none focus-visible:ring-2 focus-visible:ring-[var(--so-red)] focus-visible:ring-offset-2 focus-visible:ring-offset-[#111]'
+  'outline-none focus-visible:ring-2 focus-visible:ring-[var(--so-red)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--sp-panel)]'
 
 interface StudioWorkspaceToolbarProps {
   sceneCollapsed: boolean
@@ -28,51 +28,51 @@ export function StudioWorkspaceToolbar({
   refreshing,
 }: StudioWorkspaceToolbarProps) {
   return (
-    <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b-2 border-[#333] bg-[#111] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] sm:gap-3 sm:px-4">
+    <div className="flex flex-shrink-0 flex-wrap items-center gap-2 border-b-2 border-[var(--sp-border)] bg-[var(--so-dashboard)] px-3 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.85)] sm:gap-3 sm:px-4">
       <button
         type="button"
         onClick={onToggleScene}
         className={`border px-2.5 py-1.5 text-sm font-medium transition-colors ${officeFocus} ${
           sceneCollapsed
-            ? 'border-[var(--so-red)] bg-[var(--so-red)]/15 text-[#fca5a5]'
-            : 'border-[#444] bg-[#1f1f1f] text-[#d4d4d4] hover:border-[var(--so-red)] hover:text-white'
+            ? 'border-[var(--so-red)] bg-[rgba(225,29,72,0.1)] text-[var(--sp-border-hot)]'
+            : 'border-[var(--sp-border)] bg-[var(--sp-panel)] text-[var(--sp-text)] hover:border-[var(--so-red)] hover:bg-[var(--sp-panel-2)] hover:text-[var(--sp-border-hot)]'
         }`}
       >
         {sceneCollapsed ? '展开像素场景' : '收起场景'}
       </button>
-      <span className="hidden h-4 w-px bg-[#333] sm:block" aria-hidden />
+      <span className="hidden h-4 w-px bg-[var(--sp-border)] sm:block" aria-hidden />
       <button
         type="button"
         onClick={onOpenHelp}
-        className={`border border-[#444] bg-[#1f1f1f] px-2.5 py-1.5 text-sm text-[#d4d4d4] transition-colors hover:border-[#666] hover:text-white ${officeFocus}`}
+        className={`border border-[var(--sp-border)] bg-[var(--sp-panel)] px-2.5 py-1.5 text-sm text-[var(--sp-text)] transition-colors hover:border-[#cbd5e1] hover:bg-[var(--sp-panel-2)] ${officeFocus}`}
       >
         使用说明
       </button>
       <button
         type="button"
         onClick={onOpenMemo}
-        className={`border border-[#444] bg-[#1f1f1f] px-2.5 py-1.5 text-sm text-[#d4d4d4] transition-colors hover:border-[#666] hover:text-white ${officeFocus}`}
+        className={`border border-[var(--sp-border)] bg-[var(--sp-panel)] px-2.5 py-1.5 text-sm text-[var(--sp-text)] transition-colors hover:border-[#cbd5e1] hover:bg-[var(--sp-panel-2)] ${officeFocus}`}
       >
         工作室小记
       </button>
       <button
         type="button"
         onClick={onOpenTodo}
-        className={`border border-[#444] bg-[#1f1f1f] px-2.5 py-1.5 text-sm text-[#d4d4d4] transition-colors hover:border-[#666] hover:text-white ${officeFocus}`}
+        className={`border border-[var(--sp-border)] bg-[var(--sp-panel)] px-2.5 py-1.5 text-sm text-[var(--sp-text)] transition-colors hover:border-[#cbd5e1] hover:bg-[var(--sp-panel-2)] ${officeFocus}`}
       >
         TODO 看板
       </button>
       <button
         type="button"
         onClick={onOpenMembers}
-        className={`border border-[#444] bg-[#1f1f1f] px-2.5 py-1.5 text-sm text-[#d4d4d4] transition-colors hover:border-[#666] hover:text-white ${officeFocus}`}
+        className={`border border-[var(--sp-border)] bg-[var(--sp-panel)] px-2.5 py-1.5 text-sm text-[var(--sp-text)] transition-colors hover:border-[#cbd5e1] hover:bg-[var(--sp-panel-2)] ${officeFocus}`}
       >
         成员与 @
       </button>
       <button
         type="button"
         onClick={onOpenWorkspaces}
-        className={`border border-[#444] bg-[#1f1f1f] px-2.5 py-1.5 text-sm text-[#d4d4d4] transition-colors hover:border-[#666] hover:text-white ${officeFocus}`}
+        className={`border border-[var(--sp-border)] bg-[var(--sp-panel)] px-2.5 py-1.5 text-sm text-[var(--sp-text)] transition-colors hover:border-[#cbd5e1] hover:bg-[var(--sp-panel-2)] ${officeFocus}`}
       >
         工作区目录
       </button>
@@ -80,7 +80,7 @@ export function StudioWorkspaceToolbar({
         type="button"
         disabled={refreshing}
         onClick={onRefresh}
-        className={`ml-auto border border-[#444] bg-[#1f1f1f] px-2.5 py-1.5 text-sm text-[#d4d4d4] transition-colors hover:border-[var(--so-red)] hover:text-white disabled:opacity-50 ${officeFocus}`}
+        className={`ml-auto border border-[var(--sp-border)] bg-[var(--sp-panel)] px-2.5 py-1.5 text-sm text-[var(--sp-text)] transition-colors hover:border-[var(--so-red)] hover:bg-[var(--sp-panel-2)] hover:text-[var(--sp-border-hot)] disabled:opacity-50 ${officeFocus}`}
       >
         {refreshing ? '刷新中…' : '刷新数据'}
       </button>
@@ -107,7 +107,7 @@ export function StudioWorkspaceModalShell({
   if (!open) return null
   return (
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center bg-black/75 p-4"
+      className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-900/35 p-4 backdrop-blur-[2px]"
       role="dialog"
       aria-modal="true"
       aria-labelledby="studio-modal-title"
@@ -119,14 +119,14 @@ export function StudioWorkspaceModalShell({
         className={`studio-pixel studio-office-layout flex max-h-[88vh] w-full flex-col overflow-hidden border-4 border-[var(--so-red)] bg-[var(--sp-panel)] shadow-[var(--sp-pixel-shadow)] ${wide ? 'max-w-3xl' : 'max-w-lg'}`}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b-2 border-[var(--sp-border)] bg-[var(--so-charcoal)] px-4 py-3">
+        <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b-2 border-[var(--sp-border)] bg-[var(--sp-panel-2)] px-4 py-3">
           <h2 id="studio-modal-title" className="text-base font-bold text-[var(--sp-text)]">
             {title}
           </h2>
           <button
             type="button"
             onClick={onClose}
-            className="border-2 border-[#555] bg-[#262626] px-3 py-1.5 text-sm text-[var(--sp-text)] hover:border-[var(--so-red)]"
+            className="border-2 border-[var(--sp-border)] bg-[var(--sp-panel)] px-3 py-1.5 text-sm text-[var(--sp-text)] transition-colors hover:border-[var(--so-red)] hover:bg-[var(--sp-code)]"
           >
             关闭
           </button>

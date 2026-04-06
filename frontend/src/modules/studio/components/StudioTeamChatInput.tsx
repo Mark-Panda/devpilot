@@ -305,7 +305,7 @@ export function StudioTeamChatInput({
             className={
               pixelStyle
                 ? 'flex h-11 w-11 flex-shrink-0 items-center justify-center border-2 border-black bg-[var(--sp-accent)] text-white shadow-[var(--sp-pixel-shadow)] transition-colors hover:bg-[var(--sp-border-hot)] disabled:cursor-not-allowed disabled:opacity-40'
-                : 'flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-[#e11d48] text-white shadow-sm transition-colors hover:bg-[#be123c] disabled:cursor-not-allowed disabled:opacity-40'
+                : 'flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-studio-hot text-white shadow-sm transition-colors hover:bg-studio-hot-hover disabled:cursor-not-allowed disabled:opacity-40'
             }
             title="发送"
           >

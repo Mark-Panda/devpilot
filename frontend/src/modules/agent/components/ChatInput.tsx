@@ -78,7 +78,7 @@ export function ChatInput({
           <button
             type="submit"
             disabled={!message.trim() || isLoading || disabled}
-            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-[#e11d48] text-white shadow-sm transition-colors hover:bg-[#be123c] disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-studio-hot text-white shadow-sm transition-colors hover:bg-studio-hot-hover disabled:cursor-not-allowed disabled:opacity-40"
             title="发送"
           >
             {isLoading ? (

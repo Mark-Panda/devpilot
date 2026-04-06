@@ -193,7 +193,7 @@ export const MCPManagementPage: React.FC = () => {
               type="button"
               disabled={saving || loading}
               onClick={() => void handleSaveAll()}
-              className="rounded-xl bg-[#e11d48] px-4 py-2 text-sm font-medium text-white hover:bg-[#be123c] disabled:opacity-50"
+              className="rounded-xl bg-studio-hot px-4 py-2 text-sm font-medium text-white hover:bg-studio-hot-hover disabled:opacity-50"
             >
               {saving ? '保存中…' : '保存到磁盘'}
             </button>
@@ -206,7 +206,7 @@ export const MCPManagementPage: React.FC = () => {
 
         {loading ? (
           <div
-            className="flex items-center gap-3 rounded-xl border border-studio-border bg-studio-panel px-6 py-10 shadow-[0_8px_24px_rgba(0,0,0,0.25)]"
+            className="flex items-center gap-3 rounded-xl border border-studio-border bg-studio-panel px-6 py-10 shadow-[0_8px_24px_rgba(15,23,42,0.08)]"
             role="status"
             aria-live="polite"
           >

@@ -68,7 +68,7 @@ function proxyHostFromBaseUrl(baseUrl: string | undefined): string {
 /** 顶栏：面包屑 + 快捷入口（去掉无行为的占位按钮，减少干扰） */
 function OcTopBar() {
   return (
-    <header className="flex flex-shrink-0 items-center gap-3 border-b border-studio-border bg-studio-panel/95 px-4 py-2.5 shadow-[0_1px_0_rgba(0,0,0,0.35)] backdrop-blur-sm sm:px-6">
+    <header className="flex flex-shrink-0 items-center gap-3 border-b border-studio-border bg-studio-panel/95 px-4 py-2.5 shadow-[0_1px_0_rgba(15,23,42,0.06)] backdrop-blur-sm sm:px-6">
       <nav className="flex min-w-0 flex-1 items-center gap-1.5 text-sm text-studio-muted">
         <Link
           to="/agent"
@@ -226,7 +226,7 @@ export const AgentChatPage: React.FC = () => {
     return (
       <div className="flex min-h-0 w-full flex-1 flex-col items-center justify-center bg-studio-bg px-4 py-16">
         <div
-          className="animate-slide-up rounded-2xl border border-studio-border bg-studio-panel px-10 py-9 text-center shadow-[0_16px_48px_rgba(0,0,0,0.4)]"
+          className="animate-slide-up rounded-2xl border border-studio-border bg-studio-panel px-10 py-9 text-center shadow-[0_16px_48px_rgba(15,23,42,0.1)]"
           role="status"
           aria-live="polite"
         >
@@ -306,7 +306,7 @@ export const AgentChatPage: React.FC = () => {
           </button>
           {agentMenuOpen && (
             <ul
-              className="absolute left-0 top-full z-50 mt-1 min-w-[220px] rounded-xl border border-studio-border bg-studio-panel py-1 shadow-[0_16px_48px_rgba(0,0,0,0.45)] ring-1 ring-white/[0.06]"
+              className="absolute left-0 top-full z-50 mt-1 min-w-[220px] rounded-xl border border-studio-border bg-studio-panel py-1 shadow-[0_16px_48px_rgba(15,23,42,0.12)] ring-1 ring-slate-900/5"
               role="listbox"
             >
               {agentsOrdered.map(({ agent: a, depth }) => (
@@ -406,7 +406,7 @@ export const AgentChatPage: React.FC = () => {
           </button>
           {modelMenuOpen && (
             <ul
-              className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-y-auto rounded-xl border border-studio-border bg-studio-panel py-1 shadow-[0_16px_48px_rgba(0,0,0,0.45)] ring-1 ring-white/[0.06]"
+              className="absolute left-0 right-0 top-full z-50 mt-1 max-h-72 overflow-y-auto rounded-xl border border-studio-border bg-studio-panel py-1 shadow-[0_16px_48px_rgba(15,23,42,0.12)] ring-1 ring-slate-900/5"
               role="listbox"
             >
               {modelOptions.length === 0 ? (
@@ -527,7 +527,7 @@ export const AgentChatPage: React.FC = () => {
           />
         ) : (
           <div className="flex min-h-[40vh] flex-col items-center justify-center px-4 py-8">
-            <div className="w-full max-w-md rounded-2xl border border-studio-border bg-studio-panel/90 px-8 py-10 text-center shadow-[0_12px_40px_rgba(0,0,0,0.35)] ring-1 ring-white/[0.04]">
+            <div className="w-full max-w-md rounded-2xl border border-studio-border bg-studio-panel/90 px-8 py-10 text-center shadow-[0_12px_40px_rgba(15,23,42,0.1)] ring-1 ring-slate-900/5">
               {modelOptions.length === 0 ? (
                 <div className="flex flex-col gap-3 text-sm text-studio-muted">
                   <p className="m-0 text-studio-text">尚未配置可用模型，无法开始对话。</p>
@@ -574,7 +574,7 @@ export const AgentChatPage: React.FC = () => {
 
       {error && (
         <div
-          className="fixed bottom-4 right-4 z-[100] flex max-w-sm items-start gap-3 rounded-xl border border-studio-hot/35 bg-studio-panel px-4 py-3 text-sm text-studio-text shadow-[0_12px_40px_rgba(0,0,0,0.45)] ring-1 ring-black/20"
+          className="fixed bottom-4 right-4 z-[100] flex max-w-sm items-start gap-3 rounded-xl border border-studio-hot/35 bg-studio-panel px-4 py-3 text-sm text-studio-text shadow-[0_12px_40px_rgba(15,23,42,0.12)] ring-1 ring-slate-900/8"
           role="alert"
         >
           <span className="shrink-0 text-lg leading-none text-studio-hot" aria-hidden>
@@ -591,7 +591,7 @@ export const AgentChatPage: React.FC = () => {
           aria-modal="true"
           aria-labelledby="clear-memory-title"
         >
-          <div className="w-full max-w-md rounded-2xl border border-studio-border bg-studio-panel p-6 shadow-[0_24px_60px_rgba(0,0,0,0.55)] ring-1 ring-white/[0.06]">
+          <div className="w-full max-w-md rounded-2xl border border-studio-border bg-studio-panel p-6 shadow-[0_24px_60px_rgba(15,23,42,0.14)] ring-1 ring-slate-900/5">
             <h2 id="clear-memory-title" className="text-lg font-bold text-studio-text">
               清空对话记忆
             </h2>

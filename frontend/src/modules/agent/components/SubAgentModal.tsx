@@ -86,7 +86,7 @@ export function SubAgentModal({ parentAgent, onSubmit, onClose }: SubAgentModalP
             <button
               type="submit"
               disabled={!name.trim() || submitting}
-              className="rounded-xl bg-[#e11d48] px-4 py-2 text-sm font-medium text-white hover:bg-[#be123c] disabled:cursor-not-allowed disabled:opacity-50"
+              className="rounded-xl bg-studio-hot px-4 py-2 text-sm font-medium text-white hover:bg-studio-hot-hover disabled:cursor-not-allowed disabled:opacity-50"
             >
               {submitting ? '创建中…' : '创建'}
             </button>

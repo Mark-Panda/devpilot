@@ -261,21 +261,21 @@ export function StudioOfficeScene({
 
   return (
     <div
-      className={`studio-office-scene relative shrink-0 border-b-2 border-[var(--so-red)] bg-[#2a2218] ${nightMode ? 'studio-office-scene--night' : ''}`}
+      className={`studio-office-scene relative shrink-0 border-b-2 border-[var(--sp-border)] bg-gradient-to-b from-[#fef7ed] via-[#f8fafc] to-[#f1f5f9] ${nightMode ? 'studio-office-scene--night' : ''}`}
     >
       <button
         type="button"
         onClick={() => setVisionPanned((v) => !v)}
         title={visionPanned ? '恢复默认视野' : '横向略放大场景'}
         aria-pressed={visionPanned}
-        className="studio-office-scene-hud-btn absolute left-2 top-2 z-[12] border border-[var(--so-red)] bg-[#1a1510] px-2 py-1 text-sm text-[#f5e6d3] hover:bg-[#2a2218]"
+        className="studio-office-scene-hud-btn absolute left-2 top-2 z-[12] rounded-md border border-[var(--sp-border)] bg-[var(--sp-panel)] px-2 py-1 text-sm font-semibold text-[var(--sp-text)] shadow-sm hover:bg-[var(--sp-panel-2)]"
       >
         {visionPanned ? '默认视野' : '移动视野'}
       </button>
       <button
         type="button"
         onClick={() => setShowCoords((v) => !v)}
-        className="studio-office-scene-hud-btn absolute right-2 top-2 z-[12] border border-[var(--so-red)] bg-[#1a1510] px-2 py-1 text-sm text-[#f5e6d3] hover:bg-[#2a2218]"
+        className="studio-office-scene-hud-btn absolute right-2 top-2 z-[12] rounded-md border border-[var(--sp-border)] bg-[var(--sp-panel)] px-2 py-1 text-sm font-semibold text-[var(--sp-text)] shadow-sm hover:bg-[var(--sp-panel-2)]"
       >
         {showCoords ? '隐藏坐标' : '显示坐标'}
       </button>
@@ -333,11 +333,11 @@ export function StudioOfficeScene({
           </div>
         ) : null}
 
-        <div className="relative z-[1] border-2 border-[#c9a227] bg-[#1a1510] px-4 py-1.5 text-center shadow-[3px_3px_0_#000]">
-          <span className="text-[13px] font-bold tracking-wider text-[#f6e05e]">✦</span>
-          <span className="mx-2 text-sm font-bold text-[#f5e6d3]">{studioName || '工作室'}</span>
-          <span className="text-[13px] font-bold tracking-wider text-[#f6e05e]">✦</span>
-          <div className="text-xs text-[#a89968]">DevPilot · 协作空间</div>
+        <div className="relative z-[1] rounded-md border-2 border-[var(--sp-border)] bg-[var(--sp-panel)] px-4 py-1.5 text-center shadow-[var(--sp-pixel-shadow-sm)]">
+          <span className="text-[13px] font-bold tracking-wider text-[var(--sp-border-hot)]">✦</span>
+          <span className="mx-2 text-sm font-bold text-[var(--sp-text)]">{studioName || '工作室'}</span>
+          <span className="text-[13px] font-bold tracking-wider text-[var(--sp-border-hot)]">✦</span>
+          <div className="text-xs text-[var(--sp-muted)]">DevPilot · 协作空间</div>
         </div>
       </div>
     </div>

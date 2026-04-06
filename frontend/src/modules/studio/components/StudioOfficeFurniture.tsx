@@ -74,7 +74,7 @@ export function StudioOfficeFurniture() {
           <div className="flex h-[22px] items-end justify-center gap-px px-0.5 pb-px pt-0.5">
             <div className="h-[17px] w-[5px] bg-[#b45309]" />
             <div className="h-[14px] w-[3px] bg-[#115e59]" />
-            <div className="h-[19px] w-[5px] bg-[#be123c]" />
+            <div className="h-[19px] w-[5px] bg-studio-hot-hover" />
             <div className="h-[15px] w-[4px] bg-[#1c1917]" />
           </div>
         </div>

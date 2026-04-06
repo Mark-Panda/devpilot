@@ -358,7 +358,7 @@ export const StudioWorkspacePage: React.FC = () => {
         <div className="flex min-w-0 flex-wrap items-center gap-2">
           <Link
             to="/studios"
-            className={`shrink-0 rounded border border-transparent px-2 py-1 text-sm text-[var(--sp-muted)] transition-colors hover:border-[var(--so-red)] hover:bg-[#252525] hover:text-[var(--sp-text)] ${officeFocus}`}
+            className={`shrink-0 rounded border border-transparent px-2 py-1 text-sm text-[var(--sp-muted)] transition-colors hover:border-[var(--so-red)] hover:bg-[var(--sp-panel-2)] hover:text-[var(--sp-text)] ${officeFocus}`}
           >
             ← 工作室列表
           </Link>
@@ -386,15 +386,15 @@ export const StudioWorkspacePage: React.FC = () => {
       />
 
       {sceneCollapsed ? (
-        <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b-2 border-[var(--so-red)] bg-[#161616] px-4 py-2 text-sm text-[var(--sp-muted)]">
+        <div className="flex flex-shrink-0 items-center justify-between gap-3 border-b-2 border-[var(--so-red)] bg-[var(--so-dashboard)] px-4 py-2 text-sm text-[var(--sp-muted)] shadow-[inset_0_1px_0_rgba(255,255,255,0.75)]">
           <span className="min-w-0 truncate">
             像素场景已收起，下方为任务与对话。当前协作状态：
-            <strong className="ml-1 text-[var(--sp-border-hot)]">{displayOfficeMood}</strong>
+            <strong className="ml-1 font-semibold text-[var(--sp-border-hot)]">{displayOfficeMood}</strong>
           </span>
           <button
             type="button"
             onClick={() => setSceneCollapsed(false)}
-            className={`shrink-0 border border-[var(--so-red)] bg-[var(--so-red)]/20 px-2.5 py-1 text-sm text-[var(--sp-error-text)] transition-colors hover:bg-[var(--so-red)]/30 ${officeFocus}`}
+            className={`shrink-0 border border-[var(--so-red)] bg-[rgba(225,29,72,0.1)] px-2.5 py-1 text-sm font-medium text-[var(--sp-border-hot)] transition-colors hover:bg-[rgba(225,29,72,0.16)] ${officeFocus}`}
           >
             展开场景
           </button>

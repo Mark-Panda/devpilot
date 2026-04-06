@@ -52,9 +52,9 @@ export function StudioOfficeWallInteractives({
         title={nightMode ? '点击切回白昼' : '点击切换夜景'}
         aria-pressed={nightMode}
         aria-label="切换窗户昼夜"
-        className="pointer-events-auto absolute left-[3%] top-[14%] border-2 border-[#2a1810] bg-[#3d2d22] p-1 shadow-[3px_3px_0_#000] transition-transform hover:scale-[1.02] active:scale-[0.98]"
+        className="pointer-events-auto absolute left-[3%] top-[14%] border-2 border-[#c4b5a8] bg-[#faf6f0] p-1 shadow-[var(--sp-pixel-shadow-sm)] transition-transform hover:scale-[1.02] active:scale-[0.98]"
       >
-        <div className="relative h-16 w-[52px] overflow-hidden border-2 border-[#1a120c]">
+        <div className="relative h-16 w-[52px] overflow-hidden border-2 border-[#d6cfc7]">
           {nightMode ? (
             <div className="studio-office-window-night relative h-full w-full">
               <div className="absolute inset-0 bg-gradient-to-b from-[#0f172a] via-[#1e1b4b] to-[#312e81]" />
@@ -86,7 +86,7 @@ export function StudioOfficeWallInteractives({
             </div>
           )}
         </div>
-        <span className="mt-0.5 block text-center text-[10px] text-[#d6c4a8]">
+        <span className="mt-0.5 block text-center text-[10px] font-semibold text-[#57534e]">
           {nightMode ? '夜景' : '白昼'}
         </span>
       </button>
@@ -110,7 +110,7 @@ export function StudioOfficeWallInteractives({
         onClick={() => setBoardIdx((i) => (i + 1) % BOARD_LINES.length)}
         title="点击切换白板行"
         aria-label="工作室白板"
-        className="pointer-events-auto absolute left-1/2 top-[13%] w-[120px] -translate-x-1/2 border-4 border-[#57534e] bg-[#ecfdf5] px-2 py-1.5 shadow-[2px_3px_0_#000] transition-transform hover:scale-[1.02] active:scale-[0.98]"
+        className="pointer-events-auto absolute left-1/2 top-[13%] w-[120px] -translate-x-1/2 border-4 border-[#94a3b8] bg-[#ecfdf5] px-2 py-1.5 shadow-[var(--sp-pixel-shadow-sm)] transition-transform hover:scale-[1.02] active:scale-[0.98]"
       >
         <div className="mb-0.5 text-[10px] font-bold uppercase tracking-wide text-[#57534e]">
           白板
@@ -128,13 +128,13 @@ export function StudioOfficeWallInteractives({
         }}
         title="挂钟 · 点击闪一下"
         aria-label={`当前时间 ${h}点${m}分`}
-        className={`pointer-events-auto absolute right-[16%] top-[12%] flex w-[64px] flex-col items-center border-4 border-[#44403c] bg-[#292524] px-1 py-1 shadow-[3px_3px_0_#000] transition-transform hover:scale-105 active:scale-95 ${clockFlash ? 'ring-2 ring-amber-400/80' : ''}`}
+        className={`pointer-events-auto absolute right-[16%] top-[12%] flex w-[64px] flex-col items-center border-4 border-[#94a3b8] bg-[#f8fafc] px-1 py-1 shadow-[var(--sp-pixel-shadow-sm)] transition-transform hover:scale-105 active:scale-95 ${clockFlash ? 'ring-2 ring-amber-400/80' : ''}`}
       >
-        <div className="h-1 w-8 bg-[#57534e]" />
-        <div className="mt-1 font-mono text-[15px] font-bold leading-none tracking-wider text-[#fbbf24]">
+        <div className="h-1 w-8 bg-[#cbd5e1]" />
+        <div className="mt-1 font-mono text-[15px] font-bold leading-none tracking-wider text-[#b45309]">
           {h}:{m}:{s}
         </div>
-        <div className="mt-0.5 text-[10px] text-[#a8a29e]">
+        <div className="mt-0.5 text-[10px] text-[#64748b]">
           {mon}月{day}日
         </div>
       </button>
@@ -146,12 +146,12 @@ export function StudioOfficeWallInteractives({
         aria-pressed={onAir}
         aria-label="切换录制指示灯"
         title={onAir ? '关闭录制灯' : '打开录制灯'}
-        className="pointer-events-auto absolute right-[3%] top-[14%] flex flex-col items-center gap-1 border-2 border-[#44403c] bg-[#1c1917] px-2 py-1.5 shadow-[2px_2px_0_#000] hover:border-[#78716c]"
+        className="pointer-events-auto absolute right-[3%] top-[14%] flex flex-col items-center gap-1 rounded border-2 border-[#cbd5e1] bg-[#f1f5f9] px-2 py-1.5 shadow-[var(--sp-pixel-shadow-sm)] hover:border-[#94a3b8]"
       >
         <span
-          className={`h-2.5 w-2.5 border border-[#7f1d1d] ${onAir ? 'studio-office-onair-led bg-red-500' : 'bg-[#450a0a]'}`}
+          className={`h-2.5 w-2.5 border border-[#7f1d1d] ${onAir ? 'studio-office-onair-led bg-red-500' : 'bg-[#fecaca]'}`}
         />
-        <span className="text-[10px] font-bold tracking-widest text-[#d6d3d1]">REC</span>
+        <span className="text-[10px] font-bold tracking-widest text-[#475569]">REC</span>
       </button>
     </div>
   )
