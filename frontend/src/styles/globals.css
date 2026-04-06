@@ -2027,6 +2027,135 @@ body {
   min-width: 0;
 }
 
+/* 规则编辑器：返回列表在标题左侧（需高于 .rulego-toolbar-btn.text 的透明底） */
+.rulego-toolbar-btn.text.rulego-editor-back-to-list {
+  flex-shrink: 0;
+  padding: 7px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  color: #e2e8f0;
+  border: 1px solid rgba(100, 116, 139, 0.55);
+  border-radius: 8px;
+  background: linear-gradient(180deg, rgba(71, 85, 105, 0.85) 0%, rgba(51, 65, 85, 0.95) 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.06) inset;
+}
+
+.rulego-toolbar-btn.text.rulego-editor-back-to-list:hover:not(:disabled) {
+  color: #f8fafc;
+  border-color: rgba(148, 163, 184, 0.55);
+  background: linear-gradient(180deg, rgba(100, 116, 139, 0.9) 0%, rgba(71, 85, 105, 0.98) 100%);
+}
+
+.rulego-toolbar-btn.text.rulego-editor-back-to-list:focus-visible {
+  outline: none;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 0 0 2px #1e293b,
+    0 0 0 4px rgba(148, 163, 184, 0.55);
+}
+
+/* 规则编辑器主工具：Agent / 测试 / 保存 — 高对比色块 */
+.rulego-toolbar-btn.rulego-toolbar-btn--agent {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-color: #0ea5e9;
+  background: linear-gradient(180deg, #38bdf8 0%, #0284c7 100%);
+  color: #f0f9ff;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.2) inset,
+    0 2px 10px rgba(14, 165, 233, 0.45);
+}
+
+.rulego-toolbar-btn.rulego-toolbar-btn--agent:hover:not(:disabled) {
+  border-color: #7dd3fc;
+  background: linear-gradient(180deg, #7dd3fc 0%, #0ea5e9 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.25) inset,
+    0 3px 14px rgba(14, 165, 233, 0.55);
+}
+
+.rulego-toolbar-btn.rulego-toolbar-btn--agent:focus-visible {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.2) inset,
+    0 0 0 2px #1e293b,
+    0 0 0 4px rgba(56, 189, 248, 0.75);
+}
+
+.rulego-toolbar-btn.rulego-toolbar-btn--test {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-color: #d97706;
+  background: linear-gradient(180deg, #fbbf24 0%, #d97706 100%);
+  color: #1c1917;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.25) inset,
+    0 2px 10px rgba(217, 119, 6, 0.4);
+}
+
+.rulego-toolbar-btn.rulego-toolbar-btn--test:hover:not(:disabled) {
+  border-color: #fcd34d;
+  background: linear-gradient(180deg, #fcd34d 0%, #f59e0b 100%);
+}
+
+.rulego-toolbar-btn.rulego-toolbar-btn--test:focus-visible {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.2) inset,
+    0 0 0 2px #1e293b,
+    0 0 0 4px rgba(251, 191, 36, 0.85);
+}
+
+.rulego-toolbar-btn.rulego-toolbar-btn--test:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  filter: grayscale(0.35);
+  box-shadow: none;
+}
+
+.rulego-toolbar-btn.rulego-toolbar-btn--save.rulego-toolbar-btn--save-active {
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  border-color: #059669;
+  background: linear-gradient(180deg, #34d399 0%, #059669 100%);
+  color: #ecfdf5;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.2) inset,
+    0 2px 10px rgba(5, 150, 105, 0.45);
+}
+
+.rulego-toolbar-btn.rulego-toolbar-btn--save.rulego-toolbar-btn--save-active:hover:not(:disabled) {
+  border-color: #6ee7b7;
+  background: linear-gradient(180deg, #6ee7b7 0%, #10b981 100%);
+}
+
+.rulego-toolbar-btn.rulego-toolbar-btn--save.rulego-toolbar-btn--save-active:focus-visible {
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.2) inset,
+    0 0 0 2px #1e293b,
+    0 0 0 4px rgba(52, 211, 153, 0.8);
+}
+
+.rulego-toolbar-btn.rulego-toolbar-btn--save.rulego-toolbar-btn--save-idle {
+  font-weight: 600;
+  border-color: #475569;
+  background: #475569;
+  color: #94a3b8;
+  cursor: not-allowed;
+  opacity: 0.95;
+  box-shadow: none;
+}
+
+.rulego-toolbar-btn.rulego-toolbar-btn--save.rulego-toolbar-btn--save-idle:hover {
+  background: #475569;
+  border-color: #475569;
+  color: #94a3b8;
+  cursor: not-allowed;
+}
+
+.rulego-toolbar-btn.rulego-toolbar-btn--save.rulego-toolbar-btn--save-idle:focus-visible {
+  box-shadow: 0 0 0 2px #1e293b, 0 0 0 4px rgba(148, 163, 184, 0.45);
+}
+
 .rulego-editor-title {
   font-size: 1.125rem;
   font-weight: 600;
@@ -2068,8 +2197,9 @@ body {
 
 .rulego-editor-toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
 }
 
 .rulego-editor-view-controls {
@@ -2083,6 +2213,11 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+/* 画布缩放等控件：顶栏右侧对齐（标题与主工具在左、中） */
+.rulego-editor-header-bar > .rulego-editor-view-controls {
+  margin-left: auto;
 }
 
 .rulego-editor-decoding-banner {

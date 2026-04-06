@@ -6296,6 +6296,14 @@ export default function RuleGoScratchEditorPage() {
       <header className="rulego-editor-header-bar">
         <div className="rulego-editor-title-cluster">
           <div className="rulego-editor-title-row">
+            <button
+              className="rulego-toolbar-btn text rulego-editor-back-to-list"
+              type="button"
+              onClick={() => navigate("/rulego", { state: rulegoListLinkState })}
+              title="返回规则列表"
+            >
+              ← 返回列表
+            </button>
             <h1 className="rulego-editor-title">规则编辑器</h1>
             {isDirty ? (
               <span className="rulego-editor-unsaved-badge" title="有未保存的更改">
@@ -6312,7 +6320,27 @@ export default function RuleGoScratchEditorPage() {
         </div>
         <div className="rulego-editor-toolbar">
           <button
-            className={`rulego-toolbar-btn ${isDirty ? "primary" : "save-unchanged"}`}
+            className="rulego-toolbar-btn rulego-toolbar-btn--agent"
+            type="button"
+            title="用 Agent 根据自然语言编排或补充画布"
+            onClick={() => {
+              setAgentError(null);
+              setAgentModalOpen(true);
+            }}
+          >
+            Agent 对话
+          </button>
+          <button
+            className="rulego-toolbar-btn rulego-toolbar-btn--test"
+            type="button"
+            title={triggerLayoutError ? triggerLayoutError : "测试"}
+            onClick={handleTestClick}
+            disabled={Boolean(triggerLayoutError)}
+          >
+            测试
+          </button>
+          <button
+            className={`rulego-toolbar-btn rulego-toolbar-btn--save ${isDirty ? "rulego-toolbar-btn--save-active" : "rulego-toolbar-btn--save-idle"}`}
             type="button"
             onClick={handleSave}
             disabled={saving || !isDirty || Boolean(triggerLayoutError)}
@@ -6325,15 +6353,6 @@ export default function RuleGoScratchEditorPage() {
             }
           >
             保存
-          </button>
-          <button
-            className="rulego-toolbar-btn"
-            type="button"
-            title={triggerLayoutError ? triggerLayoutError : "测试"}
-            onClick={handleTestClick}
-            disabled={Boolean(triggerLayoutError)}
-          >
-            测试
           </button>
         </div>
         <div className="rulego-editor-view-controls">
@@ -6397,21 +6416,6 @@ export default function RuleGoScratchEditorPage() {
             }}
           >
             ⊡
-          </button>
-        </div>
-        <div className="rulego-editor-header-extra">
-          <button
-            className="rulego-toolbar-btn"
-            type="button"
-            onClick={() => {
-              setAgentError(null);
-              setAgentModalOpen(true);
-            }}
-          >
-            Agent 对话
-          </button>
-          <button className="rulego-toolbar-btn text" type="button" onClick={() => navigate("/rulego", { state: rulegoListLinkState })}>
-            返回列表
           </button>
         </div>
       </header>
