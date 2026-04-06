@@ -18,6 +18,7 @@ alwaysApply: false
 - cursor/acp
 - cursor/acp_agent
 - cursor/acp_agent_step
+- cursor/cli
 - dbClient
 - delay
 - end
@@ -45,8 +46,6 @@ alwaysApply: false
 - net
 - opensearch/search
 - ref
-- refactor/apiIoContext
-- refactor/evidencePack
 - restApiCall
 - sendEmail
 - sourcegraph/queryBuild

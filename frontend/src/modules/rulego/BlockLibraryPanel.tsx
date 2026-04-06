@@ -50,6 +50,7 @@ const BLOCK_LABELS: Record<string, string> = {
   rulego_fileDelete: "删文件",
   rulego_fileList: "列文件",
   rulego_apiRouteTracer_gitPrepare: "追踪·Git 工作区",
+  rulego_cursorCli: "追踪·Cursor CLI",
   rulego_cursorAcp: "追踪·Cursor ACP",
   rulego_cursorAcpAgent: "追踪·Cursor ACP Agent",
   rulego_cursorAcpAgentStep: "追踪·ACP Agent 单步",

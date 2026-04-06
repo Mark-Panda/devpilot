@@ -16,6 +16,7 @@ import (
 	"devpilot/backend/internal/workspace"
 
 	"github.com/rulego/rulego/api/types"
+	"github.com/rulego/rulego/utils/el"
 )
 
 // acpProgressLogMaxChars 执行日志中单次写入的流式预览上限，避免 Pebble value 过大。
@@ -260,7 +261,7 @@ func applyConfiguredACPModel(args []string, model string) []string {
 	return injectModelArg(args, strings.TrimSpace(model))
 }
 
-func resolveCursorACPCwd(cfg *cursorACPAgentConfig, msg types.RuleMsg, workspaceEnabled bool, workspaceRoot string, nodeType string) (string, error) {
+func resolveCursorACPCwd(ctx types.RuleContext, cfg *cursorACPAgentConfig, workDirTmpl el.Template, msg types.RuleMsg, workspaceEnabled bool, workspaceRoot string, nodeType string) (string, error) {
 	if workspaceEnabled {
 		workspaceRoot = strings.TrimSpace(workspaceRoot)
 		if workspaceRoot == "" {
@@ -269,17 +270,7 @@ func resolveCursorACPCwd(cfg *cursorACPAgentConfig, msg types.RuleMsg, workspace
 		return workspaceRoot, nil
 	}
 
-	cwd := expandUserPath(cfg.WorkDir)
-	if msg.Metadata != nil {
-		if v := strings.TrimSpace(msg.Metadata.GetValue("cursor_acp_cwd")); v != "" {
-			cwd = expandUserPath(v)
-		}
-		if cwd == "" {
-			if v := strings.TrimSpace(msg.Metadata.GetValue("api_route_tracer_service_path")); v != "" {
-				cwd = expandUserPath(v)
-			}
-		}
-	}
+	cwd := resolveCursorWorkDir(ctx, msg, workDirTmpl)
 	if cwd == "" {
 		return "", fmt.Errorf("%s: 缺少工作目录，请配置 workDir 或在 metadata 中设置 cursor_acp_cwd（或与 gitPrepare 联用 api_route_tracer_service_path）", nodeType)
 	}
@@ -287,7 +278,7 @@ func resolveCursorACPCwd(cfg *cursorACPAgentConfig, msg types.RuleMsg, workspace
 }
 
 // runCursorACPAgent 执行 ACP 多轮循环；maxRoundsOverride>0 时覆盖配置中的 maxPromptRounds（step 节点传 1）。
-func runCursorACPAgent(ctx types.RuleContext, msg types.RuleMsg, cfg *cursorACPAgentConfig, maxRoundsOverride int, nodeType string) {
+func runCursorACPAgent(ctx types.RuleContext, msg types.RuleMsg, cfg *cursorACPAgentConfig, workDirTmpl el.Template, maxRoundsOverride int, nodeType string) {
 	workspaceRoot, workspaceEnabled, err := resolveWorkspaceRoot(cfg)
 	if err != nil {
 		ctx.TellFailure(msg, err)
@@ -360,11 +351,14 @@ func runCursorACPAgent(ctx types.RuleContext, msg types.RuleMsg, cfg *cursorACPA
 	runCtx, cancel := context.WithTimeout(parent, time.Duration(cfg.TimeoutSec)*time.Second)
 	defer cancel()
 
-	cwd, err := resolveCursorACPCwd(cfg, msg, workspaceEnabled, workspaceRoot, nodeType)
+	cwd, err := resolveCursorACPCwd(ctx, cfg, workDirTmpl, msg, workspaceEnabled, workspaceRoot, nodeType)
 	if err != nil {
 		ctx.TellFailure(msg, err)
 		return
 	}
+
+	log.Printf("[rulego] %s 参数: cwd=%q workspaceEnabled=%v workspaceRoot=%q workspaceId=%q agentCommand=%q timeoutSec=%d maxPromptRounds=%d args=%v model=%q sessionMode=%q permissionOptionId=%q verboseLog=%v useAfterRoundHook=%v useAskDialog=%v promptLen=%d workDirRaw=%q",
+		nodeType, cwd, workspaceEnabled, workspaceRoot, cfg.WorkspaceID, agentCmd, cfg.TimeoutSec, maxR, args, cfg.Model, cfg.SessionMode, cfg.PermissionOptionID, cfg.VerboseLog, cfg.UseRegisteredAfterRoundHook, cfg.UseAskQuestionDialog, len(prompt), cfg.WorkDir)
 
 	execID := ""
 	nodeID := ""

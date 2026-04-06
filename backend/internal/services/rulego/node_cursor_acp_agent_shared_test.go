@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/rulego/rulego/api/types"
+	"github.com/rulego/rulego/utils/el"
 )
 
 type fakeWorkspaceResolver struct {
@@ -97,7 +98,11 @@ func TestResolveCursorACPCwd_WorkspaceForcesOverride(t *testing.T) {
 	msg := types.NewMsg(0, "", types.JSON, types.NewMetadata(), "")
 	msg.Metadata.PutValue("cursor_acp_cwd", "/also/should/not/use")
 
-	cwd, err := resolveCursorACPCwd(cfg, msg, true, "/ws/root", "cursor/acp_agent")
+	tmpl, err := el.NewTemplate("")
+	if err != nil {
+		t.Fatalf("template: %v", err)
+	}
+	cwd, err := resolveCursorACPCwd(nil, cfg, tmpl, msg, true, "/ws/root", "cursor/acp_agent")
 	if err != nil {
 		t.Fatalf("unexpected err: %v", err)
 	}

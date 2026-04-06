@@ -649,6 +649,21 @@ function BlockConfigModal({
       next.ACP_VERBOSE_LOG = block.getField("ACP_VERBOSE_LOG") ? getBool("ACP_VERBOSE_LOG") : true;
       next.WORKSPACE_ID = get("WORKSPACE_ID");
     }
+    if (block.type === "rulego_cursorCli") {
+      next.CLI_AGENT_PRESET = get("CLI_AGENT_PRESET") || "path";
+      next.CLI_AGENT_CMD = get("CLI_AGENT_CMD") || "agent";
+      next.CLI_TIMEOUT_PRESET = get("CLI_TIMEOUT_PRESET") || "1800";
+      next.TIMEOUT_SEC = get("TIMEOUT_SEC") || "1800";
+      next.WORK_DIR = get("WORK_DIR");
+      next.CLI_MODEL = get("CLI_MODEL");
+      next.CLI_MODE = get("CLI_MODE") || "agent";
+      next.CLI_OUTPUT_FORMAT = get("CLI_OUTPUT_FORMAT") || "text";
+      next.CLI_TRUST = block.getField("CLI_TRUST") ? getBool("CLI_TRUST") : true;
+      next.CLI_FORCE = block.getField("CLI_FORCE") ? getBool("CLI_FORCE") : false;
+      next.CLI_STREAM_PARTIAL = block.getField("CLI_STREAM_PARTIAL") ? getBool("CLI_STREAM_PARTIAL") : false;
+      next.CLI_EXTRA_ARGS_JSON = String(block.getFieldValue("CLI_EXTRA_ARGS_JSON") ?? "").trim() || "[]";
+      next.CLI_PROMPT_TEMPLATE = String(block.getFieldValue("CLI_PROMPT_TEMPLATE") ?? "");
+    }
     if (block.type === "rulego_sourcegraphSearch") {
       next.SG_ENDPOINT = get("SG_ENDPOINT") || "https://sourcegraph.com";
       next.SG_TOKEN = get("SG_TOKEN");
@@ -2210,6 +2225,186 @@ function BlockConfigModal({
           </p>
         </>
       )}
+      {block.type === "rulego_cursorCli" && (
+        <>
+          <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
+            使用 Cursor Agent CLI 的 <code>--print</code> 一次性执行（不经 ACP）。默认提示词为上游消息的 <code>data</code>；若下方填写「提示词模板」，则使用模板渲染结果（支持 <code>{"${...}"}</code>，与 exec 等节点一致，如 <code>{"${data}"}</code>、<code>{"${metadata.xxx}"}</code>）。工作目录可与「追踪·Cursor ACP」相同，由 gitPrepare 的 metadata 注入。
+          </p>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>提示词模板 (promptTemplate，可选)</span>
+            <textarea
+              value={String(form.CLI_PROMPT_TEMPLATE ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, CLI_PROMPT_TEMPLATE: e.target.value }))}
+              placeholder="留空则使用上游 msg.Data。填写示例：请根据以下内容总结：${data} 或 ${metadata.api_route_tracer_service_path}"
+              rows={4}
+              style={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }}
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>Agent 可执行文件 (agentCommand)</span>
+            <select
+              value={String(form.CLI_AGENT_PRESET ?? "path")}
+              onChange={(e) => {
+                const v = e.target.value;
+                setForm((f) => ({
+                  ...f,
+                  CLI_AGENT_PRESET: v,
+                  ...(v === "path"
+                    ? { CLI_AGENT_CMD: "agent" }
+                    : v === "local"
+                      ? { CLI_AGENT_CMD: "~/.local/bin/agent" }
+                      : {}),
+                }));
+              }}
+            >
+              {cursorAcpAgentPresetOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {form.CLI_AGENT_PRESET === "custom" && (
+            <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+              <span>自定义命令或路径</span>
+              <input
+                value={String(form.CLI_AGENT_CMD ?? "")}
+                onChange={(e) => setForm((f) => ({ ...f, CLI_AGENT_CMD: e.target.value }))}
+                placeholder="例如 /opt/cursor/bin/agent"
+                autoCapitalize="off"
+                autoCorrect="off"
+                autoComplete="off"
+              />
+            </label>
+          )}
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>执行超时（秒）</span>
+            <select
+              value={String(form.CLI_TIMEOUT_PRESET ?? "1800")}
+              onChange={(e) => {
+                const v = e.target.value;
+                setForm((f) => ({
+                  ...f,
+                  CLI_TIMEOUT_PRESET: v,
+                  ...(v !== "custom" ? { TIMEOUT_SEC: v } : {}),
+                }));
+              }}
+            >
+              {cursorAcpTimeoutPresetOptions.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          {form.CLI_TIMEOUT_PRESET === "custom" && (
+            <label className="form-field">
+              <span>自定义超时（秒）</span>
+              <input
+                type="number"
+                min={30}
+                value={String(form.TIMEOUT_SEC ?? "1800")}
+                onChange={(e) => setForm((f) => ({ ...f, TIMEOUT_SEC: e.target.value }))}
+              />
+            </label>
+          )}
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>工作目录 (workDir)</span>
+            <input
+              value={String(form.WORK_DIR ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, WORK_DIR: e.target.value }))}
+              placeholder="支持 ${data}、${metadata.xxx}；可与 gitPrepare 联用"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+            <small className="form-hint" style={{ display: "block", marginTop: 6 }}>
+              运行时先按模板渲染本字段，再若 metadata 含 <code>cursor_acp_cwd</code> 则覆盖；仍为空则用 <code>api_route_tracer_service_path</code>。
+            </small>
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>模型 (model，可选)</span>
+            <input
+              value={String(form.CLI_MODEL ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, CLI_MODEL: e.target.value }))}
+              placeholder="留空则 CLI 默认"
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>执行模式 (mode)</span>
+            <select
+              value={String(form.CLI_MODE ?? "agent")}
+              onChange={(e) => setForm((f) => ({ ...f, CLI_MODE: e.target.value }))}
+            >
+              <option value="agent">Agent（默认）</option>
+              <option value="plan">Plan（只读规划）</option>
+              <option value="ask">Ask（只读问答）</option>
+            </select>
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>输出格式 (outputFormat)</span>
+            <select
+              value={String(form.CLI_OUTPUT_FORMAT ?? "text")}
+              onChange={(e) => setForm((f) => ({ ...f, CLI_OUTPUT_FORMAT: e.target.value }))}
+            >
+              <option value="text">text</option>
+              <option value="json">json</option>
+              <option value="stream-json">stream-json</option>
+            </select>
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <input
+                type="checkbox"
+                checked={Boolean(form.CLI_TRUST)}
+                onChange={(e) => setForm((f) => ({ ...f, CLI_TRUST: e.target.checked }))}
+              />
+              信任工作区 (--trust，无头模式建议开启)
+            </span>
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <input
+                type="checkbox"
+                checked={Boolean(form.CLI_FORCE)}
+                onChange={(e) => setForm((f) => ({ ...f, CLI_FORCE: e.target.checked }))}
+              />
+              自动允许命令 (--force)
+            </span>
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <input
+                type="checkbox"
+                checked={Boolean(form.CLI_STREAM_PARTIAL)}
+                onChange={(e) => setForm((f) => ({ ...f, CLI_STREAM_PARTIAL: e.target.checked }))}
+              />
+              流式增量 (--stream-partial-output，通常配合 stream-json)
+            </span>
+          </label>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>附加参数 (extraArgs，JSON 数组)</span>
+            <textarea
+              value={String(form.CLI_EXTRA_ARGS_JSON ?? "[]")}
+              onChange={(e) => setForm((f) => ({ ...f, CLI_EXTRA_ARGS_JSON: e.target.value }))}
+              placeholder='例如 [] 或 ["--sandbox","disabled"]'
+              rows={3}
+              style={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }}
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
+        </>
+      )}
       {(block.type === "rulego_cursorAcp" ||
         block.type === "rulego_cursorAcpAgent" ||
         block.type === "rulego_cursorAcpAgentStep") && (
@@ -2485,19 +2680,19 @@ function BlockConfigModal({
             </>
           )}
           <label className="form-field" style={{ gridColumn: "1 / -1" }}>
-            <span>默认工作目录 (workDir，可选，支持 ~/ 展开)</span>
+            <span>默认工作目录 (workDir，可选，支持 ~/ 与 ${"{...}"} 模板)</span>
             <input
               value={String(form.WORK_DIR ?? "")}
               onChange={(e) => setForm((f) => ({ ...f, WORK_DIR: e.target.value }))}
-              placeholder="可被 metadata cursor_acp_cwd 或 api_route_tracer_service_path 覆盖"
+              placeholder="例如 ${metadata.api_route_tracer_service_path}；可被 metadata 覆盖"
               autoCapitalize="off"
               autoCorrect="off"
               autoComplete="off"
             />
           </label>
           <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
-            首轮提示词来自上游消息的 <code>msg.Data</code>。工作目录优先 metadata <code>cursor_acp_cwd</code>，否则{" "}
-            <code>api_route_tracer_service_path</code>，否则本块 workDir。需本机已安装 Cursor CLI 并完成 <code>agent login</code> 或配置{" "}
+            首轮提示词来自上游消息的 <code>msg.Data</code>。工作目录：先渲染本块 workDir 模板（<code>{"${data}"}</code>、<code>{"${metadata.xxx}"}</code> 等），再若 metadata 含{" "}
+            <code>cursor_acp_cwd</code> 则覆盖；仍为空则用 <code>api_route_tracer_service_path</code>。需本机已安装 Cursor CLI 并完成 <code>agent login</code> 或配置{" "}
             <code>CURSOR_API_KEY</code>。
             {block.type === "rulego_cursorAcpAgent" ? (
               <>
