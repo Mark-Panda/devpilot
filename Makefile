@@ -1,4 +1,19 @@
-.PHONY: dev build clean lint test build-all generate docs deps rulego-rules
+.PHONY: dev build build-appicon clean lint test build-all generate docs deps rulego-rules help
+
+# 打印可用目标（与 README「Make 目标」一致时可对照维护）
+help:
+	@echo "DevPilot Makefile 目标："
+	@echo "  make dev            - 启动 wails dev（桌面开发调试）"
+	@echo "  make build          - 生成应用图标后 wails build（当前平台产物）"
+	@echo "  make build-appicon  - 从 Logo 生成 build/appicon.png、build/icons、AppIcon.icns"
+	@echo "  make build-all      - 多平台 wails build（darwin/amd64+arm64、windows、linux）"
+	@echo "  make clean          - 删除 build/bin 与 frontend/dist"
+	@echo "  make generate       - wails generate module（更新绑定等）"
+	@echo "  make lint           - golangci-lint + 前端 eslint"
+	@echo "  make test           - go test -race -cover + 前端 npm test"
+	@echo "  make docs           - swag init，生成 docs/swagger"
+	@echo "  make deps           - go mod tidy/verify + 前端 npm audit"
+	@echo "  make rulego-rules   - 生成 .cursor/rules/rulego-backend-nodes.mdc"
 
 # 开发前先生成图标并清理旧 .app，确保 Dock 显示正确图标
 dev:

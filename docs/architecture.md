@@ -1,6 +1,6 @@
 # DevPilot Desktop — 架构设计文档
 
-> **技术栈**: Wails v2.11.0 + React 18 + Go 1.23 + Gin 1.10 + TypeScript  
+> **技术栈**: Wails v2.11.0 + React 18 + Go 1.26 + Gin 1.10 + TypeScript  
 > **产品定位**: 桌面级后端开发辅助工具（API 调试、代码生成、数据库管理、终端集成、Mock 服务）  
 > **版本**: v1.0.0  
 > **日期**: 2026-03-13  
@@ -3264,10 +3264,12 @@ Phase 4
 ## 13. Go 依赖清单
 
 ```go
-// go.mod
+// go.mod（节选；完整依赖以仓库根目录 go.mod 为准）
 module devpilot
 
-go 1.23
+go 1.26
+
+toolchain go1.26.1
 
 require (
     github.com/wailsapp/wails/v2     v2.11.0   // 桌面框架

@@ -4,14 +4,21 @@
 
 Wails + Go 后端 + React 前端。项目架构参考根目录的 devpilot-architecture.md。
 
-**Go 版本**：需 **Go 1.24+**（依赖链使用标准库 `crypto/mlkem`）。若 IDE 报错 `package crypto/mlkem is not in std`，请将 GOROOT 或 IDE 的 Go 解释器指向 Go 1.24+ 安装目录（或在本项目中执行 `go build` 以使用 go.mod 的 toolchain）。
+**Go 版本**：与根目录 `go.mod` 一致，当前为 **Go 1.26**（`toolchain go1.26.1`）。若 IDE 报错标准库符号缺失（例如 `crypto/mlkem` 等），请将 GOROOT 或解释器指向 **Go 1.26.1+**，或在项目根执行 `go build` / `go test` 以使用 `go.mod` 中的 `toolchain` 自动下载匹配工具链。
 
 ## 常用命令
 
+- 查看全部目标：`make help`
 - 开发：`make dev`
-- 构建：`make build`
+- 构建：`make build`（依赖 `build-appicon`）
+- 多平台构建：`make build-all`
+- 清理产物：`make clean`
+- 重新生成 Wails 绑定：`make generate`
 - 测试：`make test`
 - Lint：`make lint`
+- Swagger：`make docs`
+- 依赖检查：`make deps`
+- RuleGo 节点列表规则：`make rulego-rules`
 
 ## 目录结构
 
