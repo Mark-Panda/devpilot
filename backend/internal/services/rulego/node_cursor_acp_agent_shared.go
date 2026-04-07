@@ -16,6 +16,7 @@ import (
 	"devpilot/backend/internal/workspace"
 
 	"github.com/rulego/rulego/api/types"
+	"github.com/rulego/rulego/components/base"
 	"github.com/rulego/rulego/utils/el"
 )
 
@@ -39,6 +40,7 @@ type cursorACPAgentConfig struct {
 	WorkspaceID                string   `json:"workspaceId"`
 	WorkspacePath              string   `json:"workspacePath"`
 	Model                      string   `json:"model"`
+	PromptTemplate             string   `json:"promptTemplate"`
 	SessionMode                string   `json:"sessionMode"`
 	PermissionOptionID         string   `json:"permissionOptionId"`
 	ClientName                 string   `json:"clientName"`
@@ -71,6 +73,35 @@ func initCursorACPAgentConfig(configuration types.Configuration, cfg *cursorACPA
 	}
 	cursorACPVerboseLogDefault(configuration, &cfg.VerboseLog)
 	return nil
+}
+
+func initCursorPromptTemplate(raw string, nodeType string) (el.Template, bool, error) {
+	if pt := strings.TrimSpace(raw); pt != "" {
+		tmpl, err := el.NewTemplate(pt)
+		if err != nil {
+			return nil, false, fmt.Errorf("%s: promptTemplate 模板: %w", nodeType, err)
+		}
+		return tmpl, true, nil
+	}
+	return nil, false, nil
+}
+
+func resolveCursorPromptFromEnv(msgData string, promptTmpl el.Template, promptTmplSet bool, env map[string]interface{}, nodeType string) (string, error) {
+	var prompt string
+	if promptTmplSet {
+		prompt = strings.TrimSpace(promptTmpl.ExecuteAsString(env))
+	} else {
+		prompt = strings.TrimSpace(msgData)
+	}
+	if prompt == "" {
+		return "", errors.New(nodeType + ": 提示词为空（未配置 promptTemplate 时请在上游传入 msg.Data；已配置时请检查模板与变量）")
+	}
+	return prompt, nil
+}
+
+func resolveCursorPrompt(ctx types.RuleContext, msg types.RuleMsg, promptTmpl el.Template, promptTmplSet bool, nodeType string) (string, error) {
+	env := base.NodeUtils.GetEvnAndMetadata(ctx, msg)
+	return resolveCursorPromptFromEnv(msg.GetData(), promptTmpl, promptTmplSet, env, nodeType)
 }
 
 type workspaceRootResolver interface {
@@ -278,16 +309,16 @@ func resolveCursorACPCwd(ctx types.RuleContext, cfg *cursorACPAgentConfig, workD
 }
 
 // runCursorACPAgent 执行 ACP 多轮循环；maxRoundsOverride>0 时覆盖配置中的 maxPromptRounds（step 节点传 1）。
-func runCursorACPAgent(ctx types.RuleContext, msg types.RuleMsg, cfg *cursorACPAgentConfig, workDirTmpl el.Template, maxRoundsOverride int, nodeType string) {
+func runCursorACPAgent(ctx types.RuleContext, msg types.RuleMsg, cfg *cursorACPAgentConfig, workDirTmpl el.Template, promptTmpl el.Template, promptTmplSet bool, maxRoundsOverride int, nodeType string) {
 	workspaceRoot, workspaceEnabled, err := resolveWorkspaceRoot(cfg)
 	if err != nil {
 		ctx.TellFailure(msg, err)
 		return
 	}
 
-	prompt := strings.TrimSpace(msg.GetData())
-	if prompt == "" {
-		ctx.TellFailure(msg, errors.New(nodeType+": msg.Data 为空，请传入任务描述"))
+	prompt, err := resolveCursorPrompt(ctx, msg, promptTmpl, promptTmplSet, nodeType)
+	if err != nil {
+		ctx.TellFailure(msg, err)
 		return
 	}
 
@@ -357,8 +388,8 @@ func runCursorACPAgent(ctx types.RuleContext, msg types.RuleMsg, cfg *cursorACPA
 		return
 	}
 
-	log.Printf("[rulego] %s 参数: cwd=%q workspaceEnabled=%v workspaceRoot=%q workspaceId=%q agentCommand=%q timeoutSec=%d maxPromptRounds=%d args=%v model=%q sessionMode=%q permissionOptionId=%q verboseLog=%v useAfterRoundHook=%v useAskDialog=%v promptLen=%d workDirRaw=%q",
-		nodeType, cwd, workspaceEnabled, workspaceRoot, cfg.WorkspaceID, agentCmd, cfg.TimeoutSec, maxR, args, cfg.Model, cfg.SessionMode, cfg.PermissionOptionID, cfg.VerboseLog, cfg.UseRegisteredAfterRoundHook, cfg.UseAskQuestionDialog, len(prompt), cfg.WorkDir)
+	log.Printf("[rulego] %s 参数: cwd=%q workspaceEnabled=%v workspaceRoot=%q workspaceId=%q agentCommand=%q timeoutSec=%d maxPromptRounds=%d args=%v model=%q sessionMode=%q permissionOptionId=%q verboseLog=%v useAfterRoundHook=%v useAskDialog=%v promptFromTemplate=%v promptLen=%d workDirRaw=%q",
+		nodeType, cwd, workspaceEnabled, workspaceRoot, cfg.WorkspaceID, agentCmd, cfg.TimeoutSec, maxR, args, cfg.Model, cfg.SessionMode, cfg.PermissionOptionID, cfg.VerboseLog, cfg.UseRegisteredAfterRoundHook, cfg.UseAskQuestionDialog, promptTmplSet, len(prompt), cfg.WorkDir)
 
 	execID := ""
 	nodeID := ""

@@ -42,6 +42,26 @@ type sourcegraphSearchConfig struct {
 	DefaultSearchQuery string `json:"defaultSearchQuery"`
 }
 
+type sourcegraphSearchRequest struct {
+	Query   string   `json:"query"`
+	Queries []string `json:"queries"`
+}
+
+type sourcegraphSearchResponse struct {
+	Data   json.RawMessage   `json:"data"`
+	Errors []json.RawMessage `json:"errors"`
+}
+
+type sourcegraphSearchData struct {
+	Search *struct {
+		Results *struct {
+			MatchCount int               `json:"matchCount"`
+			LimitHit   bool              `json:"limitHit"`
+			Results    []json.RawMessage `json:"results"`
+		} `json:"results"`
+	} `json:"search"`
+}
+
 func (n *SourcegraphSearchNode) Type() string { return "sourcegraph/search" }
 
 func (n *SourcegraphSearchNode) New() types.Node { return &SourcegraphSearchNode{} }
@@ -108,9 +128,9 @@ func (n *SourcegraphSearchNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) 
 	endpoint := strings.TrimRight(strings.TrimSpace(n.endpointTmpl.ExecuteAsString(env)), "/")
 	accessToken := strings.TrimSpace(n.accessTokenTmpl.ExecuteAsString(env))
 	defaultQ := strings.TrimSpace(n.defaultQueryTmpl.ExecuteAsString(env))
-	q := resolveSourcegraphQuery(msg.GetData(), defaultQ)
-	if q == "" {
-		ctx.TellFailure(msg, errors.New("sourcegraph/search: 搜索词为空（请在消息 data 中传入字符串或 JSON {\"query\":\"...\"}，或配置 defaultSearchQuery）"))
+	queries := resolveSourcegraphQueries(msg.GetData(), defaultQ)
+	if len(queries) == 0 {
+		ctx.TellFailure(msg, errors.New("sourcegraph/search: 搜索词为空（请在消息 data 中传入字符串、JSON {\"query\":\"...\"}、JSON {\"queries\":[\"...\", ...]}，或配置 defaultSearchQuery）"))
 		return
 	}
 	if endpoint == "" {
@@ -122,70 +142,38 @@ func (n *SourcegraphSearchNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) 
 		ctx.TellFailure(msg, fmt.Errorf("sourcegraph/search: 拼接 GraphQL URL 失败: %w", err))
 		return
 	}
-
-	payload := map[string]interface{}{
-		"query": sourcegraphSearchGQL,
-		"variables": map[string]string{
-			"query": q,
-		},
-	}
-	body, err := json.Marshal(payload)
-	if err != nil {
-		ctx.TellFailure(msg, err)
-		return
-	}
-
-	ctxHTTP, cancel := context.WithTimeout(context.Background(), time.Duration(n.cfg.TimeoutSec)*time.Second)
-	defer cancel()
-	req, err := http.NewRequestWithContext(ctxHTTP, http.MethodPost, gqlURL, bytes.NewReader(body))
-	if err != nil {
-		ctx.TellFailure(msg, err)
-		return
-	}
-	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Accept", "application/json")
-	if accessToken != "" {
-		req.Header.Set("Authorization", "token "+accessToken)
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		log.Printf("[rulego] sourcegraph/search 请求失败: %v", err)
-		ctx.TellFailure(msg, err)
-		return
-	}
-	defer resp.Body.Close()
-	respBody, err := io.ReadAll(resp.Body)
-	if err != nil {
-		ctx.TellFailure(msg, err)
-		return
-	}
-
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		ctx.TellFailure(msg, fmt.Errorf("sourcegraph/search: HTTP %d（请先检查 endpoint 是否为实例根 URL、令牌是否有效）: %s", resp.StatusCode, truncateForLog(strings.TrimSpace(string(respBody)), 512)))
-		return
-	}
-
-	var gqlResp struct {
-		Data   json.RawMessage   `json:"data"`
-		Errors []json.RawMessage `json:"errors"`
-	}
-	if err := json.Unmarshal(respBody, &gqlResp); err != nil {
-		preview := truncateForLog(strings.TrimSpace(string(respBody)), 320)
-		ctx.TellFailure(msg, fmt.Errorf("sourcegraph/search: 响应非 JSON（常为登录页/网关错误/HTML）。请确认 POST %s 且返回 application/json。正文片段: %q — %w", gqlURL, preview, err))
-		return
-	}
-	if len(gqlResp.Errors) > 0 {
-		ctx.TellFailure(msg, fmt.Errorf("sourcegraph/search: GraphQL 错误: %s", string(gqlResp.Errors[0])))
-		return
+	results := make([]json.RawMessage, 0, len(queries))
+	for _, q := range queries {
+		data, err := executeSourcegraphSearchQuery(gqlURL, accessToken, q, n.cfg.TimeoutSec)
+		if err != nil {
+			ctx.TellFailure(msg, fmt.Errorf("sourcegraph/search: query %q 执行失败: %w", q, err))
+			return
+		}
+		results = append(results, data)
 	}
 
 	out := msg.Copy()
 	if out.Metadata == nil {
 		out.Metadata = types.NewMetadata()
 	}
-	out.Metadata.PutValue("sourcegraph_search_query", q)
-	out.SetData(string(gqlResp.Data))
+	out.Metadata.PutValue("sourcegraph_search_query", queries[0])
+	if len(queries) > 1 {
+		qb, _ := json.Marshal(queries)
+		out.Metadata.PutValue("sourcegraph_search_queries", string(qb))
+	} else {
+		out.Metadata.PutValue("sourcegraph_search_queries", "")
+	}
+	if len(results) == 1 {
+		out.SetData(string(results[0]))
+		ctx.TellSuccess(out)
+		return
+	}
+	merged, err := mergeSourcegraphSearchResults(queries, results)
+	if err != nil {
+		ctx.TellFailure(msg, err)
+		return
+	}
+	out.SetData(string(merged))
 	ctx.TellSuccess(out)
 }
 
@@ -197,17 +185,128 @@ func (n *SourcegraphSearchNode) Destroy() {
 }
 
 func resolveSourcegraphQuery(data string, defaultQ string) string {
+	queries := resolveSourcegraphQueries(data, defaultQ)
+	if len(queries) == 0 {
+		return ""
+	}
+	return queries[0]
+}
+
+func resolveSourcegraphQueries(data string, defaultQ string) []string {
 	data = strings.TrimSpace(data)
 	if data == "" {
-		return defaultQ
+		if q := strings.TrimSpace(defaultQ); q != "" {
+			return []string{q}
+		}
+		return nil
 	}
-	var wrap struct {
-		Query string `json:"query"`
+	var wrap sourcegraphSearchRequest
+	if err := json.Unmarshal([]byte(data), &wrap); err == nil {
+		out := make([]string, 0, len(wrap.Queries)+1)
+		for _, q := range wrap.Queries {
+			if s := strings.TrimSpace(q); s != "" {
+				out = append(out, s)
+			}
+		}
+		if len(out) > 0 {
+			return out
+		}
+		if q := strings.TrimSpace(wrap.Query); q != "" {
+			return []string{q}
+		}
+		if q := strings.TrimSpace(defaultQ); q != "" {
+			return []string{q}
+		}
+		return nil
 	}
-	if err := json.Unmarshal([]byte(data), &wrap); err == nil && strings.TrimSpace(wrap.Query) != "" {
-		return strings.TrimSpace(wrap.Query)
+	return []string{data}
+}
+
+func executeSourcegraphSearchQuery(gqlURL, accessToken, query string, timeoutSec int) (json.RawMessage, error) {
+	payload := map[string]interface{}{
+		"query": sourcegraphSearchGQL,
+		"variables": map[string]string{
+			"query": query,
+		},
 	}
-	return data
+	body, err := json.Marshal(payload)
+	if err != nil {
+		return nil, err
+	}
+	ctxHTTP, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutSec)*time.Second)
+	defer cancel()
+	req, err := http.NewRequestWithContext(ctxHTTP, http.MethodPost, gqlURL, bytes.NewReader(body))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	if accessToken != "" {
+		req.Header.Set("Authorization", "token "+accessToken)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Printf("[rulego] sourcegraph/search 请求失败: %v", err)
+		return nil, err
+	}
+	defer resp.Body.Close()
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return nil, fmt.Errorf("HTTP %d（请先检查 endpoint 是否为实例根 URL、令牌是否有效）: %s", resp.StatusCode, truncateForLog(strings.TrimSpace(string(respBody)), 512))
+	}
+	var gqlResp sourcegraphSearchResponse
+	if err := json.Unmarshal(respBody, &gqlResp); err != nil {
+		preview := truncateForLog(strings.TrimSpace(string(respBody)), 320)
+		return nil, fmt.Errorf("响应非 JSON（常为登录页/网关错误/HTML）。请确认 POST %s 且返回 application/json。正文片段: %q — %w", gqlURL, preview, err)
+	}
+	if len(gqlResp.Errors) > 0 {
+		return nil, fmt.Errorf("GraphQL 错误: %s", string(gqlResp.Errors[0]))
+	}
+	return gqlResp.Data, nil
+}
+
+func mergeSourcegraphSearchResults(queries []string, results []json.RawMessage) ([]byte, error) {
+	if len(queries) == 0 || len(results) == 0 || len(queries) != len(results) {
+		return nil, errors.New("sourcegraph/search: 批量结果聚合失败：queries 与 results 数量不匹配")
+	}
+	perQuery := make([]map[string]interface{}, 0, len(queries))
+	mergedResults := make([]json.RawMessage, 0)
+	matchCount := 0
+	limitHit := false
+	for i, raw := range results {
+		var data sourcegraphSearchData
+		if err := json.Unmarshal(raw, &data); err != nil {
+			return nil, fmt.Errorf("sourcegraph/search: 解析第 %d 条 query 的 data 失败: %w", i+1, err)
+		}
+		perQuery = append(perQuery, map[string]interface{}{
+			"query": queries[i],
+			"data":  json.RawMessage(raw),
+		})
+		if data.Search == nil || data.Search.Results == nil {
+			continue
+		}
+		matchCount += data.Search.Results.MatchCount
+		if data.Search.Results.LimitHit {
+			limitHit = true
+		}
+		mergedResults = append(mergedResults, data.Search.Results.Results...)
+	}
+	payload := map[string]interface{}{
+		"query":   queries[0],
+		"queries": queries,
+		"search": map[string]interface{}{
+			"results": map[string]interface{}{
+				"matchCount": matchCount,
+				"limitHit":   limitHit,
+				"results":    mergedResults,
+			},
+		},
+		"results": perQuery,
+	}
+	return json.Marshal(payload)
 }
 
 func truncateForLog(s string, max int) string {

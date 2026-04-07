@@ -9,6 +9,51 @@ import (
 	"github.com/rulego/rulego/utils/el"
 )
 
+func TestResolveCursorPromptFromEnv_UsesPromptTemplateWhenConfigured(t *testing.T) {
+	tmpl, err := el.NewTemplate("处理：${metadata.topic} / ${data}")
+	if err != nil {
+		t.Fatalf("template: %v", err)
+	}
+	prompt, err := resolveCursorPromptFromEnv(
+		"ignored",
+		tmpl,
+		true,
+		map[string]interface{}{
+			"data": "上游消息",
+			"metadata": map[string]interface{}{
+				"topic": "通知",
+			},
+		},
+		"cursor/acp",
+	)
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if prompt != "处理：通知 / 上游消息" {
+		t.Fatalf("unexpected prompt: %q", prompt)
+	}
+}
+
+func TestResolveCursorPromptFromEnv_FallsBackToMsgDataWhenTemplateDisabled(t *testing.T) {
+	prompt, err := resolveCursorPromptFromEnv("  hello world  ", nil, false, nil, "cursor/acp")
+	if err != nil {
+		t.Fatalf("unexpected err: %v", err)
+	}
+	if prompt != "hello world" {
+		t.Fatalf("unexpected prompt: %q", prompt)
+	}
+}
+
+func TestResolveCursorPromptFromEnv_RejectsEmptyPrompt(t *testing.T) {
+	_, err := resolveCursorPromptFromEnv("   ", nil, false, nil, "cursor/acp_agent")
+	if err == nil {
+		t.Fatalf("expected error")
+	}
+	if !strings.Contains(err.Error(), "提示词为空") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
 type fakeWorkspaceResolver struct {
 	resolve func(id string) (string, error)
 }
@@ -249,4 +294,3 @@ func TestRemoveModelArgs_MissingValueDoesNotSwallowNextFlag(t *testing.T) {
 		t.Fatalf("unexpected removal: in=%v out=%v", in, out)
 	}
 }
-

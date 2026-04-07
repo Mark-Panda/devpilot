@@ -596,6 +596,7 @@ function BlockConfigModal({
       next.AGENT_CMD = get("AGENT_CMD") || "agent";
       next.ACP_TIMEOUT_PRESET = get("ACP_TIMEOUT_PRESET") || "1800";
       next.TIMEOUT_SEC = get("TIMEOUT_SEC") || "1800";
+      next.ACP_PROMPT_TEMPLATE = get("ACP_PROMPT_TEMPLATE");
       next.WORK_DIR = get("WORK_DIR");
       next.ACP_MODEL = get("ACP_MODEL");
       next.ACP_SESSION_MODE = get("ACP_SESSION_MODE") || "agent";
@@ -609,6 +610,7 @@ function BlockConfigModal({
       next.AGENT_CMD = get("AGENT_CMD") || "agent";
       next.ACP_TIMEOUT_PRESET = get("ACP_TIMEOUT_PRESET") || "3600";
       next.TIMEOUT_SEC = get("TIMEOUT_SEC") || "3600";
+      next.ACP_PROMPT_TEMPLATE = get("ACP_PROMPT_TEMPLATE");
       next.WORK_DIR = get("WORK_DIR");
       next.ACP_MODEL = get("ACP_MODEL");
       next.ACP_SESSION_MODE = get("ACP_SESSION_MODE") || "agent";
@@ -634,6 +636,7 @@ function BlockConfigModal({
       next.AGENT_CMD = get("AGENT_CMD") || "agent";
       next.ACP_TIMEOUT_PRESET = get("ACP_TIMEOUT_PRESET") || "3600";
       next.TIMEOUT_SEC = get("TIMEOUT_SEC") || "3600";
+      next.ACP_PROMPT_TEMPLATE = get("ACP_PROMPT_TEMPLATE");
       next.WORK_DIR = get("WORK_DIR");
       next.ACP_MODEL = get("ACP_MODEL");
       next.ACP_SESSION_MODE = get("ACP_SESSION_MODE") || "agent";
@@ -2409,6 +2412,23 @@ function BlockConfigModal({
         block.type === "rulego_cursorAcpAgent" ||
         block.type === "rulego_cursorAcpAgentStep") && (
         <>
+          <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
+            首轮提示词默认使用上游消息的 <code>msg.Data</code>；若填写下方「提示词模板」，则优先使用模板渲染结果（支持 <code>{"${...}"}</code>，例如 <code>{"${data}"}</code>、<code>{"${metadata.xxx}"}</code>）。
+          </p>
+          <label className="form-field" style={{ gridColumn: "1 / -1" }}>
+            <span>首轮提示词模板 (promptTemplate，可选)</span>
+            <textarea
+              value={String(form.ACP_PROMPT_TEMPLATE ?? "")}
+              onChange={(e) => setForm((f) => ({ ...f, ACP_PROMPT_TEMPLATE: e.target.value }))}
+              placeholder="留空则使用上游 msg.Data。示例：请分析以下输入：${data} 或 ${metadata.api_route_tracer_service_path}"
+              rows={4}
+              style={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }}
+              spellCheck={false}
+              autoCapitalize="off"
+              autoCorrect="off"
+              autoComplete="off"
+            />
+          </label>
           <label className="form-field" style={{ gridColumn: "1 / -1" }}>
             <span>Agent 可执行文件</span>
             <select
@@ -2691,7 +2711,7 @@ function BlockConfigModal({
             />
           </label>
           <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
-            首轮提示词来自上游消息的 <code>msg.Data</code>。工作目录：先渲染本块 workDir 模板（<code>{"${data}"}</code>、<code>{"${metadata.xxx}"}</code> 等），再若 metadata 含{" "}
+            工作目录：先渲染本块 workDir 模板（<code>{"${data}"}</code>、<code>{"${metadata.xxx}"}</code> 等），再若 metadata 含{" "}
             <code>cursor_acp_cwd</code> 则覆盖；仍为空则用 <code>api_route_tracer_service_path</code>。需本机已安装 Cursor CLI 并完成 <code>agent login</code> 或配置{" "}
             <code>CURSOR_API_KEY</code>。
             {block.type === "rulego_cursorAcpAgent" ? (
@@ -2736,7 +2756,7 @@ function BlockConfigModal({
           <label className="form-field" style={{ gridColumn: "1 / -1" }}>
             <span>访问令牌 (accessToken，可选)</span>
             <input
-              type="password"
+              type="text"
               value={String(form.SG_TOKEN ?? "")}
               onChange={(e) => setForm((f) => ({ ...f, SG_TOKEN: e.target.value }))}
               placeholder="Sourcegraph access token"
@@ -2762,19 +2782,21 @@ function BlockConfigModal({
             <input
               value={String(form.SG_DEFAULT_QUERY ?? "")}
               onChange={(e) => setForm((f) => ({ ...f, SG_DEFAULT_QUERY: e.target.value }))}
-              placeholder="无消息 data 时使用；否则以 data 为准"
+              placeholder="无消息 data 时使用；否则优先使用 data 中的 query / queries"
               autoCapitalize="off"
               autoCorrect="off"
               autoComplete="off"
             />
             <small className="form-hint" style={{ display: "block", marginTop: 6 }}>
-              支持 <code>{"${...}"}</code> 模板；接上游「查询构建」时可填{" "}
+              支持 <code>{"${...}"}</code> 模板；接上游「查询构建」时，建议直接透传其输出的{" "}
+              <code>data.query</code> / <code>data.queries</code>。若只想提供单条兜底默认值，可填{" "}
               <code>{"${metadata.sourcegraph_built_query}"}</code>
             </small>
           </label>
           <p className="form-hint" style={{ gridColumn: "1 / -1", margin: 0 }}>
             调用 <code>/.api/graphql</code>；消息 <code>data</code> 可为纯文本或 JSON{" "}
-            <code>{"{\"query\":\"repo:foo/bar func\"}"}</code>（有 data 时优先于默认搜索词）。鉴权头为 <code>Authorization: token …</code>。
+            <code>{"{\"query\":\"repo:foo/bar func\"}"}</code> / <code>{"{\"queries\":[\"repo:a foo\",\"repo:b foo\"]}"}</code>
+            （有 data 时优先于默认搜索词；<code>queries</code> 会逐条执行并聚合结果）。鉴权头为 <code>Authorization: token …</code>。
           </p>
         </>
       )}
@@ -2917,7 +2939,7 @@ function BlockConfigModal({
             消息 <code>data</code> 为 LLM 预处理 JSON{" "}
             <code>{"{\"patternType\":\"literal|regexp\",\"patterns\":[\"...\"]}"}</code>，或纯文本（视为单条 literal）；无 data 时用上方「默认路径」。输出：{" "}
             <code>metadata.sourcegraph_built_query</code>（首条）、<code>metadata.sourcegraph_built_queries</code>（JSON 数组）、{" "}
-            <code>data</code> 含 <code>query</code> 与 <code>queries</code>。
+            <code>data</code> 含 <code>query</code> 与 <code>queries</code>；下游 <code>sourcegraph/search</code> 可直接消费并批量执行 <code>queries</code>。
           </p>
           <div className="form-field" style={{ gridColumn: "1 / -1" }}>
             <span>示例查询（取默认路径首行，若无则用 /api/example）</span>

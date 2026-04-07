@@ -109,6 +109,11 @@ func (a *App) ResolveCursorACPAskQuestion(requestID string, optionID string) {
 	backend.ResolveCursorACPAskQuestion(requestID, optionID)
 }
 
+// SendACPSystemNotification 发送 ACP 系统通知；桌面端优先走原生能力，供前端在显式启用或新任务到达时调用。
+func (a *App) SendACPSystemNotification(title string, body string) error {
+	return sendACPSystemNotification(title, body)
+}
+
 // ============ Agent Service Methods ============
 
 // CreateAgent 创建新代理

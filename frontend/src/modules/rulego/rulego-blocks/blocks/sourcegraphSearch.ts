@@ -1,6 +1,7 @@
 /**
  * Sourcegraph 代码搜索：POST `/.api/graphql`，执行 search 查询。
- * 消息 data：纯文本搜索词，或 JSON `{"query":"repo:my/repo foo"}`；可与节点上的默认搜索词配合使用。
+ * 消息 data：纯文本搜索词、JSON `{"query":"repo:my/repo foo"}`，
+ * 或批量 JSON `{"queries":["repo:a foo","repo:b foo"]}`；可与节点上的默认搜索词配合使用。
  */
 import type { Block } from "blockly/core";
 import type { BlockTypeDef, BlockHelpers } from "../types";

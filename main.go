@@ -4,7 +4,6 @@ import (
 	"embed"
 	"log"
 	"os"
-	"path/filepath"
 
 	"devpilot/backend"
 	"github.com/wailsapp/wails/v2"
@@ -24,7 +23,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	dataDir := filepath.Join(home, ".devpilot")
+	dataDir := currentRuntimeDataDir(home)
 	runtime, err := backend.InitRuntime(dataDir, initSkillsFS)
 	if err != nil {
 		log.Fatal(err)

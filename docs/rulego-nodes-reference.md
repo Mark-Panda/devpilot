@@ -83,7 +83,7 @@
 
 - **作用**：调用 Sourcegraph GraphQL `search`。
 - **configuration**：`endpoint`（实例根 URL，必填）、`accessToken`、`timeoutSec`、`defaultSearchQuery`（均可模板）。
-- **输入**：`msg.Data` 可为搜索字符串或 JSON `{"query":"..."}`。
+- **输入**：`msg.Data` 可为搜索字符串、JSON `{"query":"..."}`，或批量 JSON `{"queries":["...","..."]}`；批量模式会逐条执行并输出聚合结果。
 
 ### `sourcegraph/queryBuild`
 

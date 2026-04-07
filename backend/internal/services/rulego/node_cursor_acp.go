@@ -21,8 +21,10 @@ import (
 // cursorACPNode 通过 Cursor CLI 的 ACP（agent acp）执行一次会话内 Prompt。
 // 本节点支持流式、工具权限自动批复与会话协议。
 type cursorACPNode struct {
-	cfg         cursorACPConfig
-	workDirTmpl el.Template
+	cfg           cursorACPConfig
+	promptTmpl    el.Template
+	promptTmplSet bool
+	workDirTmpl   el.Template
 }
 
 type cursorACPConfig struct {
@@ -31,6 +33,7 @@ type cursorACPConfig struct {
 	TimeoutSec         int      `json:"timeoutSec"`
 	WorkDir            string   `json:"workDir"`
 	Model              string   `json:"model"`
+	PromptTemplate     string   `json:"promptTemplate"`
 	SessionMode        string   `json:"sessionMode"`
 	PermissionOptionID string   `json:"permissionOptionId"`
 	ClientName         string   `json:"clientName"`
@@ -55,6 +58,12 @@ func (n *cursorACPNode) Init(_ types.Config, configuration types.Configuration) 
 	}
 	n.cfg.Model = strings.TrimSpace(n.cfg.Model)
 	cursorACPVerboseLogDefault(configuration, &n.cfg.VerboseLog)
+	pt, ptSet, err := initCursorPromptTemplate(n.cfg.PromptTemplate, "cursor/acp")
+	if err != nil {
+		return err
+	}
+	n.promptTmpl = pt
+	n.promptTmplSet = ptSet
 	wdTmpl, err := el.NewTemplate(n.cfg.WorkDir)
 	if err != nil {
 		return fmt.Errorf("cursor/acp: workDir 模板: %w", err)
@@ -70,9 +79,9 @@ func (n *cursorACPNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) {
 		return
 	}
 
-	prompt := strings.TrimSpace(msg.GetData())
-	if prompt == "" {
-		ctx.TellFailure(msg, errors.New("cursor/acp: msg.Data 为空，请传入用户提示词"))
+	prompt, err := resolveCursorPrompt(ctx, msg, n.promptTmpl, n.promptTmplSet, "cursor/acp")
+	if err != nil {
+		ctx.TellFailure(msg, err)
 		return
 	}
 
@@ -101,8 +110,8 @@ func (n *cursorACPNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) {
 	runCtx, cancel := context.WithTimeout(parent, time.Duration(n.cfg.TimeoutSec)*time.Second)
 	defer cancel()
 
-	log.Printf("[rulego] cursor/acp 参数: cwd=%q agentCommand=%q timeoutSec=%d args=%v model=%q sessionMode=%q permissionOptionId=%q clientName=%q clientVersion=%q verboseLog=%v promptLen=%d workDirRaw=%q",
-		cwd, agentCmd, n.cfg.TimeoutSec, n.cfg.Args, n.cfg.Model, n.cfg.SessionMode, n.cfg.PermissionOptionID, n.cfg.ClientName, n.cfg.ClientVersion, n.cfg.VerboseLog, len(prompt), n.cfg.WorkDir)
+	log.Printf("[rulego] cursor/acp 参数: cwd=%q agentCommand=%q timeoutSec=%d args=%v model=%q sessionMode=%q permissionOptionId=%q clientName=%q clientVersion=%q verboseLog=%v promptFromTemplate=%v promptLen=%d workDirRaw=%q",
+		cwd, agentCmd, n.cfg.TimeoutSec, n.cfg.Args, n.cfg.Model, n.cfg.SessionMode, n.cfg.PermissionOptionID, n.cfg.ClientName, n.cfg.ClientVersion, n.cfg.VerboseLog, n.promptTmplSet, len(prompt), n.cfg.WorkDir)
 
 	once, err := cursoracp.RunOnce(runCtx, cfg, cwd, prompt)
 	if err != nil {
@@ -136,6 +145,8 @@ func (n *cursorACPNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) {
 
 func (n *cursorACPNode) Destroy() {
 	n.cfg = cursorACPConfig{}
+	n.promptTmpl = nil
+	n.promptTmplSet = false
 	n.workDirTmpl = nil
 }
 

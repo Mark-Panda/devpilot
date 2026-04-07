@@ -1,6 +1,15 @@
 import { useEffect, useMemo, useState, useCallback, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { LogTextPreview } from "./LogTextPreview";
+import {
+  buildACPNotificationBody,
+  buildACPStickyReminderText,
+  loadACPNotificationEnabled,
+  resolveACPNotificationChannel,
+  saveACPNotificationEnabled,
+  shouldShowACPStickyReminder,
+  updateACPStickyReminderDismissed,
+} from "./acpNotifications";
 
 export type CursorACPAfterRoundEvent = {
   request_id: string;
@@ -119,6 +128,15 @@ function resolveAskQuestionCall(requestId: string, optionId: string): void {
   if (typeof fn === "function") {
     fn(requestId, optionId);
   }
+}
+
+function getDesktopNotificationMethod():
+  | ((title: string, body: string) => Promise<void> | void)
+  | undefined {
+  const fn = (window as unknown as {
+    go?: { main?: { App?: { SendACPSystemNotification?: (title: string, body: string) => Promise<void> | void } } };
+  }).go?.main?.App?.SendACPSystemNotification;
+  return typeof fn === "function" ? fn : undefined;
 }
 
 function normalizeAskPayload(d: CursorACPAskQuestionEvent): CursorACPAskQuestionEvent {
@@ -338,15 +356,26 @@ export default function CursorACPAfterRoundHost() {
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [badgePulse, setBadgePulse] = useState(false);
   const [notifyHint, setNotifyHint] = useState<string>("");
+  const [stickyReminderDismissed, setStickyReminderDismissed] = useState(false);
+  const [notifyEnabled, setNotifyEnabled] = useState<boolean>(() =>
+    typeof window !== "undefined" ? loadACPNotificationEnabled(window.localStorage) : false,
+  );
   const autoContinuedRequestIdsRef = useRef<Set<string>>(new Set());
   const autoContinueCooldownRef = useRef<number>(0);
 
   const fabRef = useRef<HTMLButtonElement>(null);
   const drawerTitleRef = useRef<HTMLHeadingElement>(null);
 
-  const notifySupported =
-    typeof window !== "undefined" && "Notification" in window && typeof (window as unknown as { Notification?: unknown }).Notification === "function";
-  const notifyPermission = notifySupported ? (Notification.permission as NotificationPermission) : "denied";
+  const hasDesktopNotificationBridge = typeof getDesktopNotificationMethod() === "function";
+  const hasWebNotification =
+    typeof window !== "undefined" &&
+    "Notification" in window &&
+    typeof (window as unknown as { Notification?: unknown }).Notification === "function";
+  const notificationChannel = resolveACPNotificationChannel({
+    hasDesktopBridge: hasDesktopNotificationBridge,
+    hasWebNotification,
+  });
+  const webNotificationPermission = hasWebNotification ? (Notification.permission as NotificationPermission) : "denied";
 
   const removeByRequestId = useCallback((requestId: string) => {
     setPending((prev) => prev.filter((p) => p.requestId !== requestId));
@@ -361,6 +390,28 @@ export default function CursorACPAfterRoundHost() {
   const setSelectedOpt = useCallback((requestId: string, selectedOpt: string) => {
     setPending((prev) => prev.map((p) => (p.kind === "ask" && p.requestId === requestId ? { ...p, selectedOpt } : p)));
   }, []);
+
+  const sendDesktopNotification = useCallback(async (title: string, body: string) => {
+    const fn = getDesktopNotificationMethod();
+    if (typeof fn !== "function") {
+      throw new Error("desktop notification bridge unavailable");
+    }
+    await Promise.resolve(fn(title, body));
+  }, []);
+
+  const sendSystemNotification = useCallback(
+    async (title: string, body: string) => {
+      if (notificationChannel === "desktop-native") {
+        await sendDesktopNotification(title, body);
+        return;
+      }
+      if (notificationChannel === "web" && webNotificationPermission === "granted") {
+        // eslint-disable-next-line no-new
+        new Notification(title, { body });
+      }
+    },
+    [notificationChannel, sendDesktopNotification, webNotificationPermission],
+  );
 
   useEffect(() => {
     const rt = wailsRuntime();
@@ -455,19 +506,25 @@ export default function CursorACPAfterRoundHost() {
 
     if (added > 0) {
       setBadgePulse(true);
-      // 仅在权限已授予时发送通知（不会在这里请求权限）
-      if (notifySupported && notifyPermission === "granted") {
-        try {
-          // eslint-disable-next-line no-new
-          new Notification("Cursor ACP", {
-            body: `新增 ${added} 条待处理任务（当前共 ${pending.length} 条）`,
-          });
-        } catch {
-          // ignore: WebView/权限限制下可能抛错，降级为角标
-        }
+      if (notifyEnabled) {
+        void sendSystemNotification("Cursor ACP", buildACPNotificationBody(added, pending.length)).catch(() => {
+          // ignore: 通知失败不影响主流程，继续降级为角标提醒
+        });
       }
     }
-  }, [notifyPermission, notifySupported, pending]);
+    setStickyReminderDismissed((current) =>
+      updateACPStickyReminderDismissed({
+        currentDismissed: current,
+        addedCount: added,
+        pendingCount: pending.length,
+      }),
+    );
+  }, [notifyEnabled, pending, sendSystemNotification]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    saveACPNotificationEnabled(window.localStorage, notifyEnabled);
+  }, [notifyEnabled]);
 
   useEffect(() => {
     if (!badgePulse) return;
@@ -541,9 +598,60 @@ export default function CursorACPAfterRoundHost() {
   }, [drawerOpen]);
 
   const badgeText = pending.length >= 100 ? "99+" : pending.length > 0 ? String(pending.length) : "";
+  const showStickyReminder = shouldShowACPStickyReminder({
+    pendingCount: pending.length,
+    drawerOpen,
+    dismissed: stickyReminderDismissed,
+  });
 
   const content = (
     <>
+      {showStickyReminder ? (
+        <div
+          role="status"
+          aria-live="polite"
+          style={{
+            position: "fixed",
+            right: 92,
+            bottom: 28,
+            zIndex: 10001,
+            width: "min(360px, calc(100vw - 136px))",
+            padding: "14px 16px",
+            borderRadius: 12,
+            background: acp.cardBg,
+            border: `1px solid ${acp.bannerBorder}`,
+            boxShadow: "0 14px 32px rgba(0, 0, 0, 0.32)",
+            color: acp.text,
+          }}
+        >
+          <div style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>
+            {buildACPStickyReminderText(pending.length)}
+          </div>
+          <p style={{ margin: 0, fontSize: 12, lineHeight: 1.55, color: acp.muted }}>
+            系统通知会继续发送；这条应用内提醒会保留到你手动关闭，或待处理任务全部清空。
+          </p>
+          <div style={{ display: "flex", gap: 8, marginTop: 12, justifyContent: "flex-end", flexWrap: "wrap" }}>
+            <button
+              type="button"
+              className="primary-button"
+              onClick={() => {
+                setDrawerOpen(true);
+                setStickyReminderDismissed(false);
+              }}
+            >
+              打开 ACP
+            </button>
+            <button
+              type="button"
+              className="text-button"
+              onClick={() => setStickyReminderDismissed(true)}
+            >
+              关闭提醒
+            </button>
+          </div>
+        </div>
+      ) : null}
+
       <button
         ref={fabRef}
         type="button"
@@ -567,17 +675,52 @@ export default function CursorACPAfterRoundHost() {
               Cursor ACP 待处理 · {pending.length} 条
             </h2>
             <div className="cursor-acp-drawer-actions">
-              {notifySupported && notifyPermission !== "granted" ? (
+              {!notifyEnabled && notificationChannel !== "none" ? (
                 <button
                   type="button"
                   className="text-button cursor-acp-drawer-btn"
                   onClick={async () => {
+                    if (notificationChannel === "desktop-native") {
+                      try {
+                        await sendDesktopNotification("Cursor ACP", "系统通知已启用，后续新增任务会提醒你。");
+                        setNotifyEnabled(true);
+                        setNotifyHint("已启用系统通知，并发送测试通知");
+                      } catch {
+                        setNotifyEnabled(false);
+                        setNotifyHint("系统通知发送失败，请检查 macOS 通知设置");
+                      }
+                      return;
+                    }
+                    if (notificationChannel === "web") {
+                      try {
+                        const perm = await Notification.requestPermission();
+                        if (perm === "granted") {
+                          setNotifyEnabled(true);
+                          setNotifyHint("已启用系统通知");
+                          try {
+                            // eslint-disable-next-line no-new
+                            new Notification("Cursor ACP", { body: "系统通知已启用，后续新增任务会提醒你。" });
+                          } catch {
+                            // ignore web notification failures after permission prompt
+                          }
+                        } else if (perm === "denied") {
+                          setNotifyEnabled(false);
+                          setNotifyHint("已拒绝系统通知，将仅显示角标");
+                        } else {
+                          setNotifyEnabled(false);
+                          setNotifyHint("尚未授予系统通知权限，将仅显示角标");
+                        }
+                      } catch {
+                        setNotifyEnabled(false);
+                        setNotifyHint("系统通知不可用，将仅显示角标");
+                      }
+                      return;
+                    }
                     try {
-                      const perm = await Notification.requestPermission();
-                      if (perm === "granted") setNotifyHint("已启用系统通知");
-                      else if (perm === "denied") setNotifyHint("已拒绝系统通知，将仅显示角标");
+                      setNotifyEnabled(false);
+                      setNotifyHint("当前环境不支持系统通知，将仅显示角标");
                     } catch {
-                      setNotifyHint("系统通知不可用，将仅显示角标");
+                      setNotifyHint("当前环境不支持系统通知，将仅显示角标");
                     }
                   }}
                 >

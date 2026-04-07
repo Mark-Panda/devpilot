@@ -66,6 +66,7 @@ const cursorAcpAgentStepDef: BlockTypeDef = {
           "ACP_TIMEOUT_PRESET",
         );
         config.appendField(new B.FieldTextInput("3600"), "TIMEOUT_SEC");
+        config.appendField(new B.FieldTextInput(""), "ACP_PROMPT_TEMPLATE");
         config.appendField(new B.FieldTextInput(""), "WORK_DIR");
         config.appendField(new B.FieldTextInput(""), "WORKSPACE_ID");
         config.appendField(new B.FieldTextInput(""), "ACP_MODEL");
@@ -140,6 +141,7 @@ const cursorAcpAgentStepDef: BlockTypeDef = {
       agentCommand,
       args,
       timeoutSec,
+      promptTemplate: String(helpers.getFieldValue(block, "ACP_PROMPT_TEMPLATE") ?? ""),
       workDir: helpers.getFieldValue(block, "WORK_DIR"),
       workspaceId: helpers.getFieldValue(block, "WORKSPACE_ID"),
       model: String(helpers.getFieldValue(block, "ACP_MODEL") ?? "").trim(),
@@ -166,6 +168,7 @@ const cursorAcpAgentStepDef: BlockTypeDef = {
 
     block.setFieldValue(String(c.workDir ?? ""), "WORK_DIR");
     block.setFieldValue(String(c.workspaceId ?? ""), "WORKSPACE_ID");
+    block.setFieldValue(String(c.promptTemplate ?? ""), "ACP_PROMPT_TEMPLATE");
     block.setFieldValue(String(c.model ?? ""), "ACP_MODEL");
 
     const sm = String(c.sessionMode ?? "agent").trim() || "agent";
