@@ -55,7 +55,7 @@ func (n *LLMNode) Init(ruleConfig types.Config, configuration types.Configuratio
 }
 
 func (n *LLMNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) {
-	substitute := buildSubstituteFromMsg(msg)
+	substitute := buildLLMSubstituteFromMsg(msg)
 	var messages []llms.MessageContent
 	if len(n.config.Messages) > 0 {
 		messages = llm.BuildMessageContentFromNodeConfig(n.config, substitute)
@@ -75,7 +75,7 @@ func (n *LLMNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) {
 				if strings.EqualFold(strings.TrimSpace(h.Role), "assistant") {
 					role = llms.ChatMessageTypeAI
 				}
-				text := strings.TrimSpace(h.Content)
+				text := strings.TrimSpace(llm.ReplacePlaceholders(h.Content, substitute))
 				if text == "" {
 					text = " "
 				}
@@ -85,6 +85,7 @@ func (n *LLMNode) OnMsg(ctx types.RuleContext, msg types.RuleMsg) {
 				})
 			}
 		}
+		userContent = strings.TrimSpace(llm.ReplacePlaceholders(userContent, substitute))
 		if userContent == "" {
 			userContent = " "
 		}
@@ -189,11 +190,43 @@ func mapToNodeConfig(m types.Configuration, nc *llm.NodeConfig) error {
 	return json.Unmarshal(data, nc)
 }
 
-func buildSubstituteFromMsg(msg types.RuleMsg) map[string]string {
-	if msg.Metadata == nil {
-		return nil
+// buildLLMSubstituteFromMsg 供 systemPrompt / messages / msg.Data 内 ${} 替换使用。
+// 包含 metadata 全部键值，并额外注入：
+//   - ${msg} / ${vars.msg}：当前消息体 msg.Data 全文；
+//   - 若 msg.Data 为 JSON 对象，还为每个顶层字段 k 注入 ${msg.k} / ${vars.msg.k}（值为 JSON 片段：字符串会去掉外层引号，其它类型为紧凑 JSON）。
+func buildLLMSubstituteFromMsg(msg types.RuleMsg) map[string]string {
+	out := make(map[string]string)
+	if msg.Metadata != nil {
+		for k, v := range msg.Metadata.GetReadOnlyValues() {
+			out[k] = v
+		}
 	}
-	return msg.Metadata.GetReadOnlyValues()
+	data := msg.GetData()
+	if data == "" {
+		if len(out) == 0 {
+			return nil
+		}
+		return out
+	}
+	out["msg"] = data
+	trim := strings.TrimSpace(data)
+	var obj map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(trim), &obj); err != nil || len(obj) == 0 {
+		if len(out) == 0 {
+			return nil
+		}
+		return out
+	}
+	for k, raw := range obj {
+		key := "msg." + k
+		var str string
+		if err := json.Unmarshal(raw, &str); err == nil {
+			out[key] = str
+		} else {
+			out[key] = strings.TrimSpace(string(raw))
+		}
+	}
+	return out
 }
 
 // maskAPIKey 脱敏 API Key 用于日志：前 6 位 + *** + 后 4 位，便于排查配置错误又避免泄露。

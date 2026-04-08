@@ -3,6 +3,7 @@ package llm
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"strings"
 
@@ -18,6 +19,45 @@ func truncateForLog(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
+}
+
+// maxLLMRequestTextLog 单条 TextContent 写入请求日志时的最大字符数（避免日志过大）。
+const maxLLMRequestTextLog = 8000
+
+// logLLMRequestMessages 打印即将发往模型的消息内容（按条、按 part，正文截断）。
+// round 为负数时表示非 tool 循环的单次请求。
+func logLLMRequestMessages(tag string, round int, messages []llms.MessageContent) {
+	if round >= 0 {
+		log.Printf("%s request round=%d messages=%d", tag, round+1, len(messages))
+	} else {
+		log.Printf("%s request messages=%d", tag, len(messages))
+	}
+	for i, mc := range messages {
+		if len(mc.Parts) == 0 {
+			log.Printf("%s msg[%d] role=%s parts=0", tag, i, mc.Role)
+			continue
+		}
+		for pi, part := range mc.Parts {
+			switch p := part.(type) {
+			case llms.TextContent:
+				log.Printf("%s msg[%d].parts[%d] role=%s text_len=%d text=%s",
+					tag, i, pi, mc.Role, len(p.Text), truncateForLog(p.Text, maxLLMRequestTextLog))
+			case llms.ToolCall:
+				name, args := "", ""
+				if p.FunctionCall != nil {
+					name = p.FunctionCall.Name
+					args = p.FunctionCall.Arguments
+				}
+				log.Printf("%s msg[%d].parts[%d] role=%s tool_call id=%q name=%q args_len=%d args=%s",
+					tag, i, pi, mc.Role, p.ID, name, len(args), truncateForLog(args, 2000))
+			case llms.ToolCallResponse:
+				log.Printf("%s msg[%d].parts[%d] role=%s tool_result id=%q name=%q content_len=%d content=%s",
+					tag, i, pi, mc.Role, p.ToolCallID, p.Name, len(p.Content), truncateForLog(p.Content, maxLLMRequestTextLog))
+			default:
+				log.Printf("%s msg[%d].parts[%d] role=%s part_type=%T", tag, i, pi, mc.Role, part)
+			}
+		}
+	}
 }
 
 // Client 基于 langchaingo 的自定义 LLM 客户端，支持 baseUrl/apiKey/model、Skill 与 MCP 配置。
@@ -165,6 +205,7 @@ func (c *Client) generateSingleRoundWithFailover(ctx context.Context, messages [
 	chainLen := len(c.modelChain)
 	for mi, mName := range c.modelChain {
 		callOpts := c.callOptionsForModel(mName, extra)
+		logLLMRequestMessages(fmt.Sprintf("[llm] model=%q", mName), -1, messages)
 		resp, err := c.model.GenerateContent(ctx, messages, callOpts...)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
@@ -202,6 +243,7 @@ func (c *Client) generateSingleRoundWithFailover(ctx context.Context, messages [
 
 func (c *Client) generateWithToolLoopOneModel(ctx context.Context, messages []llms.MessageContent, callOpts []llms.CallOption, executor ToolExecutor, maxRounds int) (string, error) {
 	for round := 0; round < maxRounds; round++ {
+		logLLMRequestMessages("[llm] tool_loop", round, messages)
 		resp, err := c.model.GenerateContent(ctx, messages, callOpts...)
 		if err != nil {
 			return "", err

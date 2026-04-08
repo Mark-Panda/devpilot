@@ -268,6 +268,69 @@ await window.go.rulego.Service.ExecuteRule("a1b2c3d4-e5f6-7890-abcd-ef1234567890
 
 ---
 
+## 示例 4b：包容分支（inclusive）
+
+**场景**：温湿度告警——温度区间与湿度阈值**可同时成立**，需并行进入不同处理链；与 `switch` 只选一路不同，`inclusive` 会对**每个**成立的 `case` 各转发一次消息。
+
+```json
+{
+  "ruleChain": {
+    "id": "a1b2c3d4-e5f6-4789-a012-3456789abcde",
+    "name": "温湿度并行告警链",
+    "root": true,
+    "disabled": false
+  },
+  "metadata": {
+    "firstNodeIndex": 0,
+    "nodes": [
+      { "id": "s1", "type": "startTrigger", "name": "开始", "debugMode": false, "configuration": {} },
+      {
+        "id": "s2",
+        "type": "inclusive",
+        "name": "包容分支",
+        "debugMode": false,
+        "configuration": {
+          "cases": [
+            { "case": "msg.temperature >= 20 && msg.temperature <= 50", "then": "Case1" },
+            { "case": "msg.humidity >= 80", "then": "Case2" }
+          ]
+        }
+      },
+      {
+        "id": "s3",
+        "type": "jsTransform",
+        "name": "温度正常区间",
+        "debugMode": false,
+        "configuration": { "jsScript": "msg.flags = (msg.flags||[]).concat(['temp_ok']);\nreturn {msg,metadata,msgType};" }
+      },
+      {
+        "id": "s4",
+        "type": "jsTransform",
+        "name": "湿度过高",
+        "debugMode": false,
+        "configuration": { "jsScript": "msg.flags = (msg.flags||[]).concat(['humid_high']);\nreturn {msg,metadata,msgType};" }
+      },
+      {
+        "id": "s5",
+        "type": "jsTransform",
+        "name": "无匹配",
+        "debugMode": false,
+        "configuration": { "jsScript": "msg.flags = (msg.flags||[]).concat(['default']);\nreturn {msg,metadata,msgType};" }
+      }
+    ],
+    "connections": [
+      { "fromId": "s1", "toId": "s2", "type": "Success" },
+      { "fromId": "s2", "toId": "s3", "type": "Case1" },
+      { "fromId": "s2", "toId": "s4", "type": "Case2" },
+      { "fromId": "s2", "toId": "s5", "type": "Default" }
+    ],
+    "ruleChainConnections": []
+  }
+}
+```
+
+---
+
 ## 示例 5：循环处理链（for）
 
 **场景**：批量处理数组中的每个元素

@@ -4349,6 +4349,94 @@ body {
   font-size: 14px;
 }
 
+/* 执行日志明细：横向节点链路（DSL 结构 + 实际路径） */
+.rulego-log-detail-chain-block {
+  margin-bottom: 22px;
+}
+
+.rulego-log-detail-chain-block:last-of-type {
+  margin-bottom: 12px;
+}
+
+.rulego-log-detail-chain-hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+}
+
+.rulego-log-detail-chain-subhint {
+  margin: 0 0 10px;
+  font-size: 12px;
+}
+
+.rulego-log-chain-scroll--horizontal {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 10px 4px 14px;
+  margin: 0;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+}
+
+.rulego-log-chain-node--horizontal {
+  display: flex;
+  flex-direction: row;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 0;
+}
+
+.rulego-log-chain-scroll--horizontal .rulego-exec-chain-card {
+  min-width: 132px;
+  max-width: 200px;
+}
+
+.rulego-log-chain-connector-h {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 2px;
+  margin: 0 2px;
+  background: linear-gradient(90deg, #cbd5e1, #94a3b8);
+  border-radius: 1px;
+  align-self: center;
+}
+
+.rulego-log-path-relation {
+  font-size: 10px;
+  font-weight: 600;
+  color: #9d174d;
+  background: rgba(var(--studio-hot-rgb), 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rulego-log-detail-node-panel {
+  margin-top: 8px;
+}
+
+.rulego-log-detail-node-panel-relation {
+  font-weight: 500;
+  color: #64748b;
+}
+
+.rulego-log-detail-node-panel-meta {
+  margin: 0 0 12px;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.rulego-log-detail-select-hint {
+  margin: 12px 0 0;
+}
+
 .rulego-log-nodes-list {
   display: flex;
   flex-direction: column;

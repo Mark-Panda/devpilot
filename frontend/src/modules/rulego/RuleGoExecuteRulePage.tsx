@@ -26,6 +26,7 @@ import { useRuleGoRules } from "./useRuleGoRules";
 import { CursorACPExecutionDetailSection } from "./CursorACPExecutionDetailSection";
 import { LogTextPreview } from "./LogTextPreview";
 import { NodePayloadPreview } from "./NodePayloadPreview";
+import { exportExecutionLogToFile } from "./rulegoExecutionLogExport";
 
 type ChainVisual = "idle" | "waiting" | "running" | "done" | "error";
 
@@ -447,6 +448,27 @@ export default function RuleGoExecuteRulePage() {
                   <span className="rulego-exec-exec-id" title="执行记录 ID">
                     ID <code>{execId}</code>
                   </span>
+                  <button
+                    type="button"
+                    className="text-button"
+                    disabled={!pollLog && pollNodes.length === 0}
+                    title={
+                      !pollLog && pollNodes.length === 0
+                        ? "等待首次日志拉取完成后再导出"
+                        : "另存为 JSON（桌面端）或浏览器下载当前执行摘要与节点步骤"
+                    }
+                    onClick={() => {
+                      if (!execId) return;
+                      void (async () => {
+                        const res = await exportExecutionLogToFile(execId, pollLog, pollNodes);
+                        if (res.status === "error") {
+                          window.alert(res.message);
+                        }
+                      })();
+                    }}
+                  >
+                    导出日志
+                  </button>
                 </div>
                 {running ? (
                   <p className="rulego-exec-live-hint">

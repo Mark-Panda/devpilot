@@ -109,8 +109,12 @@ const def: BlockTypeDef = {
     return type === "Failure" ? "branch_failure" : undefined;
   },
   getWalkInputs(block) {
-    const inputNames = (block.inputList ?? []).map((inp: { name: string }) => inp.name);
-    return inputNames.filter((name: string) => name.startsWith("branch_"));
+    const slotCount = Math.max(1, Math.min(MAX_GROUP_SLOTS, (block as Block & { groupCount_?: number }).groupCount_ ?? 1));
+    const inputs: string[] = [];
+    for (let i = 0; i < slotCount; i++) inputs.push(`branch_${i}`);
+    // 与 switch 等一致：显式走主链 next，避免仅靠 fork 分支上的「链头+getNext」遍历时漏掉 groupAction 之后的块
+    inputs.push("__next__", "branch_failure");
+    return inputs;
   },
 };
 

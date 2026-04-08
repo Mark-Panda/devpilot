@@ -39,15 +39,18 @@ func (a *App) OpenSkillZipDialog() (string, error) {
 	})
 }
 
-// SaveExportedTextFileDialog 弹出系统「另存为」对话框，将 content 以 UTF-8 写入所选路径。
-// 用户取消时返回 ("", nil)；失败返回错误。
-func (a *App) SaveExportedTextFileDialog(defaultFilename string, content string) (string, error) {
+// saveExportedTextWithDialog 弹出系统「另存为」，将 content 以 UTF-8 写入所选路径。取消返回 ("", nil)。
+func (a *App) saveExportedTextWithDialog(dialogTitle, defaultFilename, content string) (string, error) {
 	name := strings.TrimSpace(defaultFilename)
 	if name == "" {
 		name = "export.json"
 	}
+	title := strings.TrimSpace(dialogTitle)
+	if title == "" {
+		title = "导出文件"
+	}
 	path, err := runtime.SaveFileDialog(a.ctx, runtime.SaveDialogOptions{
-		Title:           "导出规则链 DSL",
+		Title:           title,
 		DefaultFilename: name,
 		Filters: []runtime.FileFilter{
 			{DisplayName: "JSON 文件", Pattern: "*.json"},
@@ -65,6 +68,17 @@ func (a *App) SaveExportedTextFileDialog(defaultFilename string, content string)
 		return "", err
 	}
 	return path, nil
+}
+
+// SaveExportedTextFileDialog 弹出系统「另存为」对话框，将 content 以 UTF-8 写入所选路径。
+// 用户取消时返回 ("", nil)；失败返回错误。
+func (a *App) SaveExportedTextFileDialog(defaultFilename string, content string) (string, error) {
+	return a.saveExportedTextWithDialog("导出规则链 DSL", defaultFilename, content)
+}
+
+// SaveExecutionLogExportDialog 导出规则链执行日志 JSON（与 SaveExportedTextFileDialog 行为相同，对话框标题不同）。
+func (a *App) SaveExecutionLogExportDialog(defaultFilename string, content string) (string, error) {
+	return a.saveExportedTextWithDialog("导出执行日志", defaultFilename, content)
 }
 
 // OpenAgentWorkspaceDialog 选择 Agent 工作区目录（内置读/写文件工具相对此根路径）。

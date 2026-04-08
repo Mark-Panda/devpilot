@@ -22,6 +22,7 @@ import "./blocks/llm";
 import "./blocks/delay";
 import "./blocks/execCommand";
 import "./blocks/switch";
+import "./blocks/inclusive";
 import "./blocks/startTrigger";
 import "./blocks/endpointTriggers";
 import "./blocks/dbClient";
@@ -90,6 +91,7 @@ export const toolbox = {
       categorystyle: "rulego_condition",
       contents: [
         { kind: "block" as const, type: "rulego_switch" },
+        { kind: "block" as const, type: "rulego_inclusive" },
         { kind: "block" as const, type: "rulego_jsSwitch" },
       ],
     },

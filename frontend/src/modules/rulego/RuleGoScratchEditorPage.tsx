@@ -197,6 +197,39 @@ function llmChainWithNewPrimary(siteOrder: string[], chain: string[], newPrimary
   return [p, ...ordered.filter((x) => x !== p)];
 }
 
+type LlmConfigMessage = { role?: string; content?: string };
+
+function parseLlmMessagesJsonArray(raw: string): LlmConfigMessage[] {
+  const s = String(raw ?? "").trim() || "[]";
+  try {
+    const p = JSON.parse(s) as unknown;
+    if (!Array.isArray(p)) return [];
+    return p.map((x) =>
+      x != null && typeof x === "object"
+        ? {
+            role: String((x as LlmConfigMessage).role ?? ""),
+            content: String((x as LlmConfigMessage).content ?? ""),
+          }
+        : { role: "", content: "" }
+    );
+  } catch {
+    return [];
+  }
+}
+
+/** 可仅用「单条用户上下文」文本框表示：空数组或仅一条 role 为空/user 的消息 */
+function isSimpleSingleUserLlmMessages(arr: LlmConfigMessage[]): boolean {
+  if (arr.length === 0) return true;
+  if (arr.length !== 1) return false;
+  const r = String(arr[0].role ?? "").trim().toLowerCase();
+  return r === "" || r === "user";
+}
+
+function simpleUserContentFromLlmMessages(arr: LlmConfigMessage[]): string {
+  if (arr.length === 0) return "";
+  return String(arr[0].content ?? "");
+}
+
 function parseOpenSearchBodyConfig(rawBody: string): {
   size: string;
   sortOrder: string;
@@ -473,6 +506,9 @@ function BlockConfigModal({
   const [llmParamsExpanded, setLlmParamsExpanded] = useState(false);
   const [systemPromptModalOpen, setSystemPromptModalOpen] = useState(false);
   const [systemPromptDraft, setSystemPromptDraft] = useState("");
+  /** LLM：false=单条用户上下文纯文本；true=完整 messages JSON（多轮/assistant） */
+  const [llmMessagesAdvanced, setLlmMessagesAdvanced] = useState(false);
+  const initialLlmMessagesAdvancedRef = useRef(false);
   /** dbClient：参数列表（类型 + 值），长度与 SQL 中 ? 数量一致 */
   const [dbClientParams, setDbClientParams] = useState<Array<{ type: "string" | "number"; value: string }>>([]);
   /** 汇聚：额外汇聚的节点 ID 列表（除上方已接线外的分支） */
@@ -771,7 +807,18 @@ function BlockConfigModal({
       next.LLM_MODELS_JSON = JSON.stringify(chain);
       if (chain.length > 0) next.LLM_MODEL = chain[0];
       next.LLM_SYSTEM_PROMPT = get("LLM_SYSTEM_PROMPT");
-      next.LLM_MESSAGES_JSON = get("LLM_MESSAGES_JSON") || "[]";
+      const messagesJsonRaw = get("LLM_MESSAGES_JSON") || "[]";
+      next.LLM_MESSAGES_JSON = messagesJsonRaw;
+      const parsedMsgs = parseLlmMessagesJsonArray(messagesJsonRaw);
+      if (isSimpleSingleUserLlmMessages(parsedMsgs)) {
+        next.LLM_CONTEXT_USER_TEXT = simpleUserContentFromLlmMessages(parsedMsgs);
+        initialLlmMessagesAdvancedRef.current = false;
+        setLlmMessagesAdvanced(false);
+      } else {
+        next.LLM_CONTEXT_USER_TEXT = "";
+        initialLlmMessagesAdvancedRef.current = true;
+        setLlmMessagesAdvanced(true);
+      }
       const paramsJson = get("LLM_PARAMS_JSON") || "{}";
       next.LLM_PARAMS_JSON = paramsJson;
       next.LLM_ENABLED_SKILLS_JSON = get("LLM_ENABLED_SKILLS_JSON") || "[]";
@@ -958,7 +1005,7 @@ function BlockConfigModal({
       setJoinExtraIncomings([]);
       initialJoinExtraRef.current = [];
     }
-    if (block.type === "rulego_switch") {
+    if (block.type === "rulego_switch" || block.type === "rulego_inclusive") {
       try {
         const raw = get("CASES_JSON") || (block as Block & { casesJson_?: string }).casesJson_ || "";
         const arr = raw ? JSON.parse(raw) : [];
@@ -1038,8 +1085,9 @@ function BlockConfigModal({
     })) return true;
     if (joinExtraIncomings.length !== initialJoinExtraRef.current.length) return true;
     if (joinExtraIncomings.some((id, i) => id !== initialJoinExtraRef.current[i])) return true;
+    if (llmMessagesAdvanced !== initialLlmMessagesAdvancedRef.current) return true;
     return false;
-  }, [form, switchCases, dbClientParams, joinExtraIncomings]);
+  }, [form, switchCases, dbClientParams, joinExtraIncomings, llmMessagesAdvanced]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -1052,6 +1100,7 @@ function BlockConfigModal({
     }
 
     try {
+    let llmResolvedMessagesJson: string | undefined;
     const set = (name: string, value: string | boolean) => {
       if (typeof value === "boolean") {
         block.setFieldValue(value ? "TRUE" : "FALSE", name);
@@ -1083,6 +1132,8 @@ function BlockConfigModal({
         key === "FORK_BRANCH_COUNT" ||
         key === "NODE_ID" ||
         key === "DEBUG" ||
+        key === "LLM_CONTEXT_USER_TEXT" ||
+        (key === "LLM_MESSAGES_JSON" && block.type === "rulego_llm") ||
         llmParamKeys.has(key) ||
         volcTlsUiOnlyKeys.has(key) ||
         openSearchUiOnlyKeys.has(key)
@@ -1099,6 +1150,14 @@ function BlockConfigModal({
       responseFormat: "text",
     };
     if (block.type === "rulego_llm") {
+      const rawCtx = String(form.LLM_CONTEXT_USER_TEXT ?? "");
+      const messagesJson = !llmMessagesAdvanced
+        ? rawCtx.trim() === ""
+          ? "[]"
+          : JSON.stringify([{ role: "user", content: rawCtx }])
+        : String(form.LLM_MESSAGES_JSON ?? "[]");
+      llmResolvedMessagesJson = messagesJson;
+      block.setFieldValue(messagesJson, "LLM_MESSAGES_JSON");
       const stopStr = String(form.LLM_STOP ?? "").trim();
       const stopArr = stopStr ? stopStr.split(",").map((s) => s.trim()).filter(Boolean) : [];
       const paramsJson = JSON.stringify({
@@ -1115,7 +1174,7 @@ function BlockConfigModal({
       block.setFieldValue(JSON.stringify(mChain.length > 0 ? mChain : []), "LLM_MODELS_JSON");
       if (mChain.length > 0) block.setFieldValue(mChain[0], "LLM_MODEL");
     }
-    if (block.type === "rulego_switch") {
+    if (block.type === "rulego_switch" || block.type === "rulego_inclusive") {
       const casesJson = JSON.stringify(switchCases, null, 2);
       (block as Block & { casesJson_?: string }).casesJson_ = casesJson;
       block.setFieldValue(casesJson, "CASES_JSON");
@@ -1123,6 +1182,9 @@ function BlockConfigModal({
       if (typeof b.domToMutation === "function") {
         const xml = document.createElement("mutation");
         xml.setAttribute("casecount", String(Math.max(1, Math.min(6, switchCases.length))));
+        const casesEl = document.createElement("cases");
+        casesEl.textContent = casesJson;
+        xml.appendChild(casesEl);
         b.domToMutation(xml);
       }
     }
@@ -1202,7 +1264,13 @@ function BlockConfigModal({
       block.setFieldValue(form.ACP_VERBOSE_LOG ? "TRUE" : "FALSE", "ACP_VERBOSE_LOG");
     }
       onSaved?.();
-      initialFormRef.current = { ...form };
+      let formSnapshot: Record<string, string | boolean> = { ...form };
+      if (llmResolvedMessagesJson !== undefined) {
+        formSnapshot = { ...formSnapshot, LLM_MESSAGES_JSON: llmResolvedMessagesJson };
+        setForm((f) => ({ ...f, LLM_MESSAGES_JSON: llmResolvedMessagesJson! }));
+      }
+      initialFormRef.current = formSnapshot;
+      initialLlmMessagesAdvancedRef.current = llmMessagesAdvanced;
       initialSwitchCasesRef.current = switchCases.map((c) => ({ ...c }));
       initialDbClientParamsRef.current = dbClientParams.map((p) => ({ ...p }));
       if (block.type === "rulego_join") {
@@ -1254,9 +1322,11 @@ function BlockConfigModal({
           autoComplete="off"
         />
       </label>
-      {block.type === "rulego_switch" && (
+      {(block.type === "rulego_switch" || block.type === "rulego_inclusive") && (
         <div className="form-field" style={{ gridColumn: "1 / -1" }}>
-          <span className="form-label">条件分支 (cases)</span>
+          <span className="form-label">
+            {block.type === "rulego_inclusive" ? "包容分支 (cases)" : "条件分支 (cases)"}
+          </span>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {switchCases.map((item, index) => (
               <div
@@ -1328,9 +1398,21 @@ function BlockConfigModal({
             </button>
           </div>
           <small className="form-hint">
-            画布上会同步显示对应数量的 Case 槽位；Default / {UI_RELATION_FAILURE} 为固定槽位。最多 6 个 case。参考{" "}
-            <a href="https://rulego.cc/pages/switch/#%E9%85%8D%E7%BD%AE%E7%A4%BA%E4%BE%8B" target="_blank" rel="noopener noreferrer">
-              条件分支
+            {block.type === "rulego_inclusive"
+              ? "命中多个 case 时会同时路由到对应分支；全部未命中走 Default；表达式错误走 "
+              : "按顺序命中首个 case 后停止；全部未命中走 Default；表达式错误走 "}
+            {UI_RELATION_FAILURE}
+            。画布槽位与 then 名称一致；下方为 Default / {UI_RELATION_FAILURE}。最多 6 个 case。参考{" "}
+            <a
+              href={
+                block.type === "rulego_inclusive"
+                  ? "https://rulego.cc/pages/inclusive/"
+                  : "https://rulego.cc/pages/switch/#%E9%85%8D%E7%BD%AE%E7%A4%BA%E4%BE%8B"
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {block.type === "rulego_inclusive" ? "包容分支" : "条件分支"}
             </a>
           </small>
         </div>
@@ -4380,7 +4462,7 @@ function BlockConfigModal({
               <textarea
                 value={String(form.LLM_SYSTEM_PROMPT ?? "")}
                 onChange={(e) => setForm((f) => ({ ...f, LLM_SYSTEM_PROMPT: e.target.value }))}
-                placeholder="可选，支持 ${} 占位符"
+                placeholder="可选；支持 ${键}、${vars.键}（metadata），以及 ${msg}、${msg.字段名}（整条 msg.Data；若为 JSON 对象可写 ${msg.contentArray} 等）"
                 rows={4}
                 style={{ width: "100%", resize: "vertical", padding: 8, borderRadius: 6, border: "1px solid #e2e8f0" }}
               />
@@ -4413,7 +4495,7 @@ function BlockConfigModal({
                       className="system-prompt-editor-textarea"
                       value={systemPromptDraft}
                       onChange={(e) => setSystemPromptDraft(e.target.value)}
-                      placeholder="可选，支持 ${} 占位符"
+                      placeholder="可选；${键}/${vars.键}（metadata）、${msg}/${msg.字段}（见主界面说明）"
                       spellCheck={false}
                     />
                   </div>
@@ -4435,19 +4517,77 @@ function BlockConfigModal({
                 </div>
               </div>
             )}
-            <label className="form-field">
-              <span>上下文消息 (messages) — JSON 数组</span>
-              <JsonEditor
-                value={String(form.LLM_MESSAGES_JSON ?? "[]")}
-                onChange={(v) => setForm((f) => ({ ...f, LLM_MESSAGES_JSON: v }))}
-                height={100}
-                minHeight={80}
-                showFormatButton
-                showExpandButton
-                expandTitle="上下文消息 messages (JSON)"
-              />
-              <small className="form-hint">每项: {`{ "role": "user" | "assistant", "content": "..." }`}，留空 [] 则使用 msg.Data 作为单条用户消息</small>
-            </label>
+            <div className="form-field">
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, flexWrap: "wrap", marginBottom: 8 }}>
+                <span>上下文用户消息 (messages)</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  {!llmMessagesAdvanced ? (
+                    <button
+                      type="button"
+                      className="text-button"
+                      style={{ fontSize: 12, padding: "4px 10px" }}
+                      onClick={() => {
+                        const raw = String(form.LLM_CONTEXT_USER_TEXT ?? "");
+                        const json =
+                          raw.trim() === ""
+                            ? "[]"
+                            : JSON.stringify([{ role: "user", content: raw }], null, 2);
+                        setForm((f) => ({ ...f, LLM_MESSAGES_JSON: json }));
+                        setLlmMessagesAdvanced(true);
+                      }}
+                    >
+                      高级：编辑完整 JSON
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      className="text-button"
+                      style={{ fontSize: 12, padding: "4px 10px" }}
+                      onClick={() => {
+                        const arr = parseLlmMessagesJsonArray(String(form.LLM_MESSAGES_JSON ?? "[]"));
+                        if (!isSimpleSingleUserLlmMessages(arr)) {
+                          window.alert(
+                            "当前 messages 含多条消息或非 user 角色，请先在 JSON 中删成单条 user，或保留在高级模式编辑。"
+                          );
+                          return;
+                        }
+                        setForm((f) => ({
+                          ...f,
+                          LLM_CONTEXT_USER_TEXT: simpleUserContentFromLlmMessages(arr),
+                        }));
+                        setLlmMessagesAdvanced(false);
+                      }}
+                    >
+                      使用简单上下文
+                    </button>
+                  )}
+                </div>
+              </div>
+              {!llmMessagesAdvanced ? (
+                <textarea
+                  value={String(form.LLM_CONTEXT_USER_TEXT ?? "")}
+                  onChange={(e) => setForm((f) => ({ ...f, LLM_CONTEXT_USER_TEXT: e.target.value }))}
+                  placeholder='纯文本即可，保存时自动变为 [{"role":"user","content":"…"}]；支持 metadata 的 ${键}/${vars.键}，以及 ${msg}、${msg.contentArray} 等；留空则 []，将整条 msg.Data 作为用户消息'
+                  rows={6}
+                  spellCheck={false}
+                  style={{ width: "100%", resize: "vertical", padding: 8, borderRadius: 6, border: "1px solid #e2e8f0" }}
+                />
+              ) : (
+                <JsonEditor
+                  value={String(form.LLM_MESSAGES_JSON ?? "[]")}
+                  onChange={(v) => setForm((f) => ({ ...f, LLM_MESSAGES_JSON: v }))}
+                  height={100}
+                  minHeight={80}
+                  showFormatButton
+                  showExpandButton
+                  expandTitle="上下文消息 messages (JSON)"
+                />
+              )}
+              <small className="form-hint">
+                简单模式：仅一条用户消息。高级模式：多轮或 assistant 消息时用 JSON 数组，每项{" "}
+                {`{ "role": "user" | "assistant", "content": "..." }`}。messages 为 [] 时由上游 msg.Data 作为用户输入。
+              </small>
+            </div>
           </div>
           <div className="block-config-llm-section">
             <div className="block-config-llm-section-title">启用技能（~/.devpilot/skills/）</div>
@@ -5903,11 +6043,10 @@ export default function RuleGoScratchEditorPage() {
               if (nextBlock) walkChain(nextBlock);
               return;
             }
-            let branchBlock = cur.getInputTargetBlock(inputName);
-            while (branchBlock) {
-              walkChain(branchBlock);
-              branchBlock = branchBlock.getNextBlock();
-            }
+            const branchHead = cur.getInputTargetBlock(inputName);
+            // 只从链头 walk：子块若已在 getWalkInputs 里含 __next__，会递归走完整条 next 链；
+            // 若再对 getNextBlock 逐个 walkChain，会把同一条子链重复遍历并产生重复 connections。
+            if (branchHead) walkChain(branchHead);
           });
           current = null;
         } else {
@@ -5927,11 +6066,8 @@ export default function RuleGoScratchEditorPage() {
       if (walkInputs) {
         walkInputs.forEach((inputName: string) => {
           if (inputName === "__next__") return;
-          let b = block.getInputTargetBlock(inputName);
-          while (b) {
-            collectBlocks(b, set);
-            b = b.getNextBlock();
-          }
+          const head = block.getInputTargetBlock(inputName);
+          if (head) collectBlocks(head, set);
         });
       }
     };

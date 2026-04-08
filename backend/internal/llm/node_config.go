@@ -53,10 +53,7 @@ func BuildSystemUserMessages(systemPrompt, userMessage string) []llms.MessageCon
 // substitute 用于替换 content 中的 ${key} 占位符，可为 nil。
 func BuildMessageContentFromNodeConfig(nc *NodeConfig, substitute map[string]string) []llms.MessageContent {
 	var out []llms.MessageContent
-	systemPrompt := nc.SystemPrompt
-	if len(substitute) > 0 {
-		systemPrompt = ReplacePlaceholders(systemPrompt, substitute)
-	}
+	systemPrompt := ReplacePlaceholders(nc.SystemPrompt, substitute)
 	if systemPrompt != "" {
 		out = append(out, llms.MessageContent{
 			Role:  llms.ChatMessageTypeSystem,
@@ -64,10 +61,7 @@ func BuildMessageContentFromNodeConfig(nc *NodeConfig, substitute map[string]str
 		})
 	}
 	for _, m := range nc.Messages {
-		content := m.Content
-		if len(substitute) > 0 {
-			content = ReplacePlaceholders(content, substitute)
-		}
+		content := ReplacePlaceholders(m.Content, substitute)
 		role := llms.ChatMessageTypeHuman
 		if strings.ToLower(strings.TrimSpace(m.Role)) == "assistant" {
 			role = llms.ChatMessageTypeAI
@@ -81,6 +75,7 @@ func BuildMessageContentFromNodeConfig(nc *NodeConfig, substitute map[string]str
 }
 
 // ReplacePlaceholders 将 s 中的 ${key} 与 ${vars.key} 用 m 替换，供节点配置与消息模板复用。
+// key 可含点号（如 ai/llm 的 ${msg.xxx}）。
 func ReplacePlaceholders(s string, m map[string]string) string {
 	for k, v := range m {
 		s = strings.ReplaceAll(s, "${"+k+"}", v)

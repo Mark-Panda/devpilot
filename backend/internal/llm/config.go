@@ -40,7 +40,7 @@ type Config struct {
 // ChatMessage 与 RuleGo 官方 LLM 节点一致的消息结构，见 https://rulego.cc/pages/llm/
 type ChatMessage struct {
 	Role    string `json:"role"`    // user 或 assistant
-	Content string `json:"content"` // 消息内容，可使用 ${} 占位符
+	Content string `json:"content"` // 消息内容，可使用 ${}：metadata 键、${msg}（全文 msg.Data）、${msg.xxx}（Data 为 JSON 对象时的顶层字段）
 }
 
 // Params 大模型参数，仅保留与 langchaingo 已适配的字段。

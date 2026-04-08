@@ -213,6 +213,23 @@
 - `then`：分支名，需与 connections 中的 `type` 一致
 - 连接：`Case1`~`Case6`（分支）/ `Default`（无匹配时）/ `Failure`
 
+### `inclusive` — 包容分支（表达式规则，多路可同时命中）
+```json
+{
+  "type": "inclusive",
+  "configuration": {
+    "cases": [
+      { "case": "msg.temperature >= 20 && msg.temperature <= 50", "then": "Case1" },
+      { "case": "msg.humidity >= 80", "then": "Case2" }
+    ]
+  }
+}
+```
+- `cases`：**会评估全部** `case` 表达式，**每个成立的分支都会收到一份相同消息的转发**（与 `switch` 只走第一个命中不同）
+- `then`：分支名，需与 connections 中的 `type` 一致
+- 连接：`Case1`~`Case6`（分支）/ `Default`（**所有** case 均未匹配时）/ `Failure`（某条表达式执行出错时）
+- DevPilot 可视化块：`rulego_inclusive`（积木库「包容分支」）；官方说明：<https://rulego.cc/pages/inclusive/>
+
 ### `jsSwitch` — JS 路由（脚本决定分支）
 ```json
 {

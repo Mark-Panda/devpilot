@@ -81,7 +81,7 @@ backend/internal/services/rulego/methods.go
 **节点分类顺序**（保持文件内顺序一致）：
 1. 触发器类（startTrigger）
 2. 动作类（ai/llm、restApiCall、jsTransform、jsFilter、delay、log、dbClient）
-3. 条件判断类（switch、jsSwitch、msgTypeSwitch、exprFilter）
+3. 条件判断类（switch、inclusive、jsSwitch、msgTypeSwitch、exprFilter）
 4. 流程控制类（for、fork、join、groupAction、flow、break、while）
 5. 数据处理类（exprTransform、metadataTransform、text/template、fieldFilter、fetchNodeOutput）
 6. 缓存类（cacheSet、cacheGet、cacheDelete）

@@ -39,7 +39,7 @@ DevPilot 使用 **RuleGo** 规则引擎，规则链是一个有向图：节点�
 { "fromId": "n1", "toId": "n2", "type": "Success" }
 ```
 
-常用连接类型：`Success`、`Failure`、`True`、`False`、`Do`、`Default`、`Case1`~`Case6`
+常用连接类型：`Success`、`Failure`、`True`、`False`、`Do`、`Default`、`Case1`~`Case6`（`switch` / `inclusive` 的 `cases[].then` 与连线 `type` 一致）
 
 ## 构建步骤
 
@@ -117,6 +117,7 @@ startTrigger → ai/llm → [可选回调 restApiCall]
 ```
 startTrigger → jsFilter[True→处理A, False→处理B]
 ```
+- **表达式多分支**：`switch` 按顺序只走**第一个**命中的 `case`；`inclusive`（包容分支）会评估**全部** `case`，**每个命中都会并行转发**同一消息，全未命中走 `Default`，表达式错误走 `Failure`。配置均为 `configuration.cases: [{ case, then }]`，`then` 与 connections 的 `type` 一致。详见 [nodes-reference.md](nodes-reference.md)「`switch` / `inclusive`」与 [dsl-examples.md](dsl-examples.md) 示例 4 / 4b。
 
 ### 循环处理链
 ```

@@ -37,6 +37,7 @@ const BLOCK_LABELS: Record<string, string> = {
   rulego_jsTransform: "脚本转换器",
   rulego_jsFilter: "Filter",
   rulego_switch: "多条件分支",
+  rulego_inclusive: "包容分支",
   rulego_jsSwitch: "脚本路由",
   rulego_for: "循环",
   rulego_join: "汇聚",
