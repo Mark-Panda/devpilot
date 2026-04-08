@@ -139,6 +139,13 @@ function getDesktopNotificationMethod():
   return typeof fn === "function" ? fn : undefined;
 }
 
+function formatWailsCallError(e: unknown): string {
+  if (e instanceof Error && e.message.trim()) return e.message.trim();
+  if (typeof e === "string" && e.trim()) return e.trim();
+  const s = String(e);
+  return s && s !== "[object Object]" ? s : "";
+}
+
 function normalizeAskPayload(d: CursorACPAskQuestionEvent): CursorACPAskQuestionEvent {
   const opts = Array.isArray(d.options) ? d.options : [];
   return {
@@ -396,7 +403,7 @@ export default function CursorACPAfterRoundHost() {
     if (typeof fn !== "function") {
       throw new Error("desktop notification bridge unavailable");
     }
-    await Promise.resolve(fn(title, body));
+    await fn(title, body);
   }, []);
 
   const sendSystemNotification = useCallback(
@@ -685,9 +692,14 @@ export default function CursorACPAfterRoundHost() {
                         await sendDesktopNotification("Cursor ACP", "系统通知已启用，后续新增任务会提醒你。");
                         setNotifyEnabled(true);
                         setNotifyHint("已启用系统通知，并发送测试通知");
-                      } catch {
+                      } catch (e) {
                         setNotifyEnabled(false);
-                        setNotifyHint("系统通知发送失败，请检查 macOS 通知设置");
+                        const detail = formatWailsCallError(e);
+                        setNotifyHint(
+                          detail
+                            ? `系统通知发送失败：${detail}`
+                            : "系统通知发送失败，请检查 macOS 通知设置（可尝试终端执行：tccutil reset UserNotifications com.devpilot.desktop）",
+                        );
                       }
                       return;
                     }
@@ -739,6 +751,12 @@ export default function CursorACPAfterRoundHost() {
               </button>
             </div>
           </div>
+
+          {!notifyEnabled && notificationChannel === "desktop-native" ? (
+            <p className="cursor-acp-muted-only" style={{ margin: "0 0 10px", fontSize: 12, lineHeight: 1.5 }}>
+              macOS 仅在本应用首次请求通知权限后，才会把本应用列入「系统设置 › 通知」左侧的应用列表。请先点下方「启用系统通知」。该页面一般没有搜索，请在列表里按字母顺序向下找「DevPilot」或「DevPilot Desktop」（Bundle ID：<code className="cursor-acp-code-sm">com.devpilot.desktop</code>）。
+            </p>
+          ) : null}
 
           {notifyHint ? <div className="cursor-acp-drawer-hint" role="status">{notifyHint}</div> : null}
 

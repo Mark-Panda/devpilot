@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	stdruntime "runtime"
 	"strings"
 
 	"devpilot/backend"
@@ -124,8 +125,18 @@ func (a *App) ResolveCursorACPAskQuestion(requestID string, optionID string) {
 }
 
 // SendACPSystemNotification 发送 ACP 系统通知；桌面端优先走原生能力，供前端在显式启用或新任务到达时调用。
+// 若 UserNotifications 路径失败（部分系统版本/权限组合），在 macOS 上回退到 osascript 显示通知。
 func (a *App) SendACPSystemNotification(title string, body string) error {
-	return sendACPSystemNotification(title, body)
+	err := sendACPSystemNotification(title, body)
+	if err == nil {
+		return nil
+	}
+	if stdruntime.GOOS == "darwin" {
+		if fb := sendACPNotificationAppleScriptFallback(title, body); fb == nil {
+			return nil
+		}
+	}
+	return err
 }
 
 // ============ Agent Service Methods ============
